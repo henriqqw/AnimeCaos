@@ -70,5 +70,5 @@ Para criar uma versão instalável `Setup_Animecaos.exe` para outros usuários:
 > Este projeto é apenas um agregador de links públicos. O conteúdo reproduzido é de total responsabilidade de seus respectivos proprietários originais e servidores externos.
 
 <div align="center">
-  Feito com ☕ por Henri
+  Feito com ☕ por caosdev
 </div>

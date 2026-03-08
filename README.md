@@ -23,7 +23,6 @@ O **animecaos** é uma plataforma desktop moderna focada em centralizar a experi
 
 ## 🛠 Pré-requisitos
 
-Para rodar o código fonte puro:
 - **Python 3.10+**
 - **Mozilla Firefox** (Necessário para os scrapers Selenium bypassarem Cloudflare)
 - **mpv** e **yt-dlp** instalados globalmente (caso não esteja usando o executável compilado)

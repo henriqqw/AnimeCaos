@@ -1,74 +1,119 @@
 <div align="center">
-  <img src="icon.png" alt="animecaos logo" width="128" />
-  <h1>animecaos</h1>
-  <p><em>Agregador de streaming desktop premium, minimalista e autônomo.</em></p>
+  <img src="icon.png" alt="AnimeCaos Logo" width="128"/>
 
-  [![Version](https://img.shields.io/badge/version-v0.1.0-red.svg)](https://github.com/henriqqw/anicaos/releases)
-  [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-  [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+# animecaos
+
+**Agregador de streaming desktop minimalista, rápido e autônomo para animes.**
+
+Centralize sua experiência de assistir anime em uma única aplicação, sem anúncios intrusivos e com busca inteligente entre múltiplas fontes.
+
+🌐 Website: https://animecaos.vercel.app  
+📦 Repositório: https://github.com/henriqqw/anicaos  
+🚀 Releases: https://github.com/henriqqw/anicaos/releases
+
+![Version](https://img.shields.io/badge/version-v0.1.0-red.svg)
+![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+
 </div>
 
 ---
 
-O **animecaos** é uma plataforma desktop moderna focada em centralizar a experiência de assistir animes no Windows/Linux, removendo anúncios intrusivos e oferecendo uma interface limpa, rápida e imersiva. Construído com **PySide6**, ele integra metadados oficiais e ferramentas de reprodução consagradas (`mpv`) e download (`yt-dlp`).
+# 📺 Sobre o Projeto
 
-## ✨ Funcionalidades Principais
+O **AnimeCaos** é uma aplicação desktop open source criada para **centralizar a experiência de assistir animes**.
 
-*   **🎬 Hub de Streaming Inteligente**: Pesquisa unificada em múltiplas fontes brasileiras simultaneamente.
-*   **🖼️ Integração AniList (GraphQL)**: Busca automática de capas originais e sinopses (com tradução PT-BR interna) de todos os títulos.
-*   **⭐ Favoritos & Histórico**: Painel de Watchlist para salvar seus títulos preferidos e histórico local para continuar de onde parou.
-*   **⏭️ Auto-Play Next**: Detector de fim de vídeo que avança automaticamente para o próximo episódio se o player for encerrado no fim natural.
-*   **⬇️ Download Offline**: Gerenciador de downloads integrado em segundo plano com logs de progresso em tempo real.
-*   **💨 Standalone Build**: Scripts prontos para gerar um executável Windows completo que já embuti todas as dependências binárias necessárias.
+Quem acompanha anime frequentemente precisa:
 
-## 🛠 Pré-requisitos
+- navegar por vários sites diferentes  
+- lidar com anúncios intrusivos  
+- usar players inconsistentes  
+- procurar episódios manualmente  
 
-Para rodar o código fonte puro:
+O AnimeCaos resolve esse problema funcionando como um **agregador inteligente de fontes públicas**, reunindo busca, reprodução e gerenciamento de episódios em uma única interface desktop.
+
+A aplicação foi construída como um **experimento prático de automação web, scraping e agregação de dados**, explorando a integração de diversas bibliotecas Python utilizadas em projetos reais.
+
+---
+
+# ✨ Funcionalidades
+
+### 🎬 Hub de Streaming Inteligente
+Busca unificada em múltiplas fontes brasileiras simultaneamente.
+
+### 🖼 Integração AniList
+Busca automática de:
+
+- capas oficiais
+- sinopses
+- metadados
+
+utilizando a API **GraphQL do AniList**.
+
+### ⭐ Watchlist & Histórico
+Sistema local para:
+
+- salvar animes favoritos
+- acompanhar episódios assistidos
+- continuar de onde parou
+
+### ⏭ Auto-Play Next
+Detecta o fim natural do episódio e avança automaticamente para o próximo.
+
+### ⬇ Download Offline
+Gerenciador de downloads integrado usando **yt-dlp**, com logs de progresso.
+
+### 💨 Executável Standalone
+Scripts de build permitem gerar um executável completo que já inclui dependências necessárias.
+
+---
+
+# 🧠 Tecnologias Utilizadas
+
+O projeto foi desenvolvido em **Python** e integra várias bibliotecas populares do ecossistema.
+
+| Tecnologia | Função |
+|---|---|
+| **PySide6** | Interface gráfica desktop |
+| **Selenium** | Automação de navegação para páginas dinâmicas |
+| **Requests + BeautifulSoup** | Coleta e parsing de HTML |
+| **FuzzyWuzzy + Levenshtein** | Busca aproximada (fuzzy search) |
+| **yt-dlp** | Extração e resolução de streams de vídeo |
+| **mpv** | Player de vídeo externo |
+| **PyInstaller** | Empacotamento do executável |
+
+---
+
+# 🔎 O que o projeto explora
+
+Este projeto também funciona como um **laboratório prático para experimentar**:
+
+- automação de navegação web  
+- scraping de conteúdo dinâmico  
+- agregação de múltiplas fontes  
+- fuzzy matching para busca aproximada  
+- integração entre bibliotecas Python  
+- distribuição de aplicações desktop  
+
+---
+
+# 🛠 Pré-requisitos
+
+Para rodar a partir do código fonte:
+
 - **Python 3.10+**
-- **Mozilla Firefox** (Necessário para os scrapers Selenium bypassarem Cloudflare)
-- **mpv** e **yt-dlp** instalados globalmente (caso não esteja usando o executável compilado)
+- **Mozilla Firefox**
+- **mpv**
+- **yt-dlp**
 
-## 📦 Instalação (Source)
+Firefox é utilizado pelos scrapers Selenium para lidar com páginas protegidas por **Cloudflare**.
+
+---
+
+# 📦 Instalação (Source)
 
 ```bash
 git clone https://github.com/henriqqw/anicaos.git
 cd anicaos
+
 python -m venv venv
-
-# Windows
-.\venv\Scripts\activate
-# Linux/macOS
-source venv/bin/activate
-
-pip install -r requirements.txt
-python main.py
-```
-
-## 🏗 Distribuição (Build Oficial)
-
-Para criar uma versão instalável `Setup_Animecaos.exe` para outros usuários:
-
-1.  Coloque o executável do `mpv.exe` dentro da pasta `bin/`.
-2.  Rode o script de build:
-    ```bash
-    python build_release.py
-    ```
-    *Este script baixará automaticamente o yt-dlp e o geckodriver, e empacotará tudo usando PyInstaller.*
-3.  (Opcional) Compile o instalador profissional usando o arquivo `setup.iss` no **Inno Setup**.
-
-## 📂 Estrutura do Projeto
-
-- `animecaos/core/`: Domínio, carregamento de plugins e resolução de caminhos (`sys._MEIPASS`).
-- `animecaos/services/`: Serviços de API (AniList, Tradução, Watchlist, Histórico).
-- `animecaos/plugins/`: Web Scrapers baseados em Selenium e Requests.
-- `animecaos/ui/gui/`: Interface gráfica rica baseada em PySide6 e Workers assíncronos.
-- `animecaos/player/`: Wrapper de comunicação bidirecional com o `mpv`.
-
----
-
-> [!NOTE]
-> Este projeto é apenas um agregador de links públicos. O conteúdo reproduzido é de total responsabilidade de seus respectivos proprietários originais e servidores externos.
-
-<div align="center">
-  Feito com ☕ por caosdev
-</div>

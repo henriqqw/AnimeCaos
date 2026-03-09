@@ -29,3 +29,8 @@ Thumbs.db
 .vscode/
 *.swp
 *.bak
+
+# Landing Page
+landing/node_modules/
+landing/.next/
+landing/out/

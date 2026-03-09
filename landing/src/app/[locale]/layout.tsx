@@ -39,6 +39,9 @@ export const metadata: Metadata = {
         creator: "@chaosphory",
     },
     robots: { index: true, follow: true },
+    verification: {
+        google: "aKSh1c77D7HrmDemHcz8n7BgG1RSW0yw934WFZDX87w",
+    },
     alternates: {
         canonical: "https://animecaos.vercel.app",
         languages: {

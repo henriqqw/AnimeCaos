@@ -1,0 +1,119 @@
+{
+    "nav": {
+        "home": "Home",
+        "about": "About",
+        "download": "Download",
+        "howToUse": "How to Use",
+        "contact": "Contact"
+    },
+    "hero": {
+        "badge": "Open Source • v0.1.0",
+        "headline1": "Anime.",
+        "headline2": "No ads.",
+        "headline3": "No drama.",
+        "sub": "AnimeCaos searches, extracts, and delivers links straight from the source — all in a clean player with download support.",
+        "cta_download": "Download for Windows",
+        "cta_github": "View on GitHub",
+        "cta_version": "v0.1.0 — Latest release"
+    },
+    "features": {
+        "title": "Everything you need. Nothing you don't.",
+        "sub": "Built for people who actually live the anime life.",
+        "items": [
+            {
+                "title": "Smart Hub",
+                "desc": "Unified search across multiple Brazilian sources in a single query."
+            },
+            {
+                "title": "Clean Player",
+                "desc": "Powered by mpv — lightweight, ad-free, no popups, no slowdowns."
+            },
+            {
+                "title": "Native AniList",
+                "desc": "Original covers and PT-BR synopses fetched automatically via GraphQL."
+            },
+            {
+                "title": "Auto-Play",
+                "desc": "Episode-end detector that auto-advances. Binge without interruption."
+            },
+            {
+                "title": "Offline Download",
+                "desc": "Download any episode in the background with real-time progress via yt-dlp."
+            },
+            {
+                "title": "Standalone",
+                "desc": "A single .exe with everything bundled. Install, open, watch."
+            }
+        ]
+    },
+    "stats": {
+        "sources": "BR Sources",
+        "sources_val": "3+",
+        "zero_ads": "Zero Ads",
+        "zero_ads_val": "0",
+        "size": "Executable",
+        "size_val": "~120MB",
+        "open_source": "Open Source",
+        "open_source_val": "100%"
+    },
+    "download": {
+        "title": "Ready to start?",
+        "sub": "A simple .zip file. No extra dependencies. No installation.",
+        "btn": "Download .ZIP Archive",
+        "version": "Version v0.1.0",
+        "note": "Requires Windows 10/11 • ⚠️ MANDATORY: Mozilla Firefox must be installed on your system.",
+        "source_title": "Install from source",
+        "requirements": "System Requirements",
+        "req_items": [
+            "Windows 10/11 64-bit",
+            "Mozilla Firefox",
+            "Python 3.10+ (source only)"
+        ]
+    },
+    "about": {
+        "title": "Why does AnimeCaos exist?",
+        "p1": "Anyone who watches anime knows the ritual: open four sites, close ten ads, hope the player loads, search for the right episode through poorly organized pages.",
+        "p2": "AnimeCaos fixes that. It does the dirty work behind the scenes — automates navigation, extracts real player links, and delivers everything inside a clean interface. No server. No subscription. Local-first.",
+        "p3": "It's open source, built in Python, and works as a practical lab for web automation, scraping, and fuzzy search. Contributions are welcome.",
+        "tech_title": "Tech Stack",
+        "open_title": "Open Source by Design",
+        "open_desc": "Public repository on GitHub. Anyone can audit, modify, contribute, or fork. The goal isn't to compete with platforms — it's to solve a real problem with real tools."
+    },
+    "howto": {
+        "title": "How to Use",
+        "sub": "Four steps. Five minutes. Anime playing.",
+        "steps": [
+            {
+                "num": "01",
+                "title": "Download AnimeCaos",
+                "desc": "Download the .zip, extract it and run the executable. ⚠️ Firefox must be installed on your PC."
+            },
+            {
+                "num": "02",
+                "title": "Search for an Anime",
+                "desc": "Type the name in the search box. Fuzzy search finds the title even with typos."
+            },
+            {
+                "num": "03",
+                "title": "Select the Episode",
+                "desc": "Choose the source and episode. The side panel shows cover and synopsis via AniList automatically."
+            },
+            {
+                "num": "04",
+                "title": "Watch or Download",
+                "desc": "Click Play to open in mpv, or Download to save in the background to ~/Downloads/Animecaos."
+            }
+        ]
+    },
+    "contact": {
+        "title": "Get in touch",
+        "sub": "Bug? Suggestion? Want to contribute? Come along.",
+        "issue": "Open an Issue on GitHub",
+        "links_title": "Links"
+    },
+    "footer": {
+        "made": "Made with ☕ by",
+        "rights": "Open source project — MIT License",
+        "disclaimer": "This project is only a public link aggregator. Content is the responsibility of its respective original owners."
+    }
+}

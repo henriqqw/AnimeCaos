@@ -1,0 +1,119 @@
+{
+  "nav": {
+    "home": "Home",
+    "about": "Sobre",
+    "download": "Download",
+    "howToUse": "Como Usar",
+    "contact": "Contato"
+  },
+  "hero": {
+    "badge": "Open Source • v0.1.0",
+    "headline1": "Anime.",
+    "headline2": "Sem anúncio.",
+    "headline3": "Sem drama.",
+    "sub": "O AnimeCaos busca, extrai e entrega os links direto da fonte — tudo em um player limpo, rápido e com suporte a download.",
+    "cta_download": "Baixar para Windows",
+    "cta_github": "Ver no GitHub",
+    "cta_version": "v0.1.0 — Última versão"
+  },
+  "features": {
+    "title": "Tudo que você precisa. Nada que você não precisa.",
+    "sub": "Construído para quem realmente vive o anime.",
+    "items": [
+      {
+        "title": "Hub Inteligente",
+        "desc": "Pesquisa unificada em múltiplas fontes brasileiras num comando só."
+      },
+      {
+        "title": "Player Limpo",
+        "desc": "Reprodução via mpv — leve, sem anúncio, sem popup, sem lentidão."
+      },
+      {
+        "title": "AniList Nativo",
+        "desc": "Capas originais e sinopses em PT-BR buscadas automaticamente via GraphQL."
+      },
+      {
+        "title": "Auto-Play",
+        "desc": "Detector de fim de episódio que avança automático. Binge sem parar."
+      },
+      {
+        "title": "Download Offline",
+        "desc": "Baixe qualquer episódio em segundo plano com progresso em tempo real via yt-dlp."
+      },
+      {
+        "title": "Standalone",
+        "desc": "Um .exe que já traz tudo embutido. Instala, abre, assiste."
+      }
+    ]
+  },
+  "stats": {
+    "sources": "Fontes BR",
+    "sources_val": "3+",
+    "zero_ads": "Zero Anúncios",
+    "zero_ads_val": "0",
+    "size": "Executável",
+    "size_val": "~120MB",
+    "open_source": "Open Source",
+    "open_source_val": "100%"
+  },
+  "download": {
+    "title": "Pronto para começar?",
+    "sub": "Um arquivo .zip direto. Sem dependências extras. Sem instalação.",
+    "btn": "Baixar Arquivo .ZIP",
+    "version": "Versão v0.1.0",
+    "note": "Requer Windows 10/11 • ⚠️ OBRIGATÓRIO: Você precisa ter o navegador Mozilla Firefox instalado.",
+    "source_title": "Instalar pelo source",
+    "requirements": "Requisitos do Sistema",
+    "req_items": [
+      "Windows 10/11 64-bit",
+      "Mozilla Firefox",
+      "Python 3.10+ (só para source)"
+    ]
+  },
+  "about": {
+    "title": "Por que o AnimeCaos existe?",
+    "p1": "Quem assiste anime no Brasil conhece o ritual: abrir quatro sites, fechar dez anúncios, torcer para o player carregar, procurar o episódio certo entre páginas mal organizadas.",
+    "p2": "O AnimeCaos resolve isso. Ele faz o trabalho sujo nos bastidores — automatiza a navegação, extrai os links reais dos players, e entrega tudo dentro de uma interface limpa. Sem servidor. Sem assinatura. Local-first.",
+    "p3": "É open source, construído em Python, e funciona como laboratório prático de automação web, scraping e busca aproximada. Contribuições são bem-vindas.",
+    "tech_title": "Stack Técnica",
+    "open_title": "Código Aberto por Design",
+    "open_desc": "Repositório público no GitHub. Qualquer um pode auditar, modificar, contribuir ou fazer fork. A ideia não é competir com plataformas — é resolver um problema real com ferramentas reais."
+  },
+  "howto": {
+    "title": "Como Usar",
+    "sub": "Quatro passos. Cinco minutos. Anime rodando.",
+    "steps": [
+      {
+        "num": "01",
+        "title": "Baixe o AnimeCaos",
+        "desc": "Baixe o .zip, extraia e abra o executável. ⚠️ É obrigatório ter o Firefox instalado no PC."
+      },
+      {
+        "num": "02",
+        "title": "Pesquise um Anime",
+        "desc": "Digite o nome no campo de busca. O fuzzy search encontra o título mesmo com erros de digitação."
+      },
+      {
+        "num": "03",
+        "title": "Selecione o Episódio",
+        "desc": "Escolha a fonte e o episódio. O painel lateral mostra capa e sinopse via AniList automaticamente."
+      },
+      {
+        "num": "04",
+        "title": "Assista ou Baixe",
+        "desc": "Clique em Reproduzir para abrir no mpv, ou em Baixar para salvar em background em ~/Downloads/Animecaos."
+      }
+    ]
+  },
+  "contact": {
+    "title": "Fale com a gente",
+    "sub": "Bug? Sugestão? Quer contribuir? Chega junto.",
+    "issue": "Abrir uma Issue no GitHub",
+    "links_title": "Links"
+  },
+  "footer": {
+    "made": "Feito com ☕ por",
+    "rights": "Projeto open source — MIT License",
+    "disclaimer": "Este projeto é apenas um agregador de links públicos. O conteúdo é de responsabilidade de seus respectivos proprietários."
+  }
+}

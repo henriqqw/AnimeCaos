@@ -1,17 +1,20 @@
 import type { Metadata } from "next";
 import PageWrapper from "@/components/layout/PageWrapper";
 import ContactContent from "@/components/sections/ContactContent";
+import { buildLocalizedMetadata, toAppLocale } from "@/lib/seo";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
-    const { locale } = await params;
+    const locale = toAppLocale((await params).locale);
     const isPt = locale === "pt";
-    return {
-        title: isPt ? "Contato" : "Contact",
+
+    return buildLocalizedMetadata({
+        locale,
+        pathname: "/contact",
+        title: isPt ? "Contato do AnimeCaos" : "Contact AnimeCaos",
         description: isPt
-            ? "Entre em contato com caosdev — criador do AnimeCaos. GitHub, Discord, Twitter, Email."
-            : "Get in touch with caosdev — AnimeCaos creator. GitHub, Discord, Twitter, Email.",
-        alternates: { canonical: `https://animecaos.vercel.app/${locale}/contact` },
-    };
+            ? "Entre em contato com o criador do AnimeCaos por GitHub, Discord, Twitter ou email."
+            : "Get in touch with the AnimeCaos creator via GitHub, Discord, Twitter, or email.",
+    });
 }
 
 export default async function ContactPage({ params }: { params: Promise<{ locale: string }> }) {

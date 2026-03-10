@@ -5,14 +5,19 @@ import Hero from "@/components/sections/Hero";
 import Features from "@/components/sections/Features";
 import Stats from "@/components/sections/Stats";
 import DownloadCTA from "@/components/sections/DownloadCTA";
+import { buildLocalizedMetadata, toAppLocale } from "@/lib/seo";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
-    const { locale } = await params;
-    return {
-        alternates: {
-            canonical: `https://animecaos.vercel.app/${locale}`,
-        },
-    };
+    const locale = toAppLocale((await params).locale);
+    const isPt = locale === "pt";
+
+    return buildLocalizedMetadata({
+        locale,
+        title: isPt ? "Anime sem anuncio. Sem drama." : "Anime with no ads. No drama.",
+        description: isPt
+            ? "Hub desktop open source para assistir anime sem anuncios, com player limpo, download offline e integracao AniList."
+            : "Open source desktop hub to watch anime without ads, with clean playback, offline downloads, and AniList integration.",
+    });
 }
 
 const getSitelinksJsonLd = (locale: string) => {

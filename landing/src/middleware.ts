@@ -1,11 +1,20 @@
-import createMiddleware from "next-intl/middleware";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export default createMiddleware({
-    locales: ["pt", "en"],
-    defaultLocale: "pt",
-    localePrefix: "always",
-});
+export function middleware(request: NextRequest) {
+    const { pathname } = request.nextUrl;
+
+    if (
+        pathname.startsWith("/_next") ||
+        pathname.startsWith("/api") ||
+        pathname.includes(".")
+    ) {
+        return NextResponse.next();
+    }
+
+    return NextResponse.next();
+}
 
 export const config = {
-    matcher: ["/((?!_next|_vercel|.*\\..*).*)"],
+    matcher: ["/((?!_next|api|.*\\..*).*)"],
 };

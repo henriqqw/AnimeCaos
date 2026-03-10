@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
-import { motion } from "framer-motion";
 import PageWrapper from "@/components/layout/PageWrapper";
 import AboutContent from "@/components/sections/AboutContent";
+import { buildLocalizedMetadata, toAppLocale } from "@/lib/seo";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
-    const { locale } = await params;
+    const locale = toAppLocale((await params).locale);
     const t = await getTranslations({ locale, namespace: "about" });
-    return {
-        title: locale === "pt" ? "Sobre" : "About",
+
+    return buildLocalizedMetadata({
+        locale,
+        pathname: "/about",
+        title: locale === "pt" ? "Sobre o AnimeCaos" : "About AnimeCaos",
         description: t("p1"),
-        alternates: {
-            canonical: `https://animecaos.vercel.app/${locale}/about`,
-        },
-    };
+    });
 }
 
 export default async function AboutPage({ params }: { params: Promise<{ locale: string }> }) {

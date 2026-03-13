@@ -16,10 +16,25 @@ from types import ModuleType
 import cloudscraper
 import requests
 
+import os
+
 # ---------------------------------------------------------------------------
-# Scraper global reutilizável
+# Scrapers/Globals
 # ---------------------------------------------------------------------------
+_PROXY = os.getenv("SCRAPER_PROXY")
 _scraper = None
+
+
+def _parse_proxy(proxy_url: str) -> dict:
+    """Extrai host, port, user e pass de uma URL de proxy."""
+    from urllib.parse import urlparse
+    parsed = urlparse(proxy_url)
+    return {
+        "host": parsed.hostname,
+        "port": parsed.port,
+        "user": parsed.username,
+        "pass": parsed.password,
+    }
 
 
 def _get_scraper() -> cloudscraper.CloudScraper:
@@ -30,6 +45,9 @@ def _get_scraper() -> cloudscraper.CloudScraper:
             browser={"browser": "firefox", "platform": "windows", "mobile": False},
             delay=10,
         )
+        if _PROXY:
+            print(f"[cloudscraper] Usando proxy configurado")
+            _scraper.proxies = {"http": _PROXY, "https": _PROXY}
     return _scraper
 
 
@@ -55,6 +73,22 @@ def _get_with_selenium(url: str, headers: dict | None = None) -> requests.Respon
     options.set_preference("useAutomationExtension", False)
     options.set_preference("dom.webnotifications.enabled", False)
     options.set_preference("media.peerconnection.enabled", False)
+    
+    # Configurar Proxy no Selenium se disponível
+    if _PROXY:
+        try:
+            p = _parse_proxy(_PROXY)
+            print(f"[Selenium] Configurando proxy: {p['host']}:{p['port']}")
+            options.set_preference("network.proxy.type", 1)  # Manual
+            options.set_preference("network.proxy.http", p["host"])
+            options.set_preference("network.proxy.http_port", int(p["port"]))
+            options.set_preference("network.proxy.ssl", p["host"])
+            options.set_preference("network.proxy.ssl_port", int(p["port"]))
+            
+            # Nota: Proxies com autenticação no Selenium Firefox são complexos.
+            # Se tiver user/pass, pode falhar sem um helper adicional.
+        except Exception as e:
+            print(f"[Selenium] Erro ao configurar proxy: {e}")
     
     driver = None
     try:

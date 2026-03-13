@@ -41,7 +41,11 @@ def _patched_animesvision_search_anime(query: str) -> None:
             if title and href:
                 rep.add_anime(title, href, AnimesVision.name)
                 found_count += 1
-        print(f"[AnimesVision] Busca: {query} -> {found_count} resultados")
+        
+        if found_count == 0:
+            print(f"[AnimesVision] 0 resultados! Título: '{driver.title}', HTML fragment: {driver.page_source[:500]}...")
+        else:
+            print(f"[AnimesVision] Busca: {query} -> {found_count} resultados")
     except Exception as e:
         print(f"[AnimesVision] search_anime erro: {e}")
     finally:
@@ -119,7 +123,12 @@ def _patched_animefire_search_anime(query: str):
             if not link_tag or not title_tag: continue
             rep.add_anime(title_tag.get_text(strip=True), link_tag["href"], AnimeFire.name)
             found += 1
-        print(f"[AnimeFire] Busca: {query} -> {found} resultados")
+        
+        if found == 0:
+            soup_text = response.text if hasattr(response, "text") else "N/A"
+            print(f"[AnimeFire] 0 resultados! Status: {response.status_code}, HTML fragment: {soup_text[:500]}...")
+        else:
+            print(f"[AnimeFire] Busca: {query} -> {found} resultados")
     except Exception as e:
         print(f"[AnimeFire] search_anime erro: {e}")
 
@@ -163,6 +172,9 @@ def _patched_animesonlinecc_search_anime(query: str):
                     season_count = max(1, future.result())
                     rep.add_anime(title, anime_url, AnimesOnlineCC.name)
             print(f"[AnimesOnlineCC] Busca: {query} -> {len(titles_urls)} resultados")
+        else:
+            soup_text = response.text if hasattr(response, "text") else "N/A"
+            print(f"[AnimesOnlineCC] 0 resultados! Status: {response.status_code}, HTML fragment: {soup_text[:500]}...")
     except Exception as e:
         print(f"[AnimesOnlineCC] search_anime erro: {e}")
 

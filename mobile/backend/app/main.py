@@ -29,9 +29,12 @@ from animecaos.core import loader as anime_loader  # pylint: disable=wrong-impor
 from app.selenium_patch import apply as _apply_selenium_patch  # pylint: disable=wrong-import-position
 _apply_selenium_patch()
 
-# Força plugins desktop a usarem cloudscraper ao invés de requests (bypass Cloudflare).
 from app.cloudscraper_patch import apply as _apply_cloudscraper_patch  # pylint: disable=wrong-import-position
 _apply_cloudscraper_patch()
+
+# Força plugins desktop a usarem seletores atualizados para AnimesVision.
+from app.selectors_patch import apply as _apply_selectors_patch  # pylint: disable=wrong-import-position
+_apply_selectors_patch()
 
 
 class HealthResponse(BaseModel):

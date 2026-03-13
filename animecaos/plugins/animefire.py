@@ -45,6 +45,18 @@ class AnimeFire(PluginInterface):
         soup = BeautifulSoup(response.text, "html.parser")
         target_class = "col-6 col-sm-4 col-md-3 col-lg-2 mb-1 minWDanime divCardUltimosEps"
         cards = soup.find_all("div", class_=target_class)
+        
+        print(f"[{AnimeFire.name}] search_anime: {len(cards)} cards encontrados com class='{target_class}'")
+        print(f"[{AnimeFire.name}] HTML length: {len(response.text)} chars")
+        
+        # Mostrar todas as classes div encontradas
+        all_divs = soup.find_all("div")
+        classes_found = set()
+        for div in all_divs[:50]:
+            classes = div.get("class", [])
+            if classes:
+                classes_found.add(" ".join(classes))
+        print(f"[{AnimeFire.name}] Classes div encontradas: {list(classes_found)[:20]}")
 
         titles_urls: list[tuple[str, str]] = []
         for card in cards:
@@ -68,6 +80,7 @@ class AnimeFire(PluginInterface):
         if not titles_urls:
             return
 
+        print(f"[{AnimeFire.name}] {len(titles_urls)} animes encontrados")
         for title, anime_url in titles_urls:
             rep.add_anime(title, anime_url, AnimeFire.name)
 

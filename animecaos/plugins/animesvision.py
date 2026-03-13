@@ -53,9 +53,26 @@ class AnimesVision(PluginInterface):
             driver.get(url)
             # aguardar carregamento mínimo
             time.sleep(3)
+            
+            print(f"[{AnimesVision.name}] search_anime: URL={url}")
 
             # Tentar encontrar cards de resultados
             cards = driver.find_elements(By.CSS_SELECTOR, "div.film-detail h3 a, div.flw-item h2 a, div.item a.name")
+            print(f"[{AnimesVision.name}] {len(cards)} cards encontrados com seletores padrao")
+            
+            # Tentar outros seletores comuns
+            other_selectors = [
+                "div.row div.col a",
+                "div.list-anime a",
+                "a.anime-title",
+                "div.card-anime a",
+                "div.anime-item a",
+            ]
+            for selector in other_selectors:
+                elements = driver.find_elements(By.CSS_SELECTOR, selector)
+                if elements:
+                    print(f"[{AnimesVision.name}] Seletor '{selector}': {len(elements)} elementos")
+            
             for card in cards:
                 title = card.text.strip()
                 href = card.get_attribute("href") or ""

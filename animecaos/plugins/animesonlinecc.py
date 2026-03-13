@@ -36,6 +36,9 @@ class AnimesOnlineCC(PluginInterface):
 
         soup = BeautifulSoup(response.text, "html.parser")
         divs = soup.find_all("div", class_="data")
+        
+        print(f"[{AnimesOnlineCC.name}] search_anime: {len(divs)} divs encontradas com class='data'")
+        print(f"[{AnimesOnlineCC.name}] HTML length: {len(response.text)} chars")
 
         titles_urls: list[tuple[str, str]] = []
         for div in divs:
@@ -49,6 +52,8 @@ class AnimesOnlineCC(PluginInterface):
             title = anchor.get_text(strip=True)
             anime_url = anchor["href"]
             titles_urls.append((title, anime_url))
+            
+        print(f"[{AnimesOnlineCC.name}] {len(titles_urls)} animes encontrados")
 
         def inspect_season_count(anime_url: str) -> int:
             try:

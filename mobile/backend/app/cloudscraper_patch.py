@@ -24,18 +24,12 @@ def _get_scraper() -> cloudscraper.CloudScraper:
     """Cria ou retorna scraper singleton com configurações otimizadas."""
     global _scraper
     if _scraper is None:
-        # cloudscraper create_scraper com configurações compatíveis
-        kwargs = {
-            "browser": {"browser": "firefox", "platform": "windows", "mobile": False},
-            "delay": 10,
-        }
-        # double_down foi descontinuado em versões recentes
-        # tentar usar se disponivel
-        try:
-            kwargs["double_down"] = True
-        except TypeError:
-            pass
-        _scraper = cloudscraper.create_scraper(**kwargs)
+        # cloudscraper create_scraper - apenas browser e delay
+        # double_down foi removido em versões recentes
+        _scraper = cloudscraper.create_scraper(
+            browser={"browser": "firefox", "platform": "windows", "mobile": False},
+            delay=10,
+        )
     return _scraper
 
 
@@ -55,8 +49,11 @@ def _patched_get(url, **kwargs):
         kwargs["headers"] = headers
     
     # Nota: cloudscraper não suporta timeout nativo
-    # Para simplicidade, ignoramos timeout (cloudscraper já tem retry logic)
-    return scraper.get(url, **kwargs)
+    try:
+        return scraper.get(url, **kwargs)
+    except Exception as e:
+        print(f"[cloudscraper] Erro ao buscar {url}: {e}")
+        raise
 
 
 def _patched_head(url, **kwargs):
@@ -104,12 +101,16 @@ def apply() -> None:
     Estratégia:
     1. Importa os módulos de plugins primeiro
     2. Cria um módulo fake 'requests' com cloudscraper
-    3. Substitui sys.modules['requests'] APENAS para os plugins
-    4. Alternativa: substitui diretamente o atributo requests no namespace do plugin
+    3. Substitui diretamente o atributo requests no namespace do plugin
     """
-    # 1. Garantir que os módulos estejam importados
+    # 1. Importar plugins primeiro (necessário para o patch funcionar)
+    print("Info: Importando plugins para aplicar cloudscraper_patch...")
     for mod_name in _MODULES_WITH_REQUESTS:
-        _ensure_imported(mod_name)
+        try:
+            importlib.import_module(mod_name)
+            print(f"  → {mod_name}: importado")
+        except Exception as e:
+            print(f"  ⚠ {mod_name}: falha ao importar ({e})")
 
     # 2. Criar módulo fake do requests com cloudscraper
     class CloudScraperRequests:

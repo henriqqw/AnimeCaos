@@ -36,16 +36,36 @@ You can override plugin selection with:
 2. Sync Gradle.
 3. Run on emulator/device.
 
-Default API base URL is `http://10.0.2.2:8000/` (Android emulator -> host machine).
+### API Base URL Configuration
 
-If you run on a physical device, set your machine LAN IP at build time:
+**Default:** `http://10.0.0.4:8000/` (VPS production server)
 
+The app will try URLs in this order:
+1. `http://10.0.0.4:8000/` (VPS production)
+2. `http://10.0.2.2:8000/` (Android emulator -> host)
+3. `http://10.0.3.2:8000/` (Genymotion emulator)
+4. `http://127.0.0.1:8000/` (localhost)
+5. `http://localhost:8000/` (localhost)
+
+**For local development** (backend running on your machine):
+
+Option A: Build with custom URL:
 ```bash
 cd mobile/android
 ./gradlew assembleDebug -PapiBaseUrl=http://192.168.1.100:8000/
 ```
 
-Also ensure Windows Firewall allows inbound TCP `8000`.
+Option B: Create `local.properties` in `mobile/android/`:
+```properties
+apiBaseUrl=http://192.168.1.100:8000/
+```
+
+**For VPS production:**
+- Backend runs on VPS at `http://10.0.0.4:8000/`
+- App connects directly to VPS IP
+- No configuration needed (default)
+
+Also ensure firewall allows inbound TCP `8000` on the backend server.
 
 ## Important notes
 

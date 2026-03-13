@@ -20,7 +20,7 @@ android {
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
             ?: props.getProperty("apiBaseUrl")?.trim()?.takeIf { it.isNotEmpty() }
-            ?: "http://10.0.2.2:8000/"
+            ?: "http://10.0.0.4:8000/"
 
         applicationId = "com.animecaos.mobile"
         minSdk = 26

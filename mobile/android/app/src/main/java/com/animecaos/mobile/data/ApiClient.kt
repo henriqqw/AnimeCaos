@@ -22,14 +22,15 @@ object ApiClient {
         return normalized.toHttpUrlOrNull()?.newBuilder()?.encodedPath("/")?.build()
     }
 
-    // Emulator-first order: 10.0.2.2 (standard emulator), 10.0.3.2 (Genymotion),
-    // then localhost variants. These are fallbacks for local development.
-    private val fallbackBaseUrls = listOf(
+    // VPS production server first, then emulator fallbacks for local development.
+    private val vpsBaseUrl = listOf("http://10.0.0.4:8000/")
+    private val emulatorFallbackUrls = listOf(
         "http://10.0.2.2:8000/",
         "http://10.0.3.2:8000/",
         "http://127.0.0.1:8000/",
         "http://localhost:8000/",
     )
+    private val fallbackBaseUrls = vpsBaseUrl + emulatorFallbackUrls
 
     private val baseCandidates: List<HttpUrl> = buildList {
         // Production VPS URL first (configured in build.gradle.kts).

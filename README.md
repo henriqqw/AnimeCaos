@@ -22,6 +22,14 @@ Centralize sua experiência de assistir anime em uma única aplicação, sem an�
 # 🖼 Preview
 
 <div align="center">
+  <img src="screenshot2.png" alt="AnimeCaos - Tela do App" width="780"/>
+  <br/>
+  <em>Tela principal do app</em>
+</div>
+
+<br/>
+
+<div align="center">
   <img src="screenshot4.png" alt="AnimeCaos - Busca" width="780"/>
   <br/>
   <em>Busca com capas dinamicas</em>

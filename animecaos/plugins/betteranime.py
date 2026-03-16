@@ -110,5 +110,5 @@ class BetterAnime(PluginInterface):
 
 
 def load(languages_dict):
-    if any(lang in languages_dict for lang in BetterAnime.languages):
-        rep.register(BetterAnime)
+    # BetterAnime desativado - site fora do ar (betteranime.net DNS error)
+    return

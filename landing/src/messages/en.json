@@ -111,6 +111,12 @@
         "issue": "Open an Issue on GitHub",
         "links_title": "Links"
     },
+    "screenshots": {
+        "label": "Preview",
+        "title": "See the app in action",
+        "caption_app": "Main screen — search, library and anime management",
+        "caption_player": "Built-in player with auto-play and download support"
+    },
     "footer": {
         "made": "Made with ☕ by",
         "rights": "Open source project — MIT License",

@@ -4,6 +4,7 @@ import PageWrapper from "@/components/layout/PageWrapper";
 import Hero from "@/components/sections/Hero";
 import Features from "@/components/sections/Features";
 import Stats from "@/components/sections/Stats";
+import Screenshots from "@/components/sections/Screenshots";
 import DownloadCTA from "@/components/sections/DownloadCTA";
 import { buildLocalizedMetadata, toAppLocale } from "@/lib/seo";
 
@@ -67,6 +68,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <Hero locale={locale} />
             <Features />
             <Stats />
+            <Screenshots />
             <DownloadCTA />
         </PageWrapper>
     );

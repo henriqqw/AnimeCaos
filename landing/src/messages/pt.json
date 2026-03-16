@@ -111,6 +111,12 @@
     "issue": "Abrir uma Issue no GitHub",
     "links_title": "Links"
   },
+  "screenshots": {
+    "label": "Preview",
+    "title": "Veja o app em ação",
+    "caption_app": "Tela principal — busca, biblioteca e gerenciamento de animes",
+    "caption_player": "Player integrado com suporte a auto-play e download"
+  },
   "footer": {
     "made": "Feito com ☕ por",
     "rights": "Projeto open source — MIT License",

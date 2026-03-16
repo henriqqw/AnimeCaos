@@ -19,6 +19,24 @@ Centralize sua experiência de assistir anime em uma única aplicação, sem an�
 
 ---
 
+# 🖼 Preview
+
+<div align="center">
+  <img src="screenshot2.png" alt="AnimeCaos - Tela do App" width="780"/>
+  <br/>
+  <em>Tela principal do app</em>
+</div>
+
+<br/>
+
+<div align="center">
+  <img src="screenshot.png" alt="AnimeCaos - Player" width="680"/>
+  <br/>
+  <em>Player integrado</em>
+</div>
+
+---
+
 # 📺 Sobre o Projeto
 
 O **AnimeCaos** é uma aplicação desktop open source criada para **centralizar a experiência de assistir animes**.

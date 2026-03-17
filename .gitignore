@@ -1,39 +1,78 @@
+# -------------------------------
+# Security / Secrets
+# -------------------------------
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+secrets/
+credentials/
+
+# -------------------------------
+# Logs
+# -------------------------------
+*.log
+*.log.*
+log.txt
+updater.log
+logs/
+
+# -------------------------------
 # Python
+# -------------------------------
 __pycache__/
 *.py[cod]
 *.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 
+# -------------------------------
 # Environments
+# -------------------------------
 venv/
 .venv/
 env/
 
-# Build and Packaging
+# -------------------------------
+# Build / Packaging
+# -------------------------------
 build/
 dist/
-*.spec
 temp_build/
-bin/
 installer/
+bin/
+*.spec
+*.tmp
+*.temp
 
-# Local Data
+# -------------------------------
+# Local App Data
+# -------------------------------
 history.json
 watchlist.json
 cache/
-log.txt
 
-# System
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-*.swp
-*.bak
-
-# Claude Code
+# -------------------------------
+# Claude / Local tooling
+# -------------------------------
 .claude/
 
-# Landing Page
+# -------------------------------
+# Landing (Next.js)
+# -------------------------------
 landing/node_modules/
 landing/.next/
 landing/out/
@@ -43,7 +82,19 @@ landing/out/
 /package.json
 /package-lock.json
 
+# -------------------------------
+# IDE / OS
+# -------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.bak
+
+# -------------------------------
 # Android mobile
+# -------------------------------
 mobile/android/.gradle/
 mobile/android/.gradle-user/
 mobile/android/.idea/

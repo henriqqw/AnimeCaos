@@ -76,9 +76,10 @@ def run_pyinstaller():
         "--noconfirm",
         "--onefile",
         "--windowed", # Don't open a console window
-        "--icon=icon.ico",
+        "--icon=public/icon.ico",
         "--name=Animecaos",
-        "--add-data=icon.png;.",
+        "--add-data=public/icon.png;public",
+        "--add-data=public/icon.ico;public",
         "--add-data=bin;bin", # the crucial part: embedding our downloaded binaries!
         "--hidden-import=animecaos.plugins.hinatasoul",
         "--hidden-import=animecaos.plugins.betteranime",

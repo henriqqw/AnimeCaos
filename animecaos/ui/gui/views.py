@@ -361,7 +361,7 @@ class SearchView(QWidget):
             base_path = sys._MEIPASS
         except AttributeError:
             base_path = os.path.abspath(".")
-        icon_path = os.path.join(base_path, "icon.png")
+        icon_path = os.path.join(base_path, "public", "icon.png")
 
         icon_label = QLabel()
         icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)

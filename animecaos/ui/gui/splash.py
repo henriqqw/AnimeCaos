@@ -49,7 +49,7 @@ def _icon_path() -> str:
         base = sys._MEIPASS
     except AttributeError:
         base = os.path.abspath(".")
-    return os.path.join(base, "icon.png")
+    return os.path.join(base, "public", "icon.png")
 
 
 _STATUS_STEPS: list[tuple[int, str]] = [

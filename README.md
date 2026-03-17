@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icon.png" alt="AnimeCaos Logo" width="128"/>
+  <img src="public/icon.png" alt="AnimeCaos Logo" width="128"/>
 
 # AnimeCaos
 
@@ -22,7 +22,7 @@ Centralize sua experiência de assistir anime em uma única aplicação, sem an�
 # 🖼 Preview
 
 <div align="center">
-  <img src="screenshot2.png" alt="AnimeCaos - Tela do App" width="780"/>
+  <img src="public/screenshot2.webp" alt="AnimeCaos - Tela do App" width="780"/>
   <br/>
   <em>Tela principal do app</em>
 </div>
@@ -30,7 +30,7 @@ Centralize sua experiência de assistir anime em uma única aplicação, sem an�
 <br/>
 
 <div align="center">
-  <img src="screenshot4.png" alt="AnimeCaos - Busca" width="780"/>
+  <img src="public/screenshot4.webp" alt="AnimeCaos - Busca" width="780"/>
   <br/>
   <em>Busca com capas dinamicas</em>
 </div>
@@ -38,7 +38,7 @@ Centralize sua experiência de assistir anime em uma única aplicação, sem an�
 <br/>
 
 <div align="center">
-  <img src="screenshot3.png" alt="AnimeCaos - Detalhes" width="780"/>
+  <img src="public/screenshot3.webp" alt="AnimeCaos - Detalhes" width="780"/>
   <br/>
   <em>Detalhes do anime e lista de episodios</em>
 </div>
@@ -46,7 +46,7 @@ Centralize sua experiência de assistir anime em uma única aplicação, sem an�
 <br/>
 
 <div align="center">
-  <img src="screenshot.png" alt="AnimeCaos - Player" width="680"/>
+  <img src="public/screenshot.webp" alt="AnimeCaos - Player" width="680"/>
   <br/>
   <em>Player integrado</em>
 </div>

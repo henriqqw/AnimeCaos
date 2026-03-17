@@ -156,7 +156,7 @@ export default function Screenshots() {
                         }}
                     >
                         <Image
-                            src="/screenshot2.png"
+                            src="/screenshot2.webp"
                             alt="AnimeCaos – tela principal do app"
                             width={1397}
                             height={926}
@@ -197,7 +197,7 @@ export default function Screenshots() {
                             }}
                         >
                             <Image
-                                src="/screenshot4.png"
+                                src="/screenshot4.webp"
                                 alt="AnimeCaos – busca com capas dinamicas"
                                 width={1379}
                                 height={902}
@@ -237,7 +237,7 @@ export default function Screenshots() {
                         }}
                     >
                         <Image
-                            src="/screenshot3.png"
+                            src="/screenshot3.webp"
                             alt="AnimeCaos – detalhes do anime e episodios"
                             width={1372}
                             height={903}
@@ -277,7 +277,7 @@ export default function Screenshots() {
                             }}
                         >
                             <Image
-                                src="/screenshot.png"
+                                src="/screenshot.webp"
                                 alt="AnimeCaos – player integrado"
                                 width={1444}
                                 height={873}

@@ -64,7 +64,7 @@ class UpdateDialog(QDialog):
             base_path = sys._MEIPASS
         except AttributeError:
             base_path = os.path.abspath(".")
-        icon_path = os.path.join(base_path, "icon.png")
+        icon_path = os.path.join(base_path, "public", "icon.png")
 
         icon_label = QLabel()
         pixmap = QPixmap(icon_path).scaled(
@@ -218,7 +218,7 @@ class MainWindow(QMainWindow):
             base_path = sys._MEIPASS
         except AttributeError:
             base_path = os.path.abspath(".")
-        icon_path = os.path.join(base_path, "icon.png")
+        icon_path = os.path.join(base_path, "public", "icon.png")
         self.setWindowIcon(QIcon(icon_path))
 
         self.resize(1320, 820)
@@ -306,7 +306,7 @@ class MainWindow(QMainWindow):
             base_path = sys._MEIPASS
         except AttributeError:
             base_path = os.path.abspath(".")
-        icon_path = os.path.join(base_path, "icon.png")
+        icon_path = os.path.join(base_path, "public", "icon.png")
 
         from PySide6.QtGui import QPainter, QPainterPath
 

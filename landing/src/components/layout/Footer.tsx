@@ -103,14 +103,20 @@ export default function Footer({ locale }: FooterProps) {
                                         textDecoration: "none",
                                         background: "var(--surface)",
                                         transition: "all 0.2s ease",
+                                        outline: "1px solid transparent",
+                                        outlineOffset: "0px",
                                     }}
                                     onMouseEnter={(e) => {
                                         (e.currentTarget as HTMLElement).style.color = "var(--text)";
-                                        (e.currentTarget as HTMLElement).style.borderColor = "var(--border-hover)";
+                                        (e.currentTarget as HTMLElement).style.borderColor = "rgba(230, 63, 63, 0.35)";
+                                        (e.currentTarget as HTMLElement).style.outline = "1px solid rgba(230, 63, 63, 0.75)";
+                                        (e.currentTarget as HTMLElement).style.boxShadow = "0 0 0 3px rgba(230, 63, 63, 0.16)";
                                     }}
                                     onMouseLeave={(e) => {
                                         (e.currentTarget as HTMLElement).style.color = "var(--text-muted)";
                                         (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
+                                        (e.currentTarget as HTMLElement).style.outline = "1px solid transparent";
+                                        (e.currentTarget as HTMLElement).style.boxShadow = "none";
                                     }}
                                 >
                                     <Icon size={15} />

@@ -12,7 +12,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from animecaos.core.loader import PluginInterface
 from animecaos.core.repository import rep
 
-from .utils import make_driver
+from .utils import make_driver, validate_player_src
 
 log = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ class AnimesOnlineCC(PluginInterface):
             if "blogger.com/video.g" in src:
                 raise RuntimeError("Hospedagem de video nao disponivel para este episodio.")
 
-            return src
+            return validate_player_src(src, AnimesOnlineCC.name)
         finally:
             driver.quit()
 

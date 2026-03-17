@@ -1,5 +1,6 @@
 import logging
 
+import requests
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
@@ -8,7 +9,9 @@ from urllib.parse import quote
 
 from animecaos.core.repository import rep
 from animecaos.core.loader import PluginInterface
-from .utils import make_driver
+from .utils import make_driver, validate_player_src
+
+_HEADERS = {"User-Agent": "Mozilla/5.0 (animecaos)"}
 
 log = logging.getLogger(__name__)
 
@@ -89,6 +92,17 @@ class HinataSoul(PluginInterface):
             driver.quit()
 
     @staticmethod
+    def is_episode_playable(url_episode: str) -> bool:
+        """Fast HTTP check: look for blogger iframe in raw HTML."""
+        try:
+            response = requests.get(url_episode, timeout=10, headers=_HEADERS)
+            if response.status_code != 200:
+                return False
+            return "blogger.com/video" not in response.text
+        except Exception:
+            return False
+
+    @staticmethod
     def search_player_src(episode_url: str) -> str:
         driver = make_driver()
         driver.set_page_load_timeout(_PAGE_LOAD_TIMEOUT)
@@ -111,7 +125,7 @@ class HinataSoul(PluginInterface):
             if "blogger.com" in src:
                 raise RuntimeError("Blogger não é mais suportado (fonte instavel).")
 
-            return src
+            return validate_player_src(src, HinataSoul.name)
         finally:
             driver.quit()
 

@@ -49,7 +49,7 @@ class AnimeService:
 
         # Validate in parallel: only return animes with at least one playable source
         valid: list[str] = []
-        with ThreadPoolExecutor(max_workers=min(len(titles), 4)) as executor:
+        with ThreadPoolExecutor(max_workers=min(len(titles), 8)) as executor:
             future_to_title = {
                 executor.submit(rep.is_playable, t): t for t in titles
             }

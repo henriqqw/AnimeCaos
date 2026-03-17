@@ -45,6 +45,15 @@ def build_firefox_options() -> webdriver.FirefoxOptions:
     return options
 
 
+def validate_player_src(src: str, source_name: str) -> str:
+    """Validate a player URL before returning it. Raises RuntimeError if invalid."""
+    if not src or src.startswith("javascript:") or src == "about:blank":
+        raise RuntimeError(f"URL de player invalida em {source_name}: {src!r}")
+    if not src.startswith(("http://", "https://")):
+        raise RuntimeError(f"URL de player nao HTTP em {source_name}: {src!r}")
+    return src
+
+
 def make_driver() -> webdriver.Firefox:
     """Create a headless Firefox WebDriver using the best available geckodriver."""
     options = build_firefox_options()

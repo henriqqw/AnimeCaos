@@ -12,7 +12,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from animecaos.core.loader import PluginInterface
 from animecaos.core.repository import rep
 
-from .utils import make_driver
+from .utils import make_driver, validate_player_src
 
 log = logging.getLogger(__name__)
 
@@ -121,7 +121,7 @@ class AnimeFire(PluginInterface):
                 )
                 src = video.get_property("src") or video.get_attribute("src")
                 if src and _is_video_url(src):
-                    return src
+                    return validate_player_src(src, AnimeFire.name)
             except TimeoutException:
                 pass
 
@@ -137,7 +137,7 @@ class AnimeFire(PluginInterface):
 
                     # If the iframe src itself is a direct video URL, use it
                     if _is_video_url(iframe_src):
-                        return iframe_src
+                        return validate_player_src(iframe_src, AnimeFire.name)
 
                     # Otherwise, navigate inside the iframe and look for <video>
                     driver.switch_to.frame(iframe)
@@ -150,21 +150,21 @@ class AnimeFire(PluginInterface):
                             or inner_video.get_attribute("src")
                         )
                         if inner_src and _is_video_url(inner_src):
-                            return inner_src
+                            return validate_player_src(inner_src, AnimeFire.name)
 
                         # Check <source> children
                         source = inner_video.find_elements(By.TAG_NAME, "source")
                         for s in source:
                             s_src = s.get_property("src") or s.get_attribute("src")
                             if s_src and _is_video_url(s_src):
-                                return s_src
+                                return validate_player_src(s_src, AnimeFire.name)
                     except TimeoutException:
                         pass
                     finally:
                         driver.switch_to.default_content()
 
                     # Last resort: return iframe src and let mpv/yt-dlp try
-                    return iframe_src
+                    return validate_player_src(iframe_src, AnimeFire.name)
 
             except TimeoutException as exc:
                 raise RuntimeError("Iframe/video nao encontrado no AnimeFire.") from exc

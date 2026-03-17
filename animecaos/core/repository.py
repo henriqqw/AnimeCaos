@@ -49,13 +49,25 @@ class Repository:
         if not self.sources:
             return
 
+        _SEARCH_TIMEOUT = 15  # seconds — don't wait forever for slow plugins
+
         with ThreadPoolExecutor(max_workers=min(len(self.sources), _max_workers())) as executor:
-            futures = [executor.submit(plugin.search_anime, query) for plugin in self.sources.values()]
-            for future in as_completed(futures):
-                try:
-                    future.result()
-                except Exception as exc:
-                    log.warning("Fonte falhou na busca de anime: %s", exc)
+            future_to_name = {
+                executor.submit(plugin.search_anime, query): name
+                for name, plugin in self.sources.items()
+            }
+            try:
+                for future in as_completed(future_to_name, timeout=_SEARCH_TIMEOUT):
+                    name = future_to_name[future]
+                    try:
+                        future.result(timeout=0)
+                    except Exception as exc:
+                        log.warning("Fonte '%s' falhou na busca: %s", name, exc)
+            except Exception:
+                # Some plugins didn't finish in time — use whatever results we have
+                slow = [n for f, n in future_to_name.items() if not f.done()]
+                if slow:
+                    log.warning("Fontes lentas ignoradas: %s", ", ".join(slow))
 
     def _normalize_title(self, title: str) -> str:
         normalized = title.lower()
@@ -134,14 +146,27 @@ class Repository:
         if not episode_sources:
             return False
 
-        for urls, source in episode_sources:
-            if not urls:
-                continue
-            try:
-                if self.sources[source].is_episode_playable(urls[0]):
-                    return True
-            except Exception:
-                continue
+        candidates = [
+            (urls, source) for urls, source in episode_sources if urls
+        ]
+        if not candidates:
+            return False
+
+        # Check sources in parallel — return True as soon as any is playable
+        with ThreadPoolExecutor(max_workers=min(len(candidates), _max_workers())) as executor:
+            futures = {
+                executor.submit(self.sources[source].is_episode_playable, urls[0]): source
+                for urls, source in candidates
+            }
+            for future in as_completed(futures):
+                try:
+                    if future.result():
+                        for f in futures:
+                            if f is not future:
+                                f.cancel()
+                        return True
+                except Exception:
+                    continue
 
         return False
 

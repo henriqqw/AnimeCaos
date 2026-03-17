@@ -34,18 +34,41 @@ export default function Hero({ locale }: HeroProps) {
             style={{
                 position: "relative",
                 zIndex: 1,
+                isolation: "isolate",
                 minHeight: "100dvh",
                 display: "flex",
                 alignItems: "center",
                 paddingTop: "5rem",
                 paddingBottom: "5rem",
+                overflow: "hidden",
+                backgroundImage: "url('/hero.webp')",
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+                WebkitMaskImage:
+                    "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 76%, rgba(0,0,0,0.92) 84%, rgba(0,0,0,0.65) 92%, rgba(0,0,0,0) 100%)",
+                maskImage:
+                    "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 76%, rgba(0,0,0,0.92) 84%, rgba(0,0,0,0.65) 92%, rgba(0,0,0,0) 100%)",
             }}
         >
+            <div
+                aria-hidden="true"
+                style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 0,
+                    background:
+                        "radial-gradient(ellipse at center, rgba(6,8,12,0.45) 0%, rgba(6,8,12,0.7) 55%, rgba(6,8,12,0.86) 100%), linear-gradient(180deg, rgba(6,8,12,0.6) 0%, rgba(6,8,12,0.75) 100%)",
+                    pointerEvents: "none",
+                }}
+            />
+
             {/* Radial glow */}
             <div
                 aria-hidden="true"
                 style={{
                     position: "absolute",
+                    zIndex: 1,
                     top: "20%",
                     left: "50%",
                     transform: "translate(-50%, -50%)",
@@ -58,7 +81,20 @@ export default function Hero({ locale }: HeroProps) {
                 }}
             />
 
-            <div className="container">
+            <div
+                aria-hidden="true"
+                style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 2,
+                    boxShadow: "inset 0 -140px 110px -90px rgba(8,11,15,0.85)",
+                    filter: "blur(10px)",
+                    opacity: 0.75,
+                    pointerEvents: "none",
+                }}
+            />
+
+            <div className="container" style={{ position: "relative", zIndex: 3 }}>
                 <div
                     style={{
                         display: "flex",
@@ -90,13 +126,19 @@ export default function Hero({ locale }: HeroProps) {
                         initial="hidden"
                         animate="visible"
                         custom={0.1}
-                        style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "0 0.3em" }}
+                        style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            justifyContent: "center",
+                            gap: "0 0.3em",
+                            textShadow: "0 10px 30px rgba(0,0,0,0.55)",
+                        }}
                     >
                         {allWords.map(({ w, idx }, i) => (
                             <motion.span
                                 key={i}
                                 style={{
-                                    color: idx === 1 ? "var(--accent)" : "var(--text)",
+                                    color: idx === 1 ? "#ff4d4d" : "#f8fbff",
                                     display: "inline-block",
                                 }}
                                 initial={{ opacity: 0, y: 30 }}
@@ -116,9 +158,10 @@ export default function Hero({ locale }: HeroProps) {
                         custom={0.55}
                         style={{
                             fontSize: "clamp(1rem, 2vw, 1.2rem)",
-                            color: "var(--text-muted)",
+                            color: "rgba(240, 245, 255, 0.9)",
                             maxWidth: 580,
                             lineHeight: 1.65,
+                            textShadow: "0 6px 20px rgba(0,0,0,0.5)",
                         }}
                     >
                         {t("sub")}
@@ -130,13 +173,24 @@ export default function Hero({ locale }: HeroProps) {
                         initial="hidden"
                         animate="visible"
                         custom={0.7}
-                        style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", justifyContent: "center" }}
+                        style={{
+                            display: "flex",
+                            gap: "0.75rem",
+                            flexWrap: "wrap",
+                            justifyContent: "center",
+                            filter: "drop-shadow(0 10px 20px rgba(0,0,0,0.45))",
+                        }}
                     >
                         <a
                             href={DOWNLOAD_URL}
                             id="hero-download-btn"
                             className="btn btn-primary"
-                            style={{ fontSize: "1rem", padding: "0.85rem 1.75rem" }}
+                            style={{
+                                fontSize: "1rem",
+                                padding: "0.85rem 1.75rem",
+                                border: "1px solid rgba(255,255,255,0.18)",
+                                boxShadow: "0 12px 30px rgba(230,63,63,0.5)",
+                            }}
                         >
                             <Download size={18} />
                             {t("cta_download")}
@@ -147,7 +201,14 @@ export default function Hero({ locale }: HeroProps) {
                             rel="noopener noreferrer"
                             id="hero-github-btn"
                             className="btn btn-ghost"
-                            style={{ fontSize: "1rem", padding: "0.85rem 1.75rem" }}
+                            style={{
+                                fontSize: "1rem",
+                                padding: "0.85rem 1.75rem",
+                                background: "rgba(10, 14, 22, 0.78)",
+                                color: "#f8fbff",
+                                border: "1px solid rgba(255,255,255,0.22)",
+                                backdropFilter: "blur(8px)",
+                            }}
                         >
                             <Github size={18} />
                             {t("cta_github")}
@@ -168,9 +229,10 @@ export default function Hero({ locale }: HeroProps) {
                                 alignItems: "center",
                                 gap: "0.4rem",
                                 fontSize: "0.82rem",
-                                color: "var(--text-subtle)",
+                                color: "rgba(225, 234, 252, 0.86)",
                                 textDecoration: "none",
                                 transition: "color 0.2s",
+                                textShadow: "0 4px 14px rgba(0,0,0,0.45)",
                             }}
                         >
                             {t("cta_version")}

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { permanentRedirect } from "next/navigation";
 import { SITE_NAME, SITE_URL, SITE_X_HANDLE } from "@/lib/seo";
 
 const rootDescription =
@@ -35,5 +35,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootPage() {
-  redirect("/pt");
+  permanentRedirect("/pt");
 }

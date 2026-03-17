@@ -6,9 +6,9 @@ import { useTranslations } from "next-intl";
 
 const LINKS = [
     { icon: Github, label: "GitHub", href: "https://github.com/henriqqw/animecaos" },
-    { icon: Twitter, label: "Twitter", href: "https://x.com/chaosphory" },
+    { icon: Twitter, label: "Twitter", href: "https://x.com/getanimecaos" },
     { icon: MessageCircle, label: "Discord", href: "https://discord.com/users/chaosphory" },
-    { icon: Instagram, label: "Instagram", href: "https://www.instagram.com/henriqqw" },
+    { icon: Instagram, label: "Instagram", href: "https://www.instagram.com/getanimecaos/" },
     { icon: Linkedin, label: "LinkedIn", href: "https://www.linkedin.com/in/henrique-lanzoni-ab0828371/" },
     { icon: Mail, label: "Email", href: "mailto:lanzonicmpny13@gmail.com" },
 ];

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import { SITE_NAME, SITE_URL } from "@/lib/seo";
+import { SITE_NAME, SITE_URL, SITE_X_HANDLE } from "@/lib/seo";
 import "./globals.css";
 
 const siteDescription =
@@ -32,6 +32,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: SITE_X_HANDLE,
+    creator: SITE_X_HANDLE,
     title: SITE_NAME,
     description: siteDescription,
     images: [`${SITE_URL}/icon.png`],

@@ -4,6 +4,8 @@ export type AppLocale = "pt" | "en";
 
 export const SITE_URL = "https://animecaos.vercel.app";
 export const SITE_NAME = "AnimeCaos";
+export const SITE_X_URL = "https://x.com/getanimecaos";
+export const SITE_X_HANDLE = "@getanimecaos";
 const SOCIAL_IMAGE_URL = `${SITE_URL}/icon.png`;
 
 const OPEN_GRAPH_LOCALE: Record<AppLocale, string> = {
@@ -59,6 +61,8 @@ export function buildLocalizedMetadata({
     },
     twitter: {
       card: "summary_large_image",
+      site: SITE_X_HANDLE,
+      creator: SITE_X_HANDLE,
       title,
       description,
       images: [SOCIAL_IMAGE_URL],

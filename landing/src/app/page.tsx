@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { SITE_NAME, SITE_URL } from "@/lib/seo";
+import { SITE_NAME, SITE_URL, SITE_X_HANDLE } from "@/lib/seo";
 
 const rootDescription =
   "Choose Portuguese or English to explore AnimeCaos: an open source anime desktop hub with clean playback and offline downloads.";
@@ -26,6 +26,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
+    site: SITE_X_HANDLE,
+    creator: SITE_X_HANDLE,
     title: SITE_NAME,
     description: rootDescription,
     images: [`${SITE_URL}/icon.png`],

@@ -15,8 +15,8 @@ const SOCIALS = [
     {
         icon: Twitter,
         label: "Twitter / X",
-        handle: "@chaosphory",
-        href: "https://x.com/chaosphory",
+        handle: "@getanimecaos",
+        href: "https://x.com/getanimecaos",
         desc: "Updates & posts",
     },
     {
@@ -29,8 +29,8 @@ const SOCIALS = [
     {
         icon: Instagram,
         label: "Instagram",
-        handle: "@henriqqw",
-        href: "https://www.instagram.com/henriqqw",
+        handle: "@getanimecaos",
+        href: "https://www.instagram.com/getanimecaos/",
         desc: "Conteúdo & updates",
     },
     {

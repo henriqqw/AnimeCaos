@@ -16,6 +16,7 @@ const organizationJsonLd = {
             logo: "https://animecaos.vercel.app/icon.png",
             sameAs: [
                 "https://github.com/henriqqw/animecaos",
+                "https://x.com/getanimecaos",
                 "https://caosdev.vercel.app",
             ],
         },

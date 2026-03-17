@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, Variants } from "framer-motion";
 import Link from "next/link";
 import { Download, Github, ArrowRight, Star } from "lucide-react";
@@ -22,9 +22,85 @@ interface HeroProps {
     locale: string;
 }
 
+type TerminalLine = {
+    text: string;
+    color?: string;
+    marginTop?: string;
+};
+
 export default function Hero({ locale }: HeroProps) {
     const t = useTranslations("hero");
     const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+    const terminalLines: TerminalLine[] = useMemo(
+        () => [
+            { text: "# AnimeCaos v0.1.2" },
+            { text: "-> Pesquisando: attack on titan" },
+            { text: "✓ 3 fontes verificadas em 1.2s", color: "#58a6ff", marginTop: "0.3rem" },
+            { text: "✓ Capa AniList carregada", color: "#3fb950" },
+            { text: "✓ 87 episodios encontrados", color: "#3fb950" },
+            { text: "-> Reproduzindo EP 01 via mpv...", marginTop: "0.5rem" },
+        ],
+        []
+    );
+    const [typedLines, setTypedLines] = useState<string[]>(() => terminalLines.map(() => ""));
+    const [showCursor, setShowCursor] = useState(true);
+    const [terminalWindowVisible, setTerminalWindowVisible] = useState(true);
+    const [terminalWindowMinimized, setTerminalWindowMinimized] = useState(false);
+
+    useEffect(() => {
+        const cursorTimer = setInterval(() => {
+            setShowCursor((prev) => !prev);
+        }, 520);
+
+        return () => clearInterval(cursorTimer);
+    }, []);
+
+    useEffect(() => {
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        let cancelled = false;
+        let lineIndex = 0;
+        let charIndex = 0;
+
+        const resetLines = () => terminalLines.map(() => "");
+        setTypedLines(resetLines());
+
+        const typeNext = () => {
+            if (cancelled) return;
+
+            const fullLine = terminalLines[lineIndex].text;
+
+            if (charIndex <= fullLine.length) {
+                setTypedLines((prev) => {
+                    const next = [...prev];
+                    next[lineIndex] = fullLine.slice(0, charIndex);
+                    return next;
+                });
+                charIndex += 1;
+                timeout = setTimeout(typeNext, lineIndex === 0 ? 32 : 24);
+                return;
+            }
+
+            lineIndex += 1;
+            charIndex = 0;
+
+            if (lineIndex < terminalLines.length) {
+                timeout = setTimeout(typeNext, 180);
+                return;
+            }
+        };
+
+        typeNext();
+
+        return () => {
+            cancelled = true;
+            if (timeout) clearTimeout(timeout);
+        };
+    }, [terminalLines]);
+
+    const activeTypingLine = useMemo(() => {
+        const idx = terminalLines.findIndex((line, i) => typedLines[i].length < line.text.length);
+        return idx === -1 ? terminalLines.length - 1 : idx;
+    }, [terminalLines, typedLines]);
 
     useEffect(() => {
         const container = canvasContainerRef.current;
@@ -308,7 +384,20 @@ export default function Hero({ locale }: HeroProps) {
                         custom={0}
                     >
                         <div className="badge">
-                            <Star size={11} fill="currentColor" />
+                            <motion.span
+                                style={{ display: "inline-flex" }}
+                                animate={{
+                                    scale: [1, 1.16, 1],
+                                    opacity: [0.9, 1, 0.9],
+                                }}
+                                transition={{
+                                    duration: 2.8,
+                                    repeat: Infinity,
+                                    ease: "easeInOut",
+                                }}
+                            >
+                                <Star size={11} fill="currentColor" />
+                            </motion.span>
                             {t("badge")}
                         </div>
                     </motion.div>
@@ -442,35 +531,138 @@ export default function Hero({ locale }: HeroProps) {
                         custom={1}
                         style={{ width: "100%", maxWidth: 800, marginTop: "1rem" }}
                     >
-                        <div
-                            className="liquid-glass"
-                            style={{
-                                padding: "1.5rem",
-                                borderRadius: "var(--radius-xl)",
-                                overflow: "hidden",
-                            }}
-                        >
-                            {/* Fake terminal / app preview */}
-                            <div style={{ display: "flex", gap: "0.4rem", marginBottom: "1.2rem" }}>
-                                {["#ff5f56", "#ffbd2e", "#27c93f"].map((c) => (
-                                    <div key={c} style={{ width: 12, height: 12, borderRadius: "50%", background: c }} />
-                                ))}
-                            </div>
+                        {terminalWindowVisible ? (
                             <div
-                                className="code-block"
-                                style={{ textAlign: "left", background: "rgba(0,0,0,0.6)", borderRadius: 10 }}
+                                className="liquid-glass"
+                                style={{
+                                    padding: "1.5rem",
+                                    borderRadius: "var(--radius-xl)",
+                                    overflow: "hidden",
+                                }}
                             >
-                                <div><span className="comment"># AnimeCaos v0.1.2</span></div>
-                                <div><span className="cmd">→</span> Pesquisando: <strong style={{ color: "#e2c08d" }}>attack on titan</strong></div>
-                                <div style={{ marginTop: "0.3rem", color: "#58a6ff" }}>✓ 3 fontes verificadas em 1.2s</div>
-                                <div style={{ color: "#3fb950" }}>✓ Capa AniList carregada</div>
-                                <div style={{ color: "#3fb950" }}>✓ 87 episódios encontrados</div>
-                                <div style={{ marginTop: "0.5rem" }}><span className="cmd">→</span> Reproduzindo EP 01 via mpv...</div>
+                                {/* Fake terminal / app preview */}
+                                <div
+                                    style={{
+                                        display: "flex",
+                                        justifyContent: "space-between",
+                                        alignItems: "center",
+                                        gap: "0.35rem",
+                                        marginBottom: "1.2rem",
+                                    }}
+                                >
+                                    <div style={{ display: "flex", gap: "0.4rem" }}>
+                                        {["#ff5f56", "#ffbd2e", "#27c93f"].map((c) => (
+                                            <span
+                                                key={c}
+                                                aria-hidden="true"
+                                                style={{
+                                                    width: 12,
+                                                    height: 12,
+                                                    borderRadius: "50%",
+                                                    background: c,
+                                                    boxShadow: `0 0 6px ${c}55`,
+                                                }}
+                                            />
+                                        ))}
+                                    </div>
+
+                                    <div style={{ display: "flex", gap: "0.35rem" }}>
+                                    <button
+                                        type="button"
+                                        aria-label="Minimizar janela"
+                                        onClick={() => setTerminalWindowMinimized((prev) => !prev)}
+                                        style={{
+                                            width: 22,
+                                            height: 18,
+                                            borderRadius: 6,
+                                            background: "rgba(255,255,255,0.06)",
+                                            border: "1px solid rgba(255,255,255,0.1)",
+                                            cursor: "pointer",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            color: "rgba(240,242,245,0.88)",
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            lineHeight: 1,
+                                        }}
+                                    >
+                                        -
+                                    </button>
+                                    <button
+                                        type="button"
+                                        aria-label="Fechar janela"
+                                        onClick={() => setTerminalWindowVisible(false)}
+                                        style={{
+                                            width: 22,
+                                            height: 18,
+                                            borderRadius: 6,
+                                            background: "rgba(255,95,86,0.18)",
+                                            border: "1px solid rgba(255,95,86,0.42)",
+                                            cursor: "pointer",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            color: "rgba(255,210,210,0.95)",
+                                            fontSize: 11,
+                                            fontWeight: 700,
+                                            lineHeight: 1,
+                                        }}
+                                    >
+                                        x
+                                    </button>
+                                    </div>
+                                </div>
+                                {!terminalWindowMinimized ? (
+                                    <div
+                                        className="code-block"
+                                        style={{ textAlign: "left", background: "rgba(0,0,0,0.6)", borderRadius: 10 }}
+                                    >
+                                        {terminalLines.map((line, i) => (
+                                            <div
+                                                key={`${line.text}-${i}`}
+                                                style={{
+                                                    color: line.color,
+                                                    marginTop: line.marginTop,
+                                                    minHeight: "1.7em",
+                                                }}
+                                            >
+                                                {i === 0 ? <span className="comment">{typedLines[i]}</span> : typedLines[i]}
+                                                {i === activeTypingLine && showCursor ? (
+                                                    <span className="cmd" style={{ marginLeft: 2 }}>|</span>
+                                                ) : null}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div
+                                        style={{
+                                            height: 16,
+                                            borderRadius: 8,
+                                            background: "rgba(255,255,255,0.08)",
+                                            border: "1px solid rgba(255,255,255,0.1)",
+                                        }}
+                                    />
+                                )}
                             </div>
-                        </div>
+                        ) : (
+                            <button
+                                type="button"
+                                className="btn btn-ghost"
+                                onClick={() => {
+                                    setTerminalWindowVisible(true);
+                                    setTerminalWindowMinimized(false);
+                                }}
+                                style={{ padding: "0.55rem 1rem", fontSize: "0.9rem" }}
+                            >
+                                Reabrir janela
+                            </button>
+                        )}
                     </motion.div>
                 </div>
             </div>
         </section>
     );
 }
+
+

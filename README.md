@@ -8,9 +8,8 @@
 Centralize sua experiência de assistir anime em uma única aplicação, sem anúncios intrusivos e com busca inteligente entre múltiplas fontes.
 
 🌐 Website: https://animecaos.vercel.app
+📷 Instagram: https://www.instagram.com/getanimecaos/
 🐦 Twitter: https://x.com/getanimecaos
-📦 Repositório: https://github.com/henriqqw/animecaos  
-🚀 Releases: https://github.com/henriqqw/animecaos/releases
 
 ![Version](https://img.shields.io/badge/version-v0.1.0-red.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)

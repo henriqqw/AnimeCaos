@@ -100,6 +100,32 @@ def run_pyinstaller():
     subprocess.run(cmd, check=True)
 
 
+def make_update_zip():
+    print("\n[3/4] Gerando zip para auto-update...")
+    dist_dir = BASE_DIR / "dist" / "AnimeCaos"
+    if not dist_dir.exists():
+        print("  AVISO: dist/AnimeCaos/ nao encontrada, pulando zip.")
+        return
+
+    try:
+        from animecaos import __version__
+        version = __version__
+    except Exception:
+        version = "0.0.0"
+
+    zip_name = f"AnimeCaos_v{version}_windows.zip"
+    zip_path = BASE_DIR / "installer" / zip_name
+    zip_path.parent.mkdir(exist_ok=True)
+
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+        for file in dist_dir.rglob("*"):
+            if file.is_file():
+                zf.write(file, file.relative_to(dist_dir))
+
+    print(f"  Zip gerado: installer/{zip_name}")
+    print(f"  → Suba esse arquivo no GitHub Release para o auto-update funcionar.")
+
+
 def run_inno_setup():
     print("\n[3/3] Gerando instalador com Inno Setup...")
     iscc_candidates = [
@@ -123,7 +149,9 @@ if __name__ == "__main__":
     print("=== AnimeCaos — Windows Release Build ===")
     setup_binaries()
     run_pyinstaller()
+    make_update_zip()
     run_inno_setup()
     print("\n=== Build concluido! ===")
-    print("  EXE:       dist/AnimeCaos/AnimeCaos.exe")
-    print("  Instalador: installer/Setup_AnimeCaos_*.exe")
+    print("  EXE:        dist/AnimeCaos/AnimeCaos.exe")
+    print("  Auto-update: installer/AnimeCaos_v*_windows.zip  ← sobe esse no GitHub Release")
+    print("  Instalador:  installer/Setup_AnimeCaos_*.exe     ← para novos usuarios")

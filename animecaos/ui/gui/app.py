@@ -58,4 +58,7 @@ def run_gui(debug: bool = False) -> int:
     # Let the splash animate for a minimum time, then fade out
     QTimer.singleShot(2500, splash.finish)
 
-    return app.exec()
+    result = app.exec()
+    from animecaos.plugins.utils import shutdown_driver_pool
+    shutdown_driver_pool()
+    return result

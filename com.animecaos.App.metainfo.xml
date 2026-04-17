@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.animecaos.App</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Animecaos</name>
+  <summary>Assistente para streaming de animes</summary>
+  <description>
+    <p>Animecaos é um player de animes com suporte a múltiplas fontes de streaming.</p>
+  </description>
+  <url type="homepage">https://github.com/caosdev/animecaos</url>
+  <launchable type="desktop-id">com.animecaos.App.desktop</launchable>
+  <provides>
+    <binary>animecaos</binary>
+  </provides>
+  <releases>
+    <release version="1.0.0" date="2025-01-01"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

@@ -34,7 +34,7 @@ class AnimesOnlineCC(PluginInterface):
 
     @staticmethod
     def search_anime(query: str):
-        url = "https://animesonlinecc.to/search/" + "+".join(query.split())
+        url = "https://animesonlinecc.to/search/" + "+".join(query.lower().split())
         response = _SESSION.get(url, timeout=REQUEST_TIMEOUT_SECONDS)
         response.raise_for_status()
 

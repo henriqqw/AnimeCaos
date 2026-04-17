@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import sys
+import threading
 from datetime import datetime
 from typing import Any, Callable
 
@@ -27,8 +28,12 @@ from PySide6.QtWidgets import (
 )
 
 from animecaos.services.anime_service import AnimeService
+from animecaos.services.discord_service import DiscordService
+from animecaos.services.downloads_service import DownloadEntry, DownloadsService
 from animecaos.services.history_service import HistoryEntry, HistoryService
 from animecaos.services.anilist_service import AniListService
+from animecaos.services.anilist_auth_service import AniListAuthService
+from animecaos.services.config_service import ConfigService
 from animecaos.services.updater_service import UpdaterService
 
 from .animated_stack import AnimatedStackedWidget
@@ -37,7 +42,7 @@ from .icons import icon_search, icon_terminal
 from .mini_player import MiniPlayer
 from .play_overlay import PlayOverlay
 from .sidebar import SidebarNav
-from .views import AnimeDetailView, HomeView, SearchView
+from .views import AccountView, AnimeDetailView, AnimatedButton, DownloadsView, HomeView, SearchView
 from .workers import FunctionWorker, DownloadWorker, UpdaterCheckWorker
 
 
@@ -181,6 +186,8 @@ _VIEW_HOME = 0
 _VIEW_SEARCH = 1
 _VIEW_DETAIL = 2
 _VIEW_LOG = 3
+_VIEW_ACCOUNT = 4
+_VIEW_DOWNLOADS = 5
 
 
 class MainWindow(QMainWindow):
@@ -193,11 +200,16 @@ class MainWindow(QMainWindow):
         anime_service: AnimeService,
         history_service: HistoryService,
         anilist_service: AniListService,
+        config_service: ConfigService | None = None,
+        anilist_auth_service: AniListAuthService | None = None,
     ) -> None:
         super().__init__()
         self._anime_service = anime_service
         self._history_service = history_service
         self._anilist_service = anilist_service
+        self._downloads_service = DownloadsService()
+        self._config_service = config_service or ConfigService()
+        self._anilist_auth_service = anilist_auth_service or AniListAuthService(self._config_service)
         self._thread_pool = QThreadPool.globalInstance()
         self._active_workers: set[FunctionWorker] = set()
         self._metadata_workers: set[FunctionWorker] = set()
@@ -229,6 +241,21 @@ class MainWindow(QMainWindow):
         self._bind_shortcuts()
         self._reload_history()
         self._check_for_updates()
+        self._restore_anilist_state()
+        self._load_discover_sections()
+
+        # Refresh AniList stats on startup + auto-sync every 5 minutes.
+        if self._anilist_auth_service.is_authenticated():
+            self._refresh_account_stats()
+        self._stats_timer = QTimer(self)
+        self._stats_timer.setInterval(5 * 60 * 1000)
+        self._stats_timer.timeout.connect(self._refresh_account_stats)
+        self._stats_timer.start()
+
+        # Discord Rich Presence
+        self._discord = DiscordService(self._config_service)
+        self._discord.connect()
+        self._update_discord_ui()
 
     # ── UI BUILDING ──────────────────────────────────────────────
 
@@ -256,11 +283,15 @@ class MainWindow(QMainWindow):
         self._search_view = SearchView()
         self._detail_view = AnimeDetailView()
         self._log_view = LogView()
+        self._account_view = AccountView()
+        self._downloads_view = DownloadsView()
 
-        self._stack.addWidget(self._home_view)     # 0
-        self._stack.addWidget(self._search_view)   # 1
-        self._stack.addWidget(self._detail_view)   # 2
-        self._stack.addWidget(self._log_view)      # 3
+        self._stack.addWidget(self._home_view)       # 0
+        self._stack.addWidget(self._search_view)     # 1
+        self._stack.addWidget(self._detail_view)     # 2
+        self._stack.addWidget(self._log_view)        # 3
+        self._stack.addWidget(self._account_view)    # 4
+        self._stack.addWidget(self._downloads_view)  # 5
 
         body.addWidget(self._stack, 1)
         root_layout.addLayout(body, 1)
@@ -328,7 +359,7 @@ class MainWindow(QMainWindow):
         logo.mousePressEvent = lambda e: self._navigate_home()
         branding.addWidget(logo)
 
-        app_title = QLabel('anime<span style="color: #D44242;">caos</span>')
+        app_title = QLabel('Anime<span style="color: #D44242;">Caos</span>')
         app_title.setObjectName("AppTitle")
         app_title.setCursor(Qt.CursorShape.PointingHandCursor)
         app_title.mousePressEvent = lambda e: self._navigate_home()
@@ -352,7 +383,7 @@ class MainWindow(QMainWindow):
         self._search_input.setMaximumWidth(500)
         layout.addWidget(self._search_input)
 
-        self._search_btn = QPushButton()
+        self._search_btn = AnimatedButton()
         self._search_btn.setObjectName("PrimaryButton")
         self._search_btn.setIcon(QIcon(icon_search(16, "#F2F3F5")))
         self._search_btn.setIconSize(QSize(16, 16))
@@ -385,6 +416,23 @@ class MainWindow(QMainWindow):
         self._mini_player.prev_clicked.connect(self._on_previous_clicked)
         self._mini_player.next_clicked.connect(self._on_next_clicked)
         self._mini_player.bar_clicked.connect(self._navigate_to_current_anime)
+
+        # Account view
+        self._account_view.connect_clicked.connect(self._on_anilist_login)
+        self._account_view.disconnect_clicked.connect(self._on_anilist_logout)
+        self._account_view.refresh_clicked.connect(self._refresh_account_stats)
+        self._account_view.discord_toggled.connect(self._on_discord_toggled)
+
+        # Mini player
+        self._mini_player.close_clicked.connect(self._on_mini_player_closed)
+
+        # Discovery sections
+        self._home_view.discover_clicked.connect(self._on_discover_card_clicked)
+
+        # Downloads view
+        self._downloads_view.play_clicked.connect(self._on_download_episode_play)
+        self._downloads_view.delete_clicked.connect(self._on_download_episode_delete)
+        self._downloads_view.open_folder_clicked.connect(self._on_downloads_open_folder)
 
     def _bind_shortcuts(self) -> None:
         QShortcut(QKeySequence("Ctrl+F"), self, self._focus_search)
@@ -468,6 +516,12 @@ class MainWindow(QMainWindow):
             self._breadcrumb.setText(f"  >  {name}" if name else "")
         elif view_idx == _VIEW_LOG:
             self._breadcrumb.setText("  >  Log de Eventos")
+        elif view_idx == _VIEW_ACCOUNT:
+            self._sidebar.set_active("account")
+            self._breadcrumb.setText("  >  Conta")
+        elif view_idx == _VIEW_DOWNLOADS:
+            self._sidebar.set_active("downloads")
+            self._breadcrumb.setText("  >  Downloads")
 
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.BackButton:
@@ -483,9 +537,13 @@ class MainWindow(QMainWindow):
         elif key == "search":
             self._navigate_to_search()
             self._focus_search()
+        elif key == "downloads":
+            self._navigate_to_downloads()
         elif key == "log":
             self._stack.slide_to(_VIEW_LOG)
             self._breadcrumb.setText("  >  Log de Eventos")
+        elif key == "account":
+            self._navigate_to_account()
 
     def _on_escape(self) -> None:
         current = self._stack.currentIndex()
@@ -514,7 +572,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"Buscando '{query}'...")
         self._run_task(
             status_message=f"Buscando '{query}'...",
-            task=lambda: self._anime_service.search_animes(query),
+            task=lambda: self._search_with_translation(query),
             on_success=self._on_search_finished,
         )
 
@@ -538,9 +596,7 @@ class MainWindow(QMainWindow):
         self._set_status(f"{len(titles)} animes encontrados.")
         self._append_log(f"Busca por \"{self._last_search_query}\" concluida — {len(titles)} resultado(s) encontrado(s).")
 
-        for t in titles:
-            if t not in self._cover_cache:
-                self._fetch_card_metadata(t)
+        self._fetch_covers_for_results(titles, self._last_search_query)
 
     # ── CARD CLICKS ──────────────────────────────────────────────
 
@@ -610,6 +666,7 @@ class MainWindow(QMainWindow):
 
         # Show overlay popup
         self._play_overlay.show_loading(anime, index)
+        self._discord.set_loading(anime, index + 1)
 
         self._run_task(
             status_message=f"Reproduzindo '{anime}' episodio {index + 1}...",
@@ -619,8 +676,19 @@ class MainWindow(QMainWindow):
 
     def _play_episode(self, anime: str, episode_index: int) -> dict[str, object]:
         player_url = self._anime_service.resolve_player_url(anime, episode_index)
+
+        # Pre-warm next episode URL cache while this episode plays.
+        # Runs as a daemon thread so it doesn't block MPV opening.
+        # By the time the user finishes the episode, the URL is cached → autoplay is instant.
+        def _prefetch_next():
+            try:
+                self._anime_service.resolve_player_url(anime, episode_index + 1)
+            except Exception:
+                pass
+        threading.Thread(target=_prefetch_next, daemon=True).start()
+
         # Dismiss overlay from worker thread before blocking on player
-        from PySide6.QtCore import QMetaObject, Qt as QtConst, Q_ARG
+        from PySide6.QtCore import QMetaObject, Qt as QtConst
         QMetaObject.invokeMethod(
             self._play_overlay, "dismiss", QtConst.ConnectionType.QueuedConnection
         )
@@ -661,6 +729,7 @@ class MainWindow(QMainWindow):
         cover = self._cover_cache.get(anime)
         ep_count = len(self._episode_titles) if self._episode_titles else episode_index + 1
         self._mini_player.show_playback(anime, episode_index, ep_count, cover)
+        self._discord.update(anime, episode_index + 1, ep_count)
 
         self._detail_view.highlight_episode(episode_index)
         self._detail_view.scroll_to_episode(episode_index)
@@ -672,13 +741,32 @@ class MainWindow(QMainWindow):
         else:
             self._reload_history(silent=True)
 
+        # Only sync to AniList when the episode played to natural EOF.
+        # Quit mid-episode → eof=False → no spurious progress update.
+        if self._anilist_auth_service.is_authenticated() and payload.get("eof"):
+            media_id = self._anilist_service.get_media_id(anime)
+            ep = episode_index + 1
+            total = len(self._episode_titles)
+            if media_id:
+                sync_worker = FunctionWorker(
+                    lambda mid=media_id, e=ep, t=total:
+                        self._anilist_auth_service.update_progress(mid, e, t)
+                )
+                sync_worker.signals.succeeded.connect(self._on_anilist_synced)
+                self._thread_pool.start(sync_worker)
+            else:
+                # media_id not in cache yet — resolve via AniList then sync
+                self._fetch_and_sync_anilist(anime, ep, total)
+
         self._set_status(f"Episodio {episode_index + 1} finalizado.")
         self._append_log(f"Reproducao finalizada: \"{anime}\" Ep {episode_index + 1}.")
 
         if payload.get("eof") and self._mini_player.is_autoplay():
-            if episode_index + 1 < len(self._episode_titles):
-                self._append_log(f"Auto-play: avancando para Ep {episode_index + 2}...")
-                self._on_next_clicked()
+            next_idx = episode_index + 1
+            if next_idx < len(self._episode_titles):
+                self._append_log(f"Auto-play: avancando para Ep {next_idx + 1}...")
+                # Defer past the _busy reset (finished signal fires after succeeded).
+                QTimer.singleShot(0, lambda idx=next_idx: self._on_episode_play_clicked(idx))
 
     def _on_previous_clicked(self) -> None:
         if self._current_episode_index <= 0:
@@ -822,6 +910,391 @@ class MainWindow(QMainWindow):
         self._set_status("Historico aplicado. Clique para continuar.")
         self._append_log(f"Historico restaurado: \"{entry.anime}\" Ep {safe_index + 1} — {len(self._episode_titles)} episodio(s) disponiveis.")
 
+    # ── DOWNLOADS LIBRARY ────────────────────────────────────────
+
+    def _navigate_to_downloads(self) -> None:
+        self._push_nav(_VIEW_DOWNLOADS)
+        self._stack.slide_to(_VIEW_DOWNLOADS)
+        self._sidebar.set_active("downloads")
+        self._breadcrumb.setText("  >  Downloads")
+        self._refresh_downloads_view()
+
+    def _refresh_downloads_view(self) -> None:
+        groups = self._downloads_service.group_by_anime()
+        self._downloads_view.set_downloads(groups, self._cover_cache)
+        for anime in groups:
+            if anime not in self._cover_cache:
+                self._fetch_card_metadata(anime)
+
+    def _on_download_episode_play(self, entry: object) -> None:
+        if not isinstance(entry, DownloadEntry):
+            return
+        self._current_anime = entry.anime
+        self._current_episode_index = entry.episode_num - 1
+        self._play_overlay.show_loading(entry.anime, entry.episode_num - 1)
+        self._run_task(
+            status_message=f"Reproduzindo '{entry.anime}' Ep {entry.episode_num} (offline)...",
+            task=lambda e=entry: self._play_local_file(e),
+            on_success=self._on_local_play_finished,
+        )
+
+    def _play_local_file(self, entry: DownloadEntry) -> dict:
+        from animecaos.player.video_player import play_video as _pv
+        from PySide6.QtCore import QMetaObject, Qt as QtConst
+        QMetaObject.invokeMethod(
+            self._play_overlay, "dismiss", QtConst.ConnectionType.QueuedConnection
+        )
+        result = _pv(entry.file_path)
+        return {"entry": entry, **result}
+
+    def _on_local_play_finished(self, payload: object) -> None:
+        self._play_overlay.dismiss()
+        if not isinstance(payload, dict):
+            return
+        entry = payload.get("entry")
+        if not isinstance(entry, DownloadEntry):
+            return
+        cover = self._cover_cache.get(entry.anime)
+        self._mini_player.show_playback(entry.anime, entry.episode_num - 1, entry.episode_num, cover)
+        self._discord.update(entry.anime, entry.episode_num, entry.episode_num)
+        self._set_status(f"Ep {entry.episode_num} finalizado.")
+        self._append_log(f"Reproducao offline: '{entry.anime}' Ep {entry.episode_num}.")
+
+    def _on_download_episode_delete(self, entry: object) -> None:
+        if not isinstance(entry, DownloadEntry):
+            return
+        self._downloads_service.delete(entry)
+        self._append_log(f"Download removido: '{entry.anime}' Ep {entry.episode_num}.")
+        self._refresh_downloads_view()
+
+    def _on_downloads_open_folder(self) -> None:
+        path = self._downloads_service.get_dir()
+        path.mkdir(parents=True, exist_ok=True)
+        import subprocess as _sp
+        try:
+            if os.name == "nt":
+                _sp.Popen(["explorer", str(path)])
+            else:
+                _sp.Popen(["xdg-open", str(path)])
+        except Exception:
+            pass
+
+    # ── DISCOVERY SECTIONS ───────────────────────────────────────
+
+    def _load_discover_sections(self) -> None:
+        worker = FunctionWorker(self._fetch_discover_data)
+        self._metadata_workers.add(worker)
+        worker.signals.succeeded.connect(self._on_discover_loaded)
+        worker.signals.failed.connect(lambda _: None)
+        worker.signals.finished.connect(lambda w=worker: self._metadata_workers.discard(w))
+        self._thread_pool.start(worker)
+
+    def _fetch_discover_data(self) -> dict:
+        return {
+            "trending": self._anilist_service.fetch_trending(),
+            "seasonal": self._anilist_service.fetch_seasonal(),
+        }
+
+    def _on_discover_loaded(self, payload: object) -> None:
+        if not isinstance(payload, dict):
+            return
+        trending = payload.get("trending") or []
+        seasonal = payload.get("seasonal") or []
+        self._home_view.set_trending_cards(trending)
+        self._home_view.set_seasonal_cards(seasonal)
+        # Populate cover_cache from already-downloaded covers — no extra AniList calls.
+        for card in trending + seasonal:
+            title = card.get("title", "")
+            cover_path = card.get("cover_path")
+            if title and cover_path and os.path.exists(str(cover_path)):
+                self._cover_cache[title] = str(cover_path)
+
+    def _on_discover_card_clicked(self, data: dict) -> None:
+        title = data.get("title", "")
+        if not title:
+            return
+        query = title.split(":")[0].strip()
+        if query == query.upper() and len(query) > 1:
+            query = query.title()
+
+        # The discover card already has a real AniList cover — carry it forward
+        anilist_cover: str | None = data.get("cover_path") or None
+
+        self._last_search_query = query
+        self._search_input.setText(query)
+        self._search_view.show_searching(query)
+        self._navigate_to_search()
+        self._append_log(f"Discover: buscando '{query}'...")
+        self._set_status(f"Buscando '{query}'...")
+
+        worker = FunctionWorker(lambda q=query: self._search_with_translation(q))
+        self._metadata_workers.add(worker)
+        worker.signals.succeeded.connect(
+            lambda results, t=title, q=query, c=anilist_cover:
+                self._on_discover_search_done(results, t, q, c)
+        )
+        worker.signals.failed.connect(
+            lambda _e, q=query: (
+                self._search_view.set_results([], q),
+                self._set_status(f"Erro ao buscar '{q}'."),
+            )
+        )
+        worker.signals.finished.connect(lambda w=worker: self._metadata_workers.discard(w))
+        self._thread_pool.start(worker)
+
+    def _on_discover_search_done(
+        self,
+        results: object,
+        original_title: str,
+        query: str,
+        anilist_cover: str | None = None,
+    ) -> None:
+        if not isinstance(results, list):
+            results = []
+        titles = [str(r) for r in results]
+        cards = [{"title": t, "cover_path": self._cover_cache.get(t)} for t in titles]
+        self._search_view.set_results(cards, query)
+
+        if not titles:
+            self._set_status(f"'{query}' nao encontrado nas fontes.")
+            self._append_log(f"Discover: '{original_title}' sem resultados.")
+            return
+
+        self._set_status(f"{len(titles)} resultado(s) para '{query}'.")
+
+        # Apply AniList cover (already downloaded) to all results that lack one
+        if anilist_cover and os.path.exists(anilist_cover):
+            for t in titles:
+                if t not in self._cover_cache:
+                    self._cover_cache[t] = anilist_cover
+                    self._search_view.update_card_cover(t, anilist_cover)
+        else:
+            # Fallback: fetch covers per title AND via original query
+            self._fetch_covers_for_results(titles, query)
+
+        # Auto-navigate on high-confidence fuzzy match (≥ 75%)
+        best = self._fuzzy_best_match(query, titles)
+        score = self._fuzzy_score(query, best)
+        if score >= 75:
+            self._append_log(f"Discover: '{original_title}' → '{best}' ({score}%) — navegando.")
+            self._current_anime = best
+            self._navigate_to_detail(best)
+        else:
+            self._append_log(f"Discover: {len(titles)} resultado(s) — escolha manual necessaria.")
+
+    def _search_with_translation(self, query: str) -> list[str]:
+        """Search scrapers with progressive fallback:
+        1. Original query
+        2. Compact-query expansions (space at word boundaries)
+        3. AniList title variants (romaji / english) + short first token
+        """
+        results = self._anime_service.search_animes(query)
+        if results:
+            return results
+
+        # ── Step 2: compact query expansions ──────────────────────────
+        # "rezero" → try "re zero" (pos 2), "rez ero" (pos 3), "reze ro" (pos 4)
+        # "re zero" slugifies to "re-zero" which most sites have indexed.
+        if " " not in query and "-" not in query and len(query) > 4:
+            tried: set[str] = {query.lower()}
+            for pos in (2, 3, 4):
+                if pos >= len(query) - 1:
+                    break
+                expanded = query[:pos] + " " + query[pos:]
+                if expanded.lower() not in tried:
+                    tried.add(expanded.lower())
+                    self._append_log(f"Busca: tentando expansao '{expanded}'...")
+                    results = self._anime_service.search_animes(expanded)
+                    if results:
+                        return results
+
+        # ── Step 3: AniList title variant fallback ────────────────────
+        variants = self._anilist_service.get_title_variants(query)
+        seen: set[str] = {query.lower()}
+        candidates: list[str] = []
+
+        for v in variants:
+            if not v:
+                continue
+            if v.lower() not in seen:
+                candidates.append(v)
+                seen.add(v.lower())
+            # Short: first space-token — "Re:Zero kara..." → "Re:Zero"
+            words = v.split()
+            short = words[0].strip(" -") if words else ""
+            if short and short.lower() not in seen and len(short) >= 3:
+                candidates.append(short)
+                seen.add(short.lower())
+
+        for candidate in candidates:
+            self._append_log(f"Busca: '{query}' sem resultados — tentando '{candidate}'...")
+            results = self._anime_service.search_animes(candidate)
+            if results:
+                return results
+
+        return []
+
+    @staticmethod
+    def _normalize_title(text: str) -> str:
+        """Normalize for fuzzy comparison: lowercase, strip accents, collapse punctuation."""
+        import unicodedata
+        # Remove accents (é→e, ã→a, ü→u, etc.)
+        nfkd = unicodedata.normalize("NFKD", text)
+        ascii_text = nfkd.encode("ascii", "ignore").decode("ascii")
+        # Lowercase
+        s = ascii_text.lower()
+        # Apostrophes / curly quotes → remove (Hell's → hells, don't → dont)
+        s = re.sub(r"['\u2019\u2018`]", "", s)
+        # Dashes, underscores → space (Re-Zero → re zero)
+        s = re.sub(r"[-_]", " ", s)
+        # Remove remaining non-alphanumeric (except spaces)
+        s = re.sub(r"[^\w\s]", "", s)
+        # Collapse whitespace
+        return " ".join(s.split())
+
+    def _fuzzy_best_match(self, query: str, candidates: list[str]) -> str:
+        if len(candidates) == 1:
+            return candidates[0]
+        try:
+            from fuzzywuzzy import fuzz
+            q = self._normalize_title(query)
+            return max(candidates, key=lambda c: fuzz.partial_ratio(q, self._normalize_title(c)))
+        except Exception:
+            return candidates[0]
+
+    def _fuzzy_score(self, query: str, candidate: str) -> int:
+        try:
+            from fuzzywuzzy import fuzz
+            return fuzz.partial_ratio(self._normalize_title(query), self._normalize_title(candidate))
+        except Exception:
+            return 0
+
+    # ── ANILIST ACCOUNT ──────────────────────────────────────────
+
+    def _navigate_to_account(self) -> None:
+        self._push_nav(_VIEW_ACCOUNT)
+        self._stack.slide_to(_VIEW_ACCOUNT)
+        self._sidebar.set_active("account")
+        self._breadcrumb.setText("  >  Conta")
+        # Show cached values immediately, then refresh live from AniList.
+        user = self._anilist_auth_service.get_user()
+        self._account_view.set_authenticated(user)
+        if user and user.get("avatar_url"):
+            self._fetch_avatar()
+        if self._anilist_auth_service.is_authenticated():
+            self._refresh_account_stats()
+        self._update_discord_ui()
+
+    def _restore_anilist_state(self) -> None:
+        if self._anilist_auth_service.is_authenticated():
+            self._sidebar.set_account_connected(True)
+
+    def _on_anilist_login(self) -> None:
+        self._account_view.set_connecting(True)
+        worker = FunctionWorker(self._anilist_auth_service.login)
+        worker.signals.succeeded.connect(self._on_login_result)
+        worker.signals.failed.connect(lambda _: self._on_login_result(False))
+        self._thread_pool.start(worker)
+
+    def _on_login_result(self, success: object) -> None:
+        self._account_view.set_connecting(False)
+        if success:
+            user = self._anilist_auth_service.get_user()
+            self._account_view.set_authenticated(user)
+            self._sidebar.set_account_connected(True)
+            if user and user.get("avatar_url"):
+                self._fetch_avatar()
+            self._append_log(f"AniList: conectado como {(user or {}).get('username', '')}.")
+        else:
+            self._append_log("AniList: login cancelado ou falhou.")
+
+    def _on_anilist_logout(self) -> None:
+        self._anilist_auth_service.logout()
+        self._account_view.set_authenticated(None)
+        self._sidebar.set_account_connected(False)
+        self._append_log("AniList: desconectado.")
+
+    # ── DISCORD ──────────────────────────────────────────────────
+
+    def _on_mini_player_closed(self) -> None:
+        self._discord.clear()
+
+    def _on_discord_toggled(self, enabled: bool) -> None:
+        self._config_service.set("discord_rp_enabled", enabled)
+        if enabled:
+            self._discord.reconnect()
+        else:
+            self._discord.disconnect()
+        QTimer.singleShot(1500, self._update_discord_ui)
+
+    def _update_discord_ui(self) -> None:
+        self._account_view.set_discord_state(
+            enabled=bool(self._config_service.get("discord_rp_enabled")),
+            connected=self._discord.is_connected(),
+        )
+
+    def closeEvent(self, event) -> None:
+        self._discord.disconnect()
+        super().closeEvent(event)
+
+    def _fetch_and_sync_anilist(self, anime: str, episode: int, total: int) -> None:
+        """Resolve media_id on-demand (if not yet cached) then sync progress."""
+        def task(a=anime, e=episode, t=total):
+            self._anilist_service.fetch_anime_info(a)
+            mid = self._anilist_service.get_media_id(a)
+            if not mid:
+                return False
+            return self._anilist_auth_service.update_progress(mid, e, t)
+        worker = FunctionWorker(task)
+        worker.signals.succeeded.connect(self._on_anilist_synced)
+        self._metadata_workers.add(worker)
+        worker.signals.finished.connect(lambda w=worker: self._metadata_workers.discard(w))
+        self._thread_pool.start(worker)
+
+    def _on_anilist_synced(self, success: object) -> None:
+        if not success:
+            self._append_log("AniList: falha ao sincronizar progresso — verifique conexao/token.")
+            return
+        self._append_log("AniList: progresso sincronizado.")
+        # Delay 3 s before re-fetching stats: AniList aggregates episodesWatched
+        # asynchronously on their server — querying immediately returns stale data.
+        QTimer.singleShot(3000, self._refresh_account_stats)
+
+    def _refresh_account_stats(self) -> None:
+        if not self._anilist_auth_service.is_authenticated():
+            return
+        worker = FunctionWorker(self._anilist_auth_service.refresh_user_stats)
+        self._metadata_workers.add(worker)
+        worker.signals.succeeded.connect(self._on_anilist_stats_refreshed)
+        worker.signals.finished.connect(lambda w=worker: self._metadata_workers.discard(w))
+        self._thread_pool.start(worker)
+
+    def _on_anilist_stats_refreshed(self, result: object) -> None:
+        if result is False:
+            self._append_log("AniList: falha ao buscar stats — verifique conexao/token.")
+        user = self._anilist_auth_service.get_user()
+        if user and result is not False:
+            self._append_log(
+                f"AniList stats: {user.get('anime_count', 0)} animes, "
+                f"{user.get('episodes_watched', 0)} eps, "
+                f"{(user.get('minutes_watched') or 0) // 60}h"
+            )
+        self._account_view.set_authenticated(user)
+
+    def _fetch_avatar(self) -> None:
+        worker = FunctionWorker(self._anilist_auth_service.fetch_avatar_bytes)
+        worker.signals.succeeded.connect(self._on_avatar_fetched)
+        self._thread_pool.start(worker)
+
+    def _on_avatar_fetched(self, data: object) -> None:
+        if not isinstance(data, bytes) or not data:
+            return
+        from PySide6.QtGui import QPixmap as _QPixmap
+        pm = _QPixmap()
+        pm.loadFromData(data)
+        if not pm.isNull():
+            self._account_view.set_avatar_pixmap(pm)
+
     # ── METADATA ─────────────────────────────────────────────────
 
     def _fetch_metadata(self, anime: str) -> None:
@@ -851,6 +1324,84 @@ class MainWindow(QMainWindow):
         if self._detail_view.anime_name == anime:
             self._detail_view.set_metadata(desc, str(cover) if cover else None)
 
+    @staticmethod
+    def _clean_anilist_key(title: str) -> str:
+        """Derive the AniList search key from a scraper title (mirrors fetch_anime_info logic)."""
+        clean = title.replace("(Dublado)", "").replace("(Legendado)", "").strip()
+        if " - " in clean:
+            clean = clean.split(" - ")[0].strip()
+        return clean.lower()
+
+    def _fetch_covers_for_results(self, titles: list[str], search_query: str) -> None:
+        """Group titles by cleaned AniList key → one fetch per group (avoids rate-limiting).
+        Cover is applied to all titles in the group simultaneously.
+        """
+        missing = [t for t in titles if t not in self._cover_cache]
+        if not missing:
+            return
+
+        groups: dict[str, list[str]] = {}
+        for t in missing:
+            key = self._clean_anilist_key(t)
+            groups.setdefault(key, []).append(t)
+
+        for clean_key, group_titles in groups.items():
+            self._fetch_cover_for_group(clean_key, group_titles)
+
+        # Extra: user query as fallback — in case scraper titles don't match any group key
+        if search_query and self._clean_anilist_key(search_query) not in groups:
+            def _qfetch(q: str = search_query, ts: list = list(missing)) -> tuple:
+                info = self._anilist_service.fetch_anime_info(q)
+                return info, q, ts
+            qworker = FunctionWorker(_qfetch)
+            self._metadata_workers.add(qworker)
+            qworker.signals.succeeded.connect(self._on_query_cover_fetched)
+            qworker.signals.finished.connect(lambda w=qworker: self._metadata_workers.discard(w))
+            self._thread_pool.start(qworker)
+
+    def _fetch_cover_for_group(self, clean_key: str, group_titles: list[str]) -> None:
+        def task(k: str = clean_key, ts: list = list(group_titles)) -> tuple:
+            info = self._anilist_service.fetch_anime_info(k)
+            return info, ts
+        worker = FunctionWorker(task)
+        self._metadata_workers.add(worker)
+        worker.signals.succeeded.connect(self._on_group_cover_fetched)
+        worker.signals.finished.connect(lambda w=worker: self._metadata_workers.discard(w))
+        self._thread_pool.start(worker)
+
+    def _on_group_cover_fetched(self, payload: object) -> None:
+        if not isinstance(payload, tuple) or len(payload) != 2:
+            return
+        info, group_titles = payload
+        if not isinstance(info, dict) or not isinstance(group_titles, list):
+            return
+        cover = info.get("cover_path")
+        if not cover or not os.path.exists(str(cover)):
+            return
+        for t in group_titles:
+            if t not in self._cover_cache:
+                self._cover_cache[t] = str(cover)
+                self._home_view.update_card_cover(t, str(cover))
+                self._home_view.update_discover_cover(t, str(cover))
+                self._search_view.update_card_cover(t, str(cover))
+
+    def _on_query_cover_fetched(self, payload: object) -> None:
+        if not isinstance(payload, tuple) or len(payload) != 3:
+            return
+        info, query, titles = payload
+        if not isinstance(info, dict) or not isinstance(titles, list):
+            return
+        cover = info.get("cover_path")
+        if not cover or not os.path.exists(str(cover)):
+            return
+        # Apply to ALL titles that still have no cover (query-level fallback)
+        for t in [str(t) for t in titles]:
+            if t not in self._cover_cache:
+                self._cover_cache[t] = str(cover)
+                self._home_view.update_card_cover(t, str(cover))
+                self._home_view.update_discover_cover(t, str(cover))
+                self._search_view.update_card_cover(t, str(cover))
+
     def _fetch_card_metadata(self, anime: str) -> None:
         if anime in self._cover_cache:
             return
@@ -870,7 +1421,9 @@ class MainWindow(QMainWindow):
         if cover and os.path.exists(str(cover)):
             self._cover_cache[anime] = str(cover)
             self._home_view.update_card_cover(anime, str(cover))
+            self._home_view.update_discover_cover(anime, str(cover))
             self._search_view.update_card_cover(anime, str(cover))
+            self._downloads_view.update_cover(anime, str(cover))
 
     # ── TASK RUNNER ──────────────────────────────────────────────
 

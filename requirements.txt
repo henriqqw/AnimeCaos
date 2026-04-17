@@ -7,3 +7,4 @@ PySide6==6.10.2
 windows-curses==2.4.0; platform_system == "Windows"
 pyinstaller==6.11.1
 yt-dlp>=2023.1.1
+pypresence>=4.3.0

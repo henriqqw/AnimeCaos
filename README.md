@@ -3,15 +3,11 @@
 
 # AnimeCaos
 
-**App de streaming desktop minimalista, sem anúnciosm, rápido e autônomo para animes.**
+Assista anime no desktop, sem anúncios, sem abrir navegador.
 
-Centralize sua experiência de assistir anime em uma única aplicação, sem anúncios intrusivos e com busca inteligente entre múltiplas fontes.
+[Website](https://animecaos.vercel.app) · [Instagram](https://www.instagram.com/getanimecaos/) · [Twitter](https://x.com/getanimecaos)
 
-🌐 Website: https://animecaos.vercel.app
-📷 Instagram: https://www.instagram.com/getanimecaos/
-🐦 Twitter: https://x.com/getanimecaos
-
-![Version](https://img.shields.io/badge/version-v0.1.0-red.svg)
+![Version](https://img.shields.io/badge/version-v0.1.3-red.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
@@ -19,135 +15,133 @@ Centralize sua experiência de assistir anime em uma única aplicação, sem an�
 
 ---
 
-# 🖼 Preview
-
 <div align="center">
-  <img src="public/screenshot2.webp" alt="AnimeCaos - Tela do App" width="780"/>
-  <br/>
-  <em>Tela principal do app</em>
+  <img src="public/screenshot2.webp" alt="AnimeCaos" width="780"/>
 </div>
 
 <br/>
 
 <div align="center">
   <img src="public/screenshot4.webp" alt="AnimeCaos - Busca" width="780"/>
-  <br/>
-  <em>Busca com capas dinamicas</em>
 </div>
 
 <br/>
 
 <div align="center">
-  <img src="public/screenshot3.webp" alt="AnimeCaos - Detalhes" width="780"/>
-  <br/>
-  <em>Detalhes do anime e lista de episodios</em>
+  <img src="public/screenshot3.webp" alt="AnimeCaos - Episodios" width="780"/>
 </div>
 
 <br/>
 
 <div align="center">
   <img src="public/screenshot.webp" alt="AnimeCaos - Player" width="680"/>
-  <br/>
-  <em>Player integrado</em>
 </div>
 
 ---
 
-# 📺 Sobre o Projeto
+## O que é
 
-O **AnimeCaos** é uma aplicação desktop open source criada para **centralizar a experiência de assistir animes**.
+AnimeCaos é um app desktop que agrega fontes públicas de anime em uma única interface. Você busca, escolhe o episódio e assiste — sem sair do app, sem anúncio no meio.
 
-Quem acompanha anime frequentemente precisa:
-
-- navegar por vários sites diferentes  
-- lidar com anúncios intrusivos  
-- usar players inconsistentes  
-- procurar episódios manualmente  
-
-O AnimeCaos resolve esse problema funcionando como um **agregador inteligente de fontes públicas**, reunindo busca, reprodução e gerenciamento de episódios em uma única interface desktop.
-
-A aplicação foi construída como um **experimento prático de automação web, scraping e agregação de dados**, explorando a integração de diversas bibliotecas Python utilizadas em projetos reais.
+Surgiu da necessidade de ter um lugar só pra isso, sem depender de site com popup a cada clique.
 
 ---
 
-# ✨ Funcionalidades
+## Funcionalidades
 
-### 🎬 Hub de Streaming Inteligente
-Busca unificada em múltiplas fontes brasileiras simultaneamente.
+### Navegação e player
 
-### 🖼 Integração AniList
-Busca automática de:
+- **Busca e play em ~5s** — player_cache + prefetch do próximo episódio em background
+- **Mini player persistente** — flutua sobre outras janelas enquanto você navega no app
+- **Autoplay** — próximo episódio começa automaticamente ao fim de cada um
+- **Qualidade automática** — MPV prefere 1080p > 720p, HLS pega o bitrate máximo
+- **Retomar de onde parou** — abre o episódio certo com scroll automático no histórico
 
-- capas oficiais
-- sinopses
-- metadados
+### Conteúdo
 
-utilizando a API **GraphQL do AniList**.
+- **Home com Em Alta + Temporada Atual** — dados da API pública do AniList
+- **Busca inteligente com fallback** — tenta variações via AniList (romaji/english) + fuzzy match
+- **Capas dinâmicas** — quando não há capa, gera uma com gradiente + inicial do anime
+- **Biblioteca de downloads** — yt-dlp integrado, biblioteca local separada
 
-### ⭐ Watchlist & Histórico
-Sistema local para:
+### Conta e integrações
 
-- salvar animes favoritos
-- acompanhar episódios assistidos
-- continuar de onde parou
+- **Integração AniList** — OAuth completo, sincroniza histórico e stats automaticamente
+- **Discord Rich Presence** — mostra o anime e episódio que você está assistindo no Discord
 
-### ⏭ Auto-Play Next
-Detecta o fim natural do episódio e avança automaticamente para o próximo.
+### App
 
-### ⬇ Download Offline
-Gerenciador de downloads integrado usando **yt-dlp**, com logs de progresso.
-
-### 💨 Executável Standalone
-Scripts de build permitem gerar um executável completo que já inclui dependências necessárias.
+- **Auto-update** — checa releases no GitHub e baixa a atualização dentro do próprio app
+- **Navegação com histórico** — Alt+← volta, botão voltar do mouse funciona, breadcrumb
+- **Log panel** — registro de todos os eventos em tempo real para debug
+- **Splash screen** com animação no startup
+- **Atalhos de teclado** — `Ctrl+F` busca, `Ctrl+←/→` ep anterior/próximo, `Alt+←` voltar, `Escape`
 
 ---
 
-# 🧠 Tecnologias Utilizadas
+## Tecnologias
 
-O projeto foi desenvolvido em **Python** e integra várias bibliotecas populares do ecossistema.
-
-| Tecnologia | Função |
+| | |
 |---|---|
-| **PySide6** | Interface gráfica desktop |
-| **Selenium** | Automação de navegação para páginas dinâmicas |
-| **Requests + BeautifulSoup** | Coleta e parsing de HTML |
-| **FuzzyWuzzy + Levenshtein** | Busca aproximada (fuzzy search) |
-| **yt-dlp** | Extração e resolução de streams de vídeo |
-| **mpv** | Player de vídeo externo |
-| **PyInstaller** | Empacotamento do executável |
+| PySide6 | Interface gráfica |
+| Selenium | Navegação em páginas dinâmicas |
+| Requests + BeautifulSoup | Scraping |
+| FuzzyWuzzy | Busca aproximada |
+| yt-dlp | Extração de streams |
+| mpv | Player de vídeo |
 
 ---
 
-# 🔎 O que o projeto explora
+## Requisitos
 
-Este projeto também funciona como um **laboratório prático para experimentar**:
+- Python 3.10+
+- Mozilla Firefox
+- mpv
+- geckodriver
 
-- automação de navegação web  
-- scraping de conteúdo dinâmico  
-- agregação de múltiplas fontes  
-- fuzzy matching para busca aproximada  
-- integração entre bibliotecas Python  
-- distribuição de aplicações desktop  
+Firefox é usado pelos scrapers para lidar com páginas que bloqueiam requests diretos.
 
 ---
 
-# 🛠 Pré-requisitos
-
-Para rodar a partir do código fonte:
-
-- **Python 3.10+**
-- **Mozilla Firefox**
-- **mpv**
-- **yt-dlp**
-
-Firefox é utilizado pelos scrapers Selenium para lidar com páginas protegidas por **Cloudflare**.
-
----
-
-# 📦 Instalação (Source)
+## Rodando pelo código fonte
 
 ```bash
-git clone https://github.com/henriqqw/anicaos.git
-cd anicaos
+git clone https://github.com/henriqqw/AnimeCaos.git
+cd AnimeCaos
 
 python -m venv venv
+venv\Scripts\activate  # Windows
+# source venv/bin/activate  # Linux/Mac
+
+pip install -r requirements.txt
+python main.py
+```
+
+---
+
+## Linux (Flatpak)
+
+```bash
+git clone https://github.com/henriqqw/AnimeCaos.git
+cd AnimeCaos
+chmod +x build-flatpak.sh
+./build-flatpak.sh
+
+flatpak run com.animecaos.App
+```
+
+---
+
+## Build Windows (.exe)
+
+```bash
+python build_release.py
+```
+
+O executável fica em `dist/Animecaos`.
+
+---
+
+## Licença
+
+MIT

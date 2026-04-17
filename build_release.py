@@ -10,7 +10,7 @@ from pathlib import Path
 # Configs
 MPV_URL = "https://sourceforge.net/projects/mpv-player-windows/files/64bit/mpv-x86_64-20231231-git-aa8f108.7z/download"
 YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-GECKODRIVER_URL = "https://github.com/mozilla/geckodriver/releases/download/v0.34.0/geckodriver-v0.34.0-win64.zip"
+GECKODRIVER_URL = "https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-win64.zip"
 
 BASE_DIR = Path(os.path.abspath("."))
 BIN_DIR = BASE_DIR / "bin"
@@ -81,11 +81,9 @@ def run_pyinstaller():
         "--add-data=public/icon.png;public",
         "--add-data=public/icon.ico;public",
         "--add-data=bin;bin", # the crucial part: embedding our downloaded binaries!
-        "--hidden-import=animecaos.plugins.hinatasoul",
         "--hidden-import=animecaos.plugins.betteranime",
         "--hidden-import=animecaos.plugins.animesonlinecc",
         "--hidden-import=animecaos.plugins.animefire",
-        "--hidden-import=animecaos.plugins.animesvision",
         "main.py"
     ]
     

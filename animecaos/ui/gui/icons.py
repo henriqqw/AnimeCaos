@@ -295,6 +295,44 @@ def icon_search_x(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
     return pm
 
 
+# ── Icon: User (profile) ─────────────────────────────────────────
+def icon_user(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
+    pm, p, s, c = _begin(size, color)
+    # Head: circle cx=12, cy=8, r=5
+    p.drawEllipse(QRectF(_s(7, s), _s(3, s), _s(10, s), _s(10, s)))
+    # Shoulders: top arc of circle centered at (12,21) with r=8
+    p.drawArc(
+        QRectF(_s(4, s), _s(13, s), _s(16, s), _s(16, s)),
+        0,
+        180 * 16,
+    )
+    p.end()
+    return pm
+
+
+# ── Icon: Folder (downloads library) ────────────────────────────
+def icon_folder(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
+    pm, p, s, c = _begin(size, color)
+    # Tab: top-left bump
+    tab = QPainterPath()
+    tab.moveTo(_s(2, s), _s(10, s))
+    tab.lineTo(_s(2, s), _s(8, s))
+    tab.lineTo(_s(9, s), _s(8, s))
+    tab.lineTo(_s(11, s), _s(6, s))
+    tab.lineTo(_s(22, s), _s(6, s))
+    tab.lineTo(_s(22, s), _s(10, s))
+    tab.closeSubpath()
+    p.drawPath(tab)
+    # Body
+    body = QPainterPath()
+    body.addRoundedRect(
+        QRectF(_s(2, s), _s(10, s), _s(20, s), _s(12, s)), _s(1.5, s), _s(1.5, s)
+    )
+    p.drawPath(body)
+    p.end()
+    return pm
+
+
 # ── Utility: create QIcon from pixmap function ───────────────────
 def make_icon(fn, size: int = 20, color: str = "#A7ACB5", **kwargs) -> QIcon:
     """Wrap an icon function into a QIcon."""

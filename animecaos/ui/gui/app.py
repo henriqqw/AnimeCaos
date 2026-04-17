@@ -9,6 +9,8 @@ from PySide6.QtWidgets import QApplication
 from animecaos.services.anime_service import AnimeService
 from animecaos.services.history_service import HistoryService
 from animecaos.services.anilist_service import AniListService
+from animecaos.services.anilist_auth_service import AniListAuthService
+from animecaos.services.config_service import ConfigService
 from .main_window import MainWindow
 from .splash import SplashScreen
 from .theme import build_stylesheet
@@ -41,6 +43,8 @@ def run_gui(debug: bool = False) -> int:
     anime_service = AnimeService(debug=debug)
     history_service = HistoryService()
     anilist_service = AniListService()
+    config_service = ConfigService()
+    anilist_auth_service = AniListAuthService(config_service)
 
     window: MainWindow | None = None
 
@@ -50,6 +54,8 @@ def run_gui(debug: bool = False) -> int:
             anime_service=anime_service,
             history_service=history_service,
             anilist_service=anilist_service,
+            config_service=config_service,
+            anilist_auth_service=anilist_auth_service,
         )
         window.show()
 

@@ -51,23 +51,25 @@ class Repository:
 
         _SEARCH_TIMEOUT = 15  # seconds — don't wait forever for slow plugins
 
-        with ThreadPoolExecutor(max_workers=min(len(self.sources), _max_workers())) as executor:
-            future_to_name = {
-                executor.submit(plugin.search_anime, query): name
-                for name, plugin in self.sources.items()
-            }
-            try:
-                for future in as_completed(future_to_name, timeout=_SEARCH_TIMEOUT):
-                    name = future_to_name[future]
-                    try:
-                        future.result(timeout=0)
-                    except Exception as exc:
-                        log.warning("Fonte '%s' falhou na busca: %s", name, exc)
-            except Exception:
-                # Some plugins didn't finish in time — use whatever results we have
-                slow = [n for f, n in future_to_name.items() if not f.done()]
-                if slow:
-                    log.warning("Fontes lentas ignoradas: %s", ", ".join(slow))
+        executor = ThreadPoolExecutor(max_workers=min(len(self.sources), _max_workers()))
+        future_to_name = {
+            executor.submit(plugin.search_anime, query): name
+            for name, plugin in self.sources.items()
+        }
+        try:
+            for future in as_completed(future_to_name, timeout=_SEARCH_TIMEOUT):
+                name = future_to_name[future]
+                try:
+                    future.result(timeout=0)
+                except Exception as exc:
+                    log.warning("Fonte '%s' falhou na busca: %s", name, exc)
+        except Exception:
+            # Some plugins didn't finish in time — use whatever results we have
+            slow = [n for f, n in future_to_name.items() if not f.done()]
+            if slow:
+                log.warning("Fontes lentas ignoradas: %s", ", ".join(slow))
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
 
     def _normalize_title(self, title: str) -> str:
         normalized = title.lower()

@@ -19,6 +19,8 @@ from PySide6.QtCore import (
     QPropertyAnimation,
     QEasingCurve,
     Property,
+    QObject,
+    QEvent,
 )
 from PySide6.QtGui import (
     QPixmap, QPainter, QPainterPath, QFont, QCursor, QIcon, QColor,
@@ -289,8 +291,22 @@ class HorizontalCardScroll(QWidget):
         self._scroll.setWidget(self._container)
         outer.addWidget(self._scroll)
 
+        # Redirect vertical wheel → horizontal scroll
+        self._scroll.viewport().installEventFilter(self)
+        self._container.installEventFilter(self)
+
         self._cards: list[AnimeCard] = []
         self._empty_state: EmptyState | None = None
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.Wheel:
+            delta = event.angleDelta().y()
+            if delta == 0:
+                delta = -event.angleDelta().x()
+            bar = self._scroll.horizontalScrollBar()
+            bar.setValue(bar.value() - delta)
+            return True
+        return super().eventFilter(obj, event)
 
     def set_cards(self, items: list[dict[str, Any]]) -> None:
         for card in self._cards:

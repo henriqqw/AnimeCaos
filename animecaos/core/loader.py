@@ -5,7 +5,7 @@ from collections.abc import Sequence
 
 log = logging.getLogger(__name__)
 
-AVAILABLE_PLUGINS: tuple[str, ...] = ("hinatasoul", "betteranime", "animesonlinecc", "animefire", "animesvision")
+AVAILABLE_PLUGINS: tuple[str, ...] = ("betteranime", "animesonlinecc", "animefire", "animeplayer")
 
 
 class PluginInterface(ABC):

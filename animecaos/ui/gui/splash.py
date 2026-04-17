@@ -59,7 +59,7 @@ _STATUS_STEPS: list[tuple[int, str]] = [
     (1800, "Quase pronto..."),
 ]
 
-_BRAND = "animecaos"
+_BRAND = "AnimeCaos"
 _ACCENT = QColor(212, 66, 66)
 _BG_DARK = QColor(11, 12, 15)
 _BG_MID = QColor(16, 18, 24)

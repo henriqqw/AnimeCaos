@@ -39,7 +39,7 @@ def _is_video_url(url: str) -> bool:
 
 def _slugify_query(query: str) -> str:
     ascii_query = unicodedata.normalize("NFKD", query).encode("ascii", "ignore").decode("ascii")
-    slug = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_query).strip("-")
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", ascii_query).strip("-").lower()
     return slug
 
 
@@ -135,8 +135,10 @@ class AnimeFire(PluginInterface):
             resp = _SESSION.get(api_url, timeout=REQUEST_TIMEOUT_SECONDS)
             if resp.status_code == 200:
                 for entry in resp.json().get("data", []):
-                    src = (entry.get("src") or entry.get("url") or entry.get("link")
-                           or entry.get("file") or entry.get("video") or entry.get("hd") or entry.get("sd"))
+                    # Prefer HD keys first, then generic src/url, then SD as last resort.
+                    src = (entry.get("hd") or entry.get("src") or entry.get("url")
+                           or entry.get("link") or entry.get("file") or entry.get("video")
+                           or entry.get("sd"))
                     if src and _is_video_url(src):
                         return validate_player_src(src, AnimeFire.name)
         except Exception as exc:

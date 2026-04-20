@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .icons import icon_download, icon_folder, icon_home, icon_search, icon_terminal, icon_user
+from .icons import icon_book, icon_download, icon_folder, icon_home, icon_search, icon_terminal, icon_user
 from .views import AnimatedButton
 
 
@@ -52,6 +52,11 @@ class SidebarNav(QFrame):
         dl_btn = self._make_nav_btn(icon_folder(22, "#A7ACB5"), "Downloads")
         self._buttons["downloads"] = dl_btn
         layout.addWidget(dl_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+
+        # Manga reader
+        manga_btn = self._make_nav_btn(icon_book(22, "#A7ACB5"), "Manga")
+        self._buttons["manga"] = manga_btn
+        layout.addWidget(manga_btn, 0, Qt.AlignmentFlag.AlignHCenter)
 
         layout.addStretch()
 

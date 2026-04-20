@@ -333,6 +333,22 @@ def icon_folder(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
     return pm
 
 
+# ── Icon: Book (manga) ───────────────────────────────────────────
+def icon_book(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
+    pm, p, s, c = _begin(size, color)
+    # Book cover outline
+    body = QPainterPath()
+    body.addRoundedRect(QRectF(_s(4, s), _s(2, s), _s(14, s), _s(20, s)), _s(1.5, s), _s(1.5, s))
+    p.drawPath(body)
+    # Spine line
+    p.drawLine(QPointF(_s(8, s), _s(2, s)), QPointF(_s(8, s), _s(22, s)))
+    # Two text lines
+    p.drawLine(QPointF(_s(10, s), _s(7, s)), QPointF(_s(16, s), _s(7, s)))
+    p.drawLine(QPointF(_s(10, s), _s(10, s)), QPointF(_s(16, s), _s(10, s)))
+    p.end()
+    return pm
+
+
 # ── Utility: create QIcon from pixmap function ───────────────────
 def make_icon(fn, size: int = 20, color: str = "#A7ACB5", **kwargs) -> QIcon:
     """Wrap an icon function into a QIcon."""

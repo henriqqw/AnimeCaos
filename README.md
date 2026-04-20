@@ -16,25 +16,18 @@ Assista anime no desktop, sem anúncios, sem abrir navegador.
 ---
 
 <div align="center">
-  <img src="public/screenshot2.webp" alt="AnimeCaos" width="780"/>
-</div>
-
-<br/>
-
-<div align="center">
-  <img src="public/screenshot4.webp" alt="AnimeCaos - Busca" width="780"/>
-</div>
-
-<br/>
-
-<div align="center">
-  <img src="public/screenshot3.webp" alt="AnimeCaos - Episodios" width="780"/>
-</div>
-
-<br/>
-
-<div align="center">
-  <img src="public/screenshot.webp" alt="AnimeCaos - Player" width="680"/>
+  <table>
+    <tr>
+      <td><img src="https://github.com/user-attachments/assets/cfbcf158-3a6b-412f-9b6e-2131c9249ce5" alt="pesquisar" width="310"/></td>
+      <td><img src="https://github.com/user-attachments/assets/7dd5a9da-8f54-4252-be9c-6763458ab2c5" alt="pesquisado" width="310"/></td>
+      <td><img src="https://github.com/user-attachments/assets/2df8f8c7-1cf2-4d75-8a94-6d6c5a857753" alt="home" width="310"/></td>
+    </tr>
+    <tr>
+      <td><img src="https://github.com/user-attachments/assets/1c0c2a71-c3ef-401d-8530-414c3692876f" alt="anilist" width="310"/></td>
+      <td><img src="https://github.com/user-attachments/assets/7cabccb1-ed90-45f8-9af4-d231cf8f84b0" alt="downloads" width="310"/></td>
+      <td><img src="https://github.com/user-attachments/assets/57c5b171-52fd-44e5-be6d-22344a83952a" alt="anime_eps" width="310"/></td>
+    </tr>
+  </table>
 </div>
 
 ---

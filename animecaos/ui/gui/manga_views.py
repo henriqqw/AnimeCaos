@@ -1,11 +1,13 @@
 """Manga reader views: home/search, detail, and vertical-scroll chapter reader."""
 from __future__ import annotations
 
+import os
 import re
+import sys
 from typing import Optional
 
-from PySide6.QtCore import Qt, QSize, QTimer, QThreadPool, Signal
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import Qt, QSize, QTimer, QThreadPool, Signal, QRectF, QPointF
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QLinearGradient, QRadialGradient, QPainterPath, QFont, QCursor
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
@@ -22,6 +24,138 @@ from PySide6.QtWidgets import (
 from .icons import icon_arrow_left, icon_download, icon_search
 from .views import AnimatedButton
 from .workers import FunctionWorker
+
+
+def _zinnes_logo_path() -> str:
+    try:
+        base = sys._MEIPASS
+    except AttributeError:
+        base = os.path.abspath(".")
+    return os.path.join(base, "public", "zinnes_logo.webp")
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  ZINNES BANNER
+# ═══════════════════════════════════════════════════════════════════
+
+_ZINNES_GOLD       = QColor(245, 172, 40)
+_ZINNES_GOLD_DIM   = QColor(245, 172, 40, 30)
+_ZINNES_GOLD_MID   = QColor(245, 172, 40, 12)
+
+
+class ZinnesBanner(QWidget):
+    """Promotional banner for the Zinnes manga partnership section."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setFixedHeight(130)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
+
+        root = QHBoxLayout(self)
+        root.setContentsMargins(28, 0, 20, 0)
+        root.setSpacing(0)
+
+        # ── LEFT: copy ──────────────────────────────────────────
+        left = QVBoxLayout()
+        left.setContentsMargins(0, 0, 0, 0)
+        left.setSpacing(0)
+        left.addStretch()
+
+        badge = QLabel("EM BREVE")
+        badge.setFixedHeight(20)
+        badge.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        badge.setStyleSheet(
+            "QLabel { color: #F5AC28; background: rgba(245,172,40,0.18);"
+            " border: 1px solid rgba(245,172,40,0.45); border-radius: 10px;"
+            " padding: 0px 10px; font-size: 10px; font-weight: 700; letter-spacing: 1.5px; }"
+        )
+        left.addWidget(badge)
+        left.addSpacing(8)
+
+        headline = QLabel("Mangás Nacionais — Zinnes")
+        headline.setStyleSheet(
+            "QLabel { color: #F2F3F5; font-size: 18px; font-weight: 700;"
+            " background: transparent; }"
+        )
+        left.addWidget(headline)
+        left.addSpacing(5)
+
+        sub = QLabel(
+            "Editora brasileira independente especializada em mangás originais.\n"
+            "Em breve, acesse o catálogo completo diretamente pelo AnimeCaos."
+        )
+        sub.setStyleSheet(
+            "QLabel { color: rgba(200,202,210,0.75); font-size: 12px;"
+            " background: transparent; line-height: 1.4; }"
+        )
+        sub.setWordWrap(True)
+        left.addWidget(sub)
+        left.addStretch()
+
+        root.addLayout(left, 1)
+
+        # ── RIGHT: logo ─────────────────────────────────────────
+        self._logo_lbl = QLabel()
+        self._logo_lbl.setAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+        self._logo_lbl.setStyleSheet("background: transparent;")
+        self._logo_lbl.setFixedWidth(200)
+        self._load_logo()
+        root.addWidget(self._logo_lbl)
+
+    def _load_logo(self) -> None:
+        pm = QPixmap(_zinnes_logo_path())
+        if pm.isNull():
+            return
+        # The WebP has a white background — render onto transparent by colour-keying white
+        pm = pm.scaled(
+            180, 60,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+        # Composite onto transparent bg, replace near-white pixels with transparent
+        result = QPixmap(pm.size())
+        result.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(result)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawPixmap(0, 0, pm)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_DestinationIn)
+        # Mask: white areas become transparent using a threshold image
+        mask = pm.toImage()
+        for y in range(mask.height()):
+            for x in range(mask.width()):
+                c = QColor(mask.pixel(x, y))
+                brightness = (c.red() + c.green() + c.blue()) // 3
+                alpha = 0 if brightness > 230 else 255
+                mask.setPixelColor(x, y, QColor(0, 0, 0, alpha))
+        painter.drawImage(0, 0, mask)
+        painter.end()
+        self._logo_lbl.setPixmap(result)
+
+    def paintEvent(self, event) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        w, h = self.width(), self.height()
+
+        # Rounded card background
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(0, 0, w, h), 14, 14)
+
+        # Base dark fill
+        p.fillPath(path, QColor(18, 20, 26))
+
+        # Subtle gold radial glow from left
+        glow = QRadialGradient(QPointF(w * 0.15, h * 0.5), w * 0.55)
+        glow.setColorAt(0.0, QColor(245, 172, 40, 35))
+        glow.setColorAt(0.6, QColor(245, 172, 40, 8))
+        glow.setColorAt(1.0, QColor(0, 0, 0, 0))
+        p.fillPath(path, glow)
+
+        # Border with gold tint
+        p.setPen(QColor(245, 172, 40, 55))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(QRectF(0.5, 0.5, w - 1, h - 1), 14, 14)
+
+        p.end()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -151,6 +285,10 @@ class MangaHomeView(QWidget):
         sub = QLabel("Leia mangás com tradução em português via MangaDex")
         sub.setObjectName("MutedText")
         outer.addWidget(sub)
+
+        outer.addSpacing(4)
+        outer.addWidget(ZinnesBanner())
+        outer.addSpacing(4)
 
         # Search row
         row = QHBoxLayout()

@@ -1,0 +1,25 @@
+- generic [ref=e3]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - main [ref=e4]:
+    - generic [ref=e8]:
+      - img [ref=e13]
+      - generic [ref=e15]:
+        - generic [ref=e16]:
+          - img [ref=e17]
+          - generic [ref=e19]: Security Alert
+          - img [ref=e20]
+        - heading "Developer Console Not Allowed" [level=1] [ref=e22]:
+          - text: Developer Console
+          - text: Not Allowed
+      - generic [ref=e23]:
+        - generic [ref=e24]:
+          - img [ref=e25]
+          - paragraph [ref=e27]: Tatakai has detected that developer tools are open. For security reasons, the application cannot run while the developer console is active.
+        - generic [ref=e28]: "Status: devtools still detected"
+        - paragraph [ref=e30]: Close the developer tools (F12 or Ctrl+Shift+I) and refresh the page to continue.
+      - generic [ref=e31]:
+        - generic [ref=e32]: "▶ Tatakai | SECURITY :: devtools.detected → access.denied"
+        - generic [ref=e33]: "{ \"success\": false, \"message\": \"Unauthorized: Developer tools are not allowed to be open while using this application.\", \"reason\": \"lock-active\", \"detectedAt\": \"2026-04-24T22:13:25.163Z\" }"
+      - generic [ref=e34]: Interaction is locked while developer tools are open. Close developer tools to continue. Access restores automatically after closure is detected.

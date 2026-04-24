@@ -38,6 +38,17 @@ class AnimeService:
         loader.load_plugins({"pt-br"}, selected_plugins)
         self._plugins_loaded = True
 
+    def quick_search_exists(self, query: str) -> bool:
+        """Fast existence check — no is_playable validation, just title lookup."""
+        normalized = query.strip()
+        if not normalized:
+            return False
+        with self._rep_lock:
+            self.ensure_plugins_loaded()
+            rep.reset_runtime_data()
+            rep.search_anime(normalized)
+            return bool(rep.get_anime_titles())
+
     def search_animes(self, query: str) -> list[str]:
         normalized_query = query.strip()
         if not normalized_query:

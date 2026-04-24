@@ -235,34 +235,36 @@ def build_stylesheet() -> str:
         background-color: rgba(255, 255, 255, 0.06);
     }}
 
-    /* Sidebar navigation buttons */
+    /* Sidebar navigation buttons — circular highlight */
     QPushButton#NavButton {{
         background: transparent;
         border: none;
-        border-radius: 8px;
-        padding: 10px;
+        border-radius: 20px;
+        padding: 0px;
         min-width: 40px;
         min-height: 40px;
-        font-size: 18px;
-        color: {TEXT_MUTED};
+        max-width: 40px;
+        max-height: 40px;
     }}
 
     QPushButton#NavButton:hover {{
-        background-color: rgba(255, 255, 255, 0.08);
-        color: {TEXT_PRIMARY};
+        background-color: rgba(255, 255, 255, 0.10);
     }}
 
     QPushButton#NavButton:checked {{
-        background-color: {ACCENT_DIM};
-        color: {ACCENT};
-        border: 1px solid {ACCENT_BORDER};
+        background-color: rgba(255, 255, 255, 0.16);
+        border: none;
     }}
 
-    /* ── Sidebar ──────────────────────────────────────────── */
+    QPushButton#NavButton:checked:hover {{
+        background-color: rgba(255, 255, 255, 0.22);
+    }}
+
+    /* ── Sidebar floating pill ───────────────────────────── */
     QFrame#Sidebar {{
-        background-color: rgba(255, 255, 255, 0.04);
-        border-right: 1px solid {BORDER_SUBTLE};
-        border-radius: 0px;
+        background-color: rgba(20, 22, 28, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 18px;
     }}
 
     /* ── Mini Player ─────────────────────────────────────── */

@@ -361,6 +361,22 @@ class HorizontalCardScroll(QWidget):
     def card_count(self) -> int:
         return len(self._cards)
 
+    def trim_to(self, max_cards: int) -> None:
+        while len(self._cards) > max_cards:
+            card = self._cards.pop()
+            self._row_layout.removeWidget(card)
+            card.setParent(None)
+            card.deleteLater()
+
+    def remove_card(self, title: str) -> None:
+        for card in list(self._cards):
+            if card.data.get("title") == title:
+                self._row_layout.removeWidget(card)
+                card.setParent(None)
+                card.deleteLater()
+                self._cards.remove(card)
+                break
+
     def update_card_cover(self, title: str, cover_path: str) -> None:
         for card in self._cards:
             if card.data.get("title") == title:

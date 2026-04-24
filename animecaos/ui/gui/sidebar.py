@@ -4,8 +4,8 @@ Only Home, Search, Log, and Account — favorites and history are part of Home.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QCursor, QIcon
+from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtGui import QCursor, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
     QFrame,
@@ -18,10 +18,24 @@ from .icons import icon_book, icon_download, icon_folder, icon_home, icon_search
 from .views import AnimatedButton
 
 
+_ICON_SIZE = 20
+_BTN_SIZE  = 40
+_COLOR_OFF = "#8A8F9A"
+_COLOR_ON  = "#FFFFFF"
+
+
+def _dual_icon(fn, size: int = _ICON_SIZE) -> QIcon:
+    """Build a QIcon with separate pixmaps for Off (muted) and On (white) states."""
+    icon = QIcon()
+    icon.addPixmap(fn(size, _COLOR_OFF), QIcon.Mode.Normal,   QIcon.State.Off)
+    icon.addPixmap(fn(size, _COLOR_ON),  QIcon.Mode.Normal,   QIcon.State.On)
+    icon.addPixmap(fn(size, _COLOR_ON),  QIcon.Mode.Active,   QIcon.State.Off)
+    icon.addPixmap(fn(size, _COLOR_ON),  QIcon.Mode.Selected, QIcon.State.Off)
+    return icon
 
 
 class SidebarNav(QFrame):
-    """Vertical icon sidebar for top-level navigation."""
+    """Vertical icon sidebar — floating pill with circular icon highlights."""
 
     nav_changed = Signal(str)
 
@@ -31,59 +45,51 @@ class SidebarNav(QFrame):
         self.setFixedWidth(56)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 12, 8, 12)
-        layout.setSpacing(4)
+        layout.setContentsMargins(8, 14, 8, 14)
+        layout.setSpacing(6)
 
         self._buttons: dict[str, QPushButton] = {}
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
 
         # Home
-        home_btn = self._make_nav_btn(icon_home(22, "#A7ACB5"), "Inicio")
-        self._buttons["home"] = home_btn
-        layout.addWidget(home_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._buttons["home"] = self._make_btn(_dual_icon(icon_home), "Inicio")
+        layout.addWidget(self._buttons["home"], 0, Qt.AlignmentFlag.AlignHCenter)
 
         # Search
-        search_btn = self._make_nav_btn(icon_search(22, "#A7ACB5"), "Buscar")
-        self._buttons["search"] = search_btn
-        layout.addWidget(search_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        self._buttons["search"] = self._make_btn(_dual_icon(icon_search), "Buscar")
+        layout.addWidget(self._buttons["search"], 0, Qt.AlignmentFlag.AlignHCenter)
 
-        # Downloads library
-        dl_btn = self._make_nav_btn(icon_folder(22, "#A7ACB5"), "Downloads")
-        self._buttons["downloads"] = dl_btn
-        layout.addWidget(dl_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        # Downloads
+        self._buttons["downloads"] = self._make_btn(_dual_icon(icon_folder), "Downloads")
+        layout.addWidget(self._buttons["downloads"], 0, Qt.AlignmentFlag.AlignHCenter)
 
-        # Manga reader
-        manga_btn = self._make_nav_btn(icon_book(22, "#A7ACB5"), "Manga")
-        self._buttons["manga"] = manga_btn
-        layout.addWidget(manga_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        # Manga
+        self._buttons["manga"] = self._make_btn(_dual_icon(icon_book), "Manga")
+        layout.addWidget(self._buttons["manga"], 0, Qt.AlignmentFlag.AlignHCenter)
 
         layout.addStretch()
 
-        # Account (before log)
-        account_btn = self._make_nav_btn(icon_user(22, "#A7ACB5"), "Conta AniList")
-        self._buttons["account"] = account_btn
-        layout.addWidget(account_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        # Account
+        self._buttons["account"] = self._make_btn(_dual_icon(icon_user), "Conta AniList")
+        layout.addWidget(self._buttons["account"], 0, Qt.AlignmentFlag.AlignHCenter)
 
-        # Log at bottom
-        log_btn = self._make_nav_btn(icon_terminal(22, "#A7ACB5"), "Log de eventos")
-        self._buttons["log"] = log_btn
-        layout.addWidget(log_btn, 0, Qt.AlignmentFlag.AlignHCenter)
+        # Log
+        self._buttons["log"] = self._make_btn(_dual_icon(icon_terminal), "Log de eventos")
+        layout.addWidget(self._buttons["log"], 0, Qt.AlignmentFlag.AlignHCenter)
 
-        # Default
         self._buttons["home"].setChecked(True)
-
         self._group.buttonClicked.connect(self._on_button_clicked)
 
-    def _make_nav_btn(self, pixmap, tooltip: str) -> QPushButton:
+    def _make_btn(self, icon: QIcon, tooltip: str) -> QPushButton:
         btn = AnimatedButton()
         btn.setObjectName("NavButton")
-        btn.setIcon(QIcon(pixmap))
+        btn.setIcon(icon)
+        btn.setIconSize(QSize(_ICON_SIZE, _ICON_SIZE))
         btn.setToolTip(tooltip)
         btn.setCheckable(True)
         btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        btn.setFixedSize(40, 40)
-        btn.setIconSize(pixmap.size())
+        btn.setFixedSize(_BTN_SIZE, _BTN_SIZE)
         self._group.addButton(btn)
         return btn
 

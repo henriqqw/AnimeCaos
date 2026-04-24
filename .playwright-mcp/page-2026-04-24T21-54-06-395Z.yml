@@ -1,0 +1,147 @@
+- generic [ref=e3]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - navigation [ref=e4]:
+    - img "Tatakai Logo" [ref=e6] [cursor=pointer]
+    - generic [ref=e7]:
+      - button "Home" [ref=e8] [cursor=pointer]:
+        - img [ref=e9]
+        - generic: Home
+      - button "Search" [ref=e14] [cursor=pointer]:
+        - img [ref=e15]
+        - generic: Search
+      - button "Manga" [ref=e18] [cursor=pointer]:
+        - img [ref=e19]
+        - generic: Manga
+      - button "Trending" [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+        - generic: Trending
+      - button "Favorites" [ref=e25] [cursor=pointer]:
+        - img [ref=e26]
+        - generic: Favorites
+      - button "Community" [ref=e28] [cursor=pointer]:
+        - img [ref=e29]
+        - generic: Community
+      - button "Sign In" [ref=e34] [cursor=pointer]:
+        - img [ref=e35]
+        - generic: Sign In
+    - button "Settings" [ref=e39] [cursor=pointer]:
+      - img [ref=e40]
+      - generic: Settings
+  - main [ref=e43]:
+    - generic [ref=e44]:
+      - navigation [ref=e45]:
+        - img "Tatakai Logo" [ref=e47] [cursor=pointer]
+        - generic [ref=e48]:
+          - button "Home" [ref=e49] [cursor=pointer]:
+            - img [ref=e50]
+            - generic: Home
+          - button "Search" [ref=e55] [cursor=pointer]:
+            - img [ref=e56]
+            - generic: Search
+          - button "Manga" [ref=e59] [cursor=pointer]:
+            - img [ref=e60]
+            - generic: Manga
+          - button "Trending" [ref=e62] [cursor=pointer]:
+            - img [ref=e63]
+            - generic: Trending
+          - button "Favorites" [ref=e66] [cursor=pointer]:
+            - img [ref=e67]
+            - generic: Favorites
+          - button "Community" [ref=e69] [cursor=pointer]:
+            - img [ref=e70]
+            - generic: Community
+          - button "Sign In" [ref=e75] [cursor=pointer]:
+            - img [ref=e76]
+            - generic: Sign In
+        - button "Settings" [ref=e80] [cursor=pointer]:
+          - img [ref=e81]
+          - generic: Settings
+      - main [ref=e84]:
+        - generic [ref=e86]:
+          - generic [ref=e87]:
+            - heading "Welcome back, Traveler" [level=2] [ref=e88]
+            - link "Status" [ref=e89] [cursor=pointer]:
+              - /url: /status
+              - generic [ref=e91]: Status
+          - generic [ref=e92]:
+            - generic [ref=e93] [cursor=pointer]:
+              - img [ref=e94]
+              - textbox "Search anime" [ref=e97]:
+                - /placeholder: Search anime...
+              - button "Search by image" [ref=e98]:
+                - img [ref=e99]
+              - generic [ref=e102]:
+                - generic [ref=e103]: ⌘
+                - generic [ref=e104]: K
+            - link "Sign In" [ref=e105] [cursor=pointer]:
+              - /url: /auth
+              - img [ref=e106]
+              - generic [ref=e109]: Sign In
+  - contentinfo [ref=e149]:
+    - generic [ref=e150]:
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - link "TATAKAI" [ref=e153] [cursor=pointer]:
+            - /url: /
+            - heading "TATAKAI" [level=2] [ref=e154]
+          - paragraph [ref=e155]: The next generation anime streaming platform. Sleek, fast, and community-driven.
+          - generic [ref=e156]:
+            - link "Discord" [ref=e157] [cursor=pointer]:
+              - /url: https://discord.gg/Mt2jG5QuGP
+              - img [ref=e158]
+            - link "GitHub" [ref=e160] [cursor=pointer]:
+              - /url: https://github.com/snozxyx/tatakai
+              - img [ref=e161]
+        - generic [ref=e164]:
+          - generic [ref=e165]:
+            - heading "Product" [level=3] [ref=e166]
+            - list [ref=e167]:
+              - listitem [ref=e168]:
+                - link "Home" [ref=e169] [cursor=pointer]:
+                  - /url: /
+              - listitem [ref=e170]:
+                - link "Collections" [ref=e171] [cursor=pointer]:
+                  - /url: /collections
+              - listitem [ref=e172]:
+                - link "Trending" [ref=e173] [cursor=pointer]:
+                  - /url: /trending
+              - listitem [ref=e174]:
+                - link "Suggestions" [ref=e175] [cursor=pointer]:
+                  - /url: /suggestions
+          - generic [ref=e176]:
+            - heading "Support" [level=3] [ref=e177]
+            - list [ref=e178]:
+              - listitem [ref=e179]:
+                - link "Community" [ref=e180] [cursor=pointer]:
+                  - /url: /community
+              - listitem [ref=e181]:
+                - link "Terms of Service" [ref=e182] [cursor=pointer]:
+                  - /url: /terms
+              - listitem [ref=e183]:
+                - link "Privacy Policy" [ref=e184] [cursor=pointer]:
+                  - /url: /privacy
+              - listitem [ref=e185]:
+                - link "DMCA" [ref=e186] [cursor=pointer]:
+                  - /url: /dmca
+          - generic [ref=e187]:
+            - heading "Socials" [level=3] [ref=e188]
+            - list [ref=e189]:
+              - listitem [ref=e190]:
+                - link "Discord" [ref=e191] [cursor=pointer]:
+                  - /url: https://discord.gg/Mt2jG5QuGP
+                  - text: Discord
+                  - img [ref=e192]
+              - listitem [ref=e196]:
+                - link "Github" [ref=e197] [cursor=pointer]:
+                  - /url: https://github.com/snozxyx/tatakai
+                  - text: Github
+                  - img [ref=e198]
+      - generic [ref=e202]:
+        - paragraph [ref=e203]: © 2026 Tatakai. All rights reserved.
+        - generic [ref=e205]:
+          - text: Made with
+          - img [ref=e206]
+          - text: by Tatakai Team
+      - paragraph [ref=e209]: This platform is for educational purposes only. We do not host any content.

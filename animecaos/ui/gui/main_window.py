@@ -1067,15 +1067,10 @@ class MainWindow(QMainWindow):
 
     def _load_discover_sections(self) -> None:
         if self._preloaded_discover is not None:
-            # Data already loaded during splash — apply directly on next event loop tick
+            # Data already filtered during splash — apply directly, no background check needed
             data = self._preloaded_discover
             self._preloaded_discover = None
             QTimer.singleShot(0, lambda: self._on_discover_loaded(data))
-            # Still run background availability filter
-            trending = data.get("trending") or []
-            seasonal = data.get("seasonal") or []
-            spotlight_title = (data.get("spotlight") or {}).get("title", "")
-            QTimer.singleShot(50, lambda: self._start_discover_availability_check(trending, seasonal, spotlight_title))
             return
         worker = FunctionWorker(self._fetch_discover_data)
         self._metadata_workers.add(worker)

@@ -4,6 +4,8 @@ import os
 import re
 import sys
 import threading
+import webbrowser
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Any, Callable
 
@@ -201,6 +203,8 @@ class MainWindow(QMainWindow):
     update_progress_signal = Signal(int)
     update_status_signal = Signal(str)
     update_finished_signal = Signal()
+    _discover_card_unavailable = Signal(str, str)  # (section, title)
+    _discover_filter_done = Signal()
 
     def __init__(
         self,
@@ -209,6 +213,7 @@ class MainWindow(QMainWindow):
         anilist_service: AniListService,
         config_service: ConfigService | None = None,
         anilist_auth_service: AniListAuthService | None = None,
+        preloaded_discover: dict | None = None,
     ) -> None:
         super().__init__()
         self._anime_service = anime_service
@@ -258,6 +263,7 @@ class MainWindow(QMainWindow):
         self._reload_manga_history()
         self._check_for_updates()
         self._restore_anilist_state()
+        self._preloaded_discover = preloaded_discover
         self._load_discover_sections()
 
         # Refresh AniList stats on startup + auto-sync every 5 minutes.
@@ -292,7 +298,14 @@ class MainWindow(QMainWindow):
         body.setSpacing(0)
 
         self._sidebar = SidebarNav()
-        body.addWidget(self._sidebar)
+        sidebar_wrapper = QWidget()
+        sidebar_wrapper.setFixedWidth(72)
+        sidebar_wrapper.setStyleSheet("background: transparent;")
+        sw_layout = QVBoxLayout(sidebar_wrapper)
+        sw_layout.setContentsMargins(8, 10, 4, 10)
+        sw_layout.setSpacing(0)
+        sw_layout.addWidget(self._sidebar)
+        body.addWidget(sidebar_wrapper)
 
         self._stack = AnimatedStackedWidget()
         self._home_view = HomeView()
@@ -451,6 +464,9 @@ class MainWindow(QMainWindow):
 
         # Discovery sections
         self._home_view.discover_clicked.connect(self._on_discover_card_clicked)
+        self._home_view.anilist_page_requested.connect(self._on_open_anilist_page)
+        self._discover_card_unavailable.connect(self._on_discover_card_unavailable)
+        self._discover_filter_done.connect(lambda: self._home_view.trim_discover_sections(10))
 
         # Downloads view
         self._downloads_view.play_clicked.connect(self._on_download_episode_play)
@@ -1050,6 +1066,17 @@ class MainWindow(QMainWindow):
     # ── DISCOVERY SECTIONS ───────────────────────────────────────
 
     def _load_discover_sections(self) -> None:
+        if self._preloaded_discover is not None:
+            # Data already loaded during splash — apply directly on next event loop tick
+            data = self._preloaded_discover
+            self._preloaded_discover = None
+            QTimer.singleShot(0, lambda: self._on_discover_loaded(data))
+            # Still run background availability filter
+            trending = data.get("trending") or []
+            seasonal = data.get("seasonal") or []
+            spotlight_title = (data.get("spotlight") or {}).get("title", "")
+            QTimer.singleShot(50, lambda: self._start_discover_availability_check(trending, seasonal, spotlight_title))
+            return
         worker = FunctionWorker(self._fetch_discover_data)
         self._metadata_workers.add(worker)
         worker.signals.succeeded.connect(self._on_discover_loaded)
@@ -1058,18 +1085,58 @@ class MainWindow(QMainWindow):
         self._thread_pool.start(worker)
 
     def _fetch_discover_data(self) -> dict:
+        trending = self._anilist_service.fetch_trending(per_page=25)
+        seasonal = self._anilist_service.fetch_seasonal(per_page=25)
+        spotlight = None
+        spotlight_rank = 1
+        for i, candidate in enumerate(trending[:8]):
+            if self._spotlight_candidate_available(candidate):
+                spotlight = self._anilist_service.fetch_spotlight_extras(candidate)
+                spotlight_rank = i + 1
+                break
+        if spotlight is not None:
+            spotlight["_rank"] = spotlight_rank
         return {
-            "trending": self._anilist_service.fetch_trending(),
-            "seasonal": self._anilist_service.fetch_seasonal(),
+            "trending": trending,
+            "seasonal": seasonal,
+            "spotlight": spotlight,
         }
+
+    def _spotlight_candidate_available(self, card: dict) -> bool:
+        """Quick check: does the scraper return any results for this anime?"""
+        title = card.get("title", "")
+        if not title:
+            return False
+        base = title.split(":")[0].strip()
+        if base == base.upper() and len(base) > 1:
+            base = base.title()
+        if self._anime_service.search_animes(base):
+            return True
+        variants = self._anilist_service.get_title_variants(title)
+        for variant in variants:
+            if not variant:
+                continue
+            if self._anime_service.search_animes(variant):
+                return True
+            short = variant.split()[0].strip(" -") if variant.split() else ""
+            if short and len(short) >= 3 and self._anime_service.search_animes(short):
+                return True
+        return False
 
     def _on_discover_loaded(self, payload: object) -> None:
         if not isinstance(payload, dict):
             return
         trending = payload.get("trending") or []
         seasonal = payload.get("seasonal") or []
+        spotlight = payload.get("spotlight")
         self._home_view.set_trending_cards(trending)
         self._home_view.set_seasonal_cards(seasonal)
+        if spotlight:
+            rank = spotlight.get("_rank", 1)
+            self._home_view.set_spotlight(spotlight, rank=rank)
+            banner_path = spotlight.get("banner_path")
+            if banner_path and os.path.exists(str(banner_path)):
+                self._home_view.set_spotlight_banner(str(banner_path))
         status = self._anilist_service.api_status
         if self._anilist_service.is_offline:
             desc = status.ui_description()
@@ -1085,6 +1152,77 @@ class MainWindow(QMainWindow):
             cover_path = card.get("cover_path")
             if title and cover_path and os.path.exists(str(cover_path)):
                 self._cover_cache[title] = str(cover_path)
+
+        # Background availability filter — remove cards the scraper can't find.
+        # Runs after display so UI appears immediately; unavailable cards vanish quietly.
+        spotlight_title = (spotlight or {}).get("title", "")
+        self._start_discover_availability_check(trending, seasonal, spotlight_title)
+
+    def _start_discover_availability_check(
+        self,
+        trending: list[dict],
+        seasonal: list[dict],
+        spotlight_title: str,
+    ) -> None:
+        """Spawn a background thread that checks each discover card and removes unavailable ones."""
+        tagged = [("trending", c) for c in trending] + [("seasonal", c) for c in seasonal]
+        if not tagged:
+            return
+
+        def run() -> None:
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                futures = {
+                    pool.submit(self._card_is_available, card): (section, card.get("title", ""))
+                    for section, card in tagged
+                    if card.get("title") and card.get("title") != spotlight_title
+                }
+                for future in as_completed(futures):
+                    section, title = futures[future]
+                    try:
+                        available = future.result()
+                    except Exception:
+                        available = True  # keep on error
+                    if not available and title:
+                        self._discover_card_unavailable.emit(section, title)
+            self._discover_filter_done.emit()
+
+        t = threading.Thread(target=run, daemon=True)
+        t.start()
+
+    def _card_is_available(self, card: dict) -> bool:
+        """Strict availability check for discover cards — no AniList variant fallback.
+        Uses only title-derived queries so JoJo variants don't match unrelated JoJo seasons.
+        """
+        title = card.get("title", "")
+        if not title:
+            return False
+
+        # Split on ": " (colon+space) to drop subtitle — "Steel Ball Run: JoJo's..." → "Steel Ball Run"
+        # Does NOT split "Re:ZERO" (no space after colon) so those titles stay intact.
+        query = re.split(r":\s+", title, maxsplit=1)[0].strip()
+        if query == query.upper() and len(query) > 1:
+            query = query.title()
+
+        if len(query) >= 3 and self._anime_service.search_animes(query):
+            return True
+
+        # Secondary: first 3 words of the full title (helps long titles like "Re:ZERO -Starting Life...")
+        words = title.split()
+        if len(words) > 3:
+            short = " ".join(words[:3])
+            if short.lower() != query.lower() and self._anime_service.search_animes(short):
+                return True
+
+        return False
+
+    def _on_discover_card_unavailable(self, section: str, title: str) -> None:
+        if section == "trending":
+            self._home_view.remove_trending_card(title)
+        elif section == "seasonal":
+            self._home_view.remove_seasonal_card(title)
+
+    def _on_open_anilist_page(self, anilist_id: int) -> None:
+        webbrowser.open(f"https://anilist.co/anime/{anilist_id}")
 
     def _on_discover_card_clicked(self, data: dict) -> None:
         title = data.get("title", "")
@@ -1149,15 +1287,7 @@ class MainWindow(QMainWindow):
             # Fallback: fetch covers per title AND via original query
             self._fetch_covers_for_results(titles, query)
 
-        # Auto-navigate on high-confidence fuzzy match (≥ 75%)
-        best = self._fuzzy_best_match(query, titles)
-        score = self._fuzzy_score(query, best)
-        if score >= 75:
-            self._append_log(f"Discover: '{original_title}' → '{best}' ({score}%) — navegando.")
-            self._current_anime = best
-            self._navigate_to_detail(best)
-        else:
-            self._append_log(f"Discover: {len(titles)} resultado(s) — escolha manual necessaria.")
+        self._append_log(f"Discover: {len(titles)} resultado(s) para '{original_title}'.")
 
     def _search_with_translation(self, query: str) -> list[str]:
         """Search scrapers with progressive fallback:

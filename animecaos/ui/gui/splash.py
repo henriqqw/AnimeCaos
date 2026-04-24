@@ -52,13 +52,6 @@ def _icon_path() -> str:
     return os.path.join(base, "public", "icon.png")
 
 
-_STATUS_STEPS: list[tuple[int, str]] = [
-    (0,    "Inicializando..."),
-    (600,  "Carregando plugins..."),
-    (1200, "Preparando interface..."),
-    (1800, "Quase pronto..."),
-]
-
 _BRAND = "AnimeCaos"
 _ACCENT = QColor(212, 66, 66)
 _BG_DARK = QColor(11, 12, 15)
@@ -68,7 +61,6 @@ _TEXT_MUTED = QColor(167, 172, 181)
 
 _WIDTH = 420
 _HEIGHT = 340
-_ANIM_DURATION_MS = 2400
 _FADE_OUT_MS = 350
 
 
@@ -88,12 +80,11 @@ class SplashScreen(QWidget):
         self.setFixedSize(_WIDTH, _HEIGHT)
 
         # State
-        self._progress = 0.0      # 0..1 overall progress
+        self._progress = 0.0      # 0..1 overall progress (driven externally)
         self._ring_angle = 0.0    # spinning ring
         self._text_reveal = 0.0   # 0..1 letter reveal
         self._opacity = 0.0       # master opacity
-        self._status_text = _STATUS_STEPS[0][1]
-        self._next_status = 1
+        self._status_text = "Inicializando..."
         self._elapsed_ms = 0
         self._closing = False
 
@@ -131,6 +122,16 @@ class SplashScreen(QWidget):
     masterOpacity = Property(float, _get_opacity, _set_opacity)
 
     # ── Public API ───────────────────────────────────────────────
+    def set_status(self, text: str) -> None:
+        """Update the status label text (called from background loader via signal)."""
+        self._status_text = text
+        self.update()
+
+    def set_progress(self, fraction: float) -> None:
+        """Advance the progress bar to `fraction` (0..1). Never goes backwards."""
+        self._progress = max(self._progress, fraction)
+        self.update()
+
     def start(self) -> None:
         self._center_on_screen()
         self.show()
@@ -162,22 +163,12 @@ class SplashScreen(QWidget):
         dt = 16
         self._elapsed_ms += dt
 
-        # Progress 0→1 over the animation duration
-        self._progress = min(1.0, self._elapsed_ms / _ANIM_DURATION_MS)
-
         # Ring spin
         self._ring_angle = (self._ring_angle + 3.6) % 360.0
 
         # Text reveal (ease-out curve)
         t = min(1.0, self._elapsed_ms / 1400.0)
         self._text_reveal = 1.0 - (1.0 - t) ** 3  # cubic ease-out
-
-        # Status messages
-        if self._next_status < len(_STATUS_STEPS):
-            ms_threshold, msg = _STATUS_STEPS[self._next_status]
-            if self._elapsed_ms >= ms_threshold:
-                self._status_text = msg
-                self._next_status += 1
 
         self.update()
 

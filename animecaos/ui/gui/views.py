@@ -125,6 +125,281 @@ class AnimatedButton(QPushButton):
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  SPOTLIGHT BANNER
+# ═══════════════════════════════════════════════════════════════════
+
+class _MetaBadge(QLabel):
+    """Dark pill badge for metadata (TV, 24m, HD…)."""
+
+    def __init__(self, text: str, parent: QWidget | None = None) -> None:
+        super().__init__(text, parent)
+        self.setStyleSheet(
+            "QLabel { background: rgba(255,255,255,0.12); color: #E8E9EC; border-radius: 14px;"
+            " padding: 4px 14px; font-size: 12px; font-weight: 500; }"
+        )
+        self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+
+
+class SpotlightBanner(QWidget):
+    """
+    Hero spotlight — full-width, split layout:
+      LEFT  45%: badge · title · description · meta pills · watch button
+      RIGHT 55%: banner artwork image (rounded corners)
+    Matches Tatakai reference design.
+    """
+
+    watch_clicked = Signal(dict)
+    anilist_clicked = Signal(int)  # anilist_id
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setObjectName("SpotlightBanner")
+        self.setFixedHeight(420)
+        self._card: dict = {}
+        self._image_pixmap: QPixmap | None = None   # banner or cover
+        self._meta_badges: list[_MetaBadge] = []
+
+        root = QHBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+
+        # ══ LEFT PANEL ══
+        left_widget = QWidget()
+        left_widget.setStyleSheet("background: transparent;")
+        left = QVBoxLayout(left_widget)
+        left.setContentsMargins(36, 36, 24, 32)
+        left.setSpacing(0)
+
+        # Badge: ★ #N SPOTLIGHT
+        self._rank_badge = QLabel()
+        self._rank_badge.setStyleSheet(
+            "QLabel { color: #F5D060; background: rgba(245,208,96,0.14);"
+            " border: 1px solid rgba(245,208,96,0.40); border-radius: 14px;"
+            " padding: 4px 14px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }"
+        )
+        self._rank_badge.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        left.addWidget(self._rank_badge)
+        left.addSpacing(16)
+
+        # Title — very large bold
+        self._title_lbl = QLabel()
+        self._title_lbl.setWordWrap(True)
+        self._title_lbl.setStyleSheet(
+            "QLabel { color: #FFFFFF; font-size: 36px; font-weight: 800;"
+            " background: transparent; line-height: 1.05; }"
+        )
+        self._title_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        left.addWidget(self._title_lbl)
+        left.addSpacing(16)
+
+        # Description with left accent bar
+        desc_wrapper = QFrame()
+        desc_wrapper.setStyleSheet(
+            "QFrame { border-left: 3px solid rgba(255,255,255,0.22);"
+            " background: transparent; padding-left: 0px; }"
+        )
+        desc_inner = QHBoxLayout(desc_wrapper)
+        desc_inner.setContentsMargins(12, 2, 0, 2)
+        desc_inner.setSpacing(0)
+        self._desc_lbl = QLabel()
+        self._desc_lbl.setWordWrap(True)
+        self._desc_lbl.setMaximumHeight(68)
+        self._desc_lbl.setStyleSheet(
+            "QLabel { color: rgba(210,212,220,0.80); font-size: 13px;"
+            " background: transparent; border: none; }"
+        )
+        desc_inner.addWidget(self._desc_lbl)
+        left.addWidget(desc_wrapper)
+        left.addSpacing(20)
+
+        # Meta badges row
+        self._meta_row = QHBoxLayout()
+        self._meta_row.setSpacing(8)
+        self._meta_row.setContentsMargins(0, 0, 0, 0)
+        left.addLayout(self._meta_row)
+        left.addSpacing(24)
+
+        # Buttons row
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        btn_row.setContentsMargins(0, 0, 0, 0)
+
+        self._watch_btn = QPushButton("▶   Assistir")
+        self._watch_btn.setFixedHeight(46)
+        self._watch_btn.setMinimumWidth(160)
+        self._watch_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self._watch_btn.setStyleSheet(
+            "QPushButton { background: #FFFFFF; color: #0B0C0F; border: none;"
+            " border-radius: 23px; font-size: 14px; font-weight: 700; padding: 0 24px; }"
+            " QPushButton:hover { background: #E8E9EC; }"
+            " QPushButton:pressed { background: #CDCFD4; }"
+        )
+        self._watch_btn.clicked.connect(lambda: self.watch_clicked.emit(self._card))
+
+        self._list_btn = QPushButton("≡")
+        self._list_btn.setFixedSize(46, 46)
+        self._list_btn.setToolTip("Ver no AniList")
+        self._list_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self._list_btn.setStyleSheet(
+            "QPushButton { background: rgba(255,255,255,0.12); color: #FFFFFF; border: none;"
+            " border-radius: 23px; font-size: 18px; }"
+            " QPushButton:hover { background: rgba(255,255,255,0.18); }"
+            " QPushButton:pressed { background: rgba(255,255,255,0.08); }"
+        )
+        self._list_btn.clicked.connect(self._on_list_btn_clicked)
+
+        btn_row.addWidget(self._watch_btn)
+        btn_row.addWidget(self._list_btn)
+        btn_row.addStretch()
+        left.addLayout(btn_row)
+
+        left.addStretch()
+
+        root.addWidget(left_widget, 45)
+
+        # ══ RIGHT PANEL — artwork image ══
+        self._image_lbl = QLabel()
+        self._image_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._image_lbl.setStyleSheet("background: transparent;")
+        self._image_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        root.addWidget(self._image_lbl, 55)
+
+    # ── Public API ──────────────────────────────────────────────
+
+    def set_data(self, card: dict, rank: int = 1) -> None:
+        self._card = card
+
+        self._rank_badge.setText(f"★  #{rank} DESTAQUE DA TEMPORADA")
+        self._title_lbl.setText(card.get("title", ""))
+        self._list_btn.setVisible(bool(card.get("anilist_id")))
+
+        desc = card.get("description") or ""
+        if desc:
+            words = desc.split()
+            truncated = " ".join(words[:30])
+            if len(words) > 30:
+                truncated += "..."
+            self._desc_lbl.setText(truncated)
+            self._desc_lbl.parentWidget().show()
+        else:
+            self._desc_lbl.parentWidget().hide()
+
+        self._rebuild_meta_badges(card)
+
+        cover_path = card.get("cover_path")
+        banner_path = card.get("banner_path")
+        img_path = banner_path or cover_path
+        if img_path and os.path.exists(str(img_path)):
+            self._load_image(str(img_path), prefer_banner=bool(banner_path))
+
+    def set_banner(self, path: str) -> None:
+        if os.path.exists(path):
+            self._load_image(path, prefer_banner=True)
+
+    def set_cover(self, path: str) -> None:
+        if os.path.exists(path) and self._image_pixmap is None:
+            self._load_image(path, prefer_banner=False)
+
+    def _on_list_btn_clicked(self) -> None:
+        anilist_id = self._card.get("anilist_id")
+        if anilist_id:
+            self.anilist_clicked.emit(int(anilist_id))
+
+    # ── Internal ────────────────────────────────────────────────
+
+    def _rebuild_meta_badges(self, card: dict) -> None:
+        for b in self._meta_badges:
+            b.deleteLater()
+        self._meta_badges.clear()
+
+        tags: list[str] = []
+        fmt = card.get("format")
+        if fmt:
+            tags.append(fmt.replace("_", " "))
+        dur = card.get("duration")
+        if dur:
+            tags.append(f"{dur}m")
+        score = card.get("score")
+        if score:
+            tags.append(f"★ {score / 10:.1f}")
+        episodes = card.get("episodes")
+        if episodes:
+            tags.append(f"{episodes} eps")
+        tags.append("HD")
+
+        for tag in tags:
+            badge = _MetaBadge(tag)
+            self._meta_row.addWidget(badge)
+            self._meta_badges.append(badge)
+        self._meta_row.addStretch()
+
+    def _load_image(self, path: str, prefer_banner: bool) -> None:
+        raw = QPixmap(path)
+        if raw.isNull():
+            return
+
+        panel = self._image_lbl
+        pw = panel.width() if panel.width() > 0 else 600
+        ph = self.height()
+
+        if prefer_banner:
+            # Banner: scale to fill right panel width
+            scaled = raw.scaled(
+                pw, ph,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation,
+            )
+            # Crop to panel size centered
+            x = max(0, (scaled.width() - pw) // 2)
+            y = max(0, (scaled.height() - ph) // 2)
+            cropped = scaled.copy(x, y, min(pw, scaled.width()), min(ph, scaled.height()))
+            final = self._apply_rounded(cropped, 16)
+        else:
+            # Cover/poster: scale to fit height, center horizontally
+            th = ph - 32
+            tw = int(th * 0.70)
+            scaled = raw.scaled(tw, th, Qt.AspectRatioMode.KeepAspectRatio,
+                                Qt.TransformationMode.SmoothTransformation)
+            final = self._apply_rounded(scaled, 12)
+
+        self._image_pixmap = final
+        panel.setPixmap(final)
+
+    @staticmethod
+    def _apply_rounded(pm: QPixmap, radius: int) -> QPixmap:
+        out = QPixmap(pm.size())
+        out.fill(Qt.GlobalColor.transparent)
+        p = QPainter(out)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        clip = QPainterPath()
+        clip.addRoundedRect(QRectF(out.rect()), radius, radius)
+        p.setClipPath(clip)
+        p.drawPixmap(0, 0, pm)
+        p.end()
+        return out
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        # Reload image at new panel size when widget is resized
+        if self._card:
+            banner_path = self._card.get("banner_path")
+            cover_path = self._card.get("cover_path")
+            img_path = banner_path or cover_path
+            if img_path and os.path.exists(str(img_path)):
+                self._image_pixmap = None
+                self._load_image(str(img_path), prefer_banner=bool(banner_path))
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = self.rect()
+        # Solid dark background
+        painter.fillRect(rect, QColor(10, 10, 12))
+        painter.end()
+        super().paintEvent(event)
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  HOME VIEW
 # ═══════════════════════════════════════════════════════════════════
 
@@ -188,6 +463,7 @@ class HomeView(QWidget):
 
     history_clicked = Signal(object)
     discover_clicked = Signal(object)
+    anilist_page_requested = Signal(int)  # anilist_id
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -197,14 +473,31 @@ class HomeView(QWidget):
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
 
+        # Root container — zero margins so spotlight fills edge to edge
         container = QWidget()
         container.setStyleSheet("background: transparent;")
-        self._content = QVBoxLayout(container)
-        self._content.setContentsMargins(24, 16, 24, 24)
-        self._content.setSpacing(28)
+        root_layout = QVBoxLayout(container)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
 
+        # ── AniList offline banner (inside padded inner) ──
         self._offline_banner = _AniListOfflineBanner()
         self._offline_banner.hide()
+
+        # ── Spotlight Hero — full width, no side margins ──
+        self.spotlight = SpotlightBanner()
+        self.spotlight.watch_clicked.connect(self.discover_clicked.emit)
+        self.spotlight.anilist_clicked.connect(self.anilist_page_requested.emit)
+        self.spotlight.hide()
+        root_layout.addWidget(self.spotlight)
+
+        # ── Inner padded section for all other content ──
+        inner_widget = QWidget()
+        inner_widget.setStyleSheet("background: transparent;")
+        self._content = QVBoxLayout(inner_widget)
+        self._content.setContentsMargins(24, 20, 24, 24)
+        self._content.setSpacing(24)
+
         self._content.addWidget(self._offline_banner)
 
         # ── Continue Watching ──
@@ -228,7 +521,8 @@ class HomeView(QWidget):
         self._content.addWidget(self.trending_section)
 
         # ── Temporada Atual ──
-        self.seasonal_section = HorizontalCardScroll("Temporada Atual")
+        self._seasonal_title = self._current_season_label()
+        self.seasonal_section = HorizontalCardScroll(self._seasonal_title)
         self.seasonal_section.card_clicked.connect(self.discover_clicked.emit)
         self.seasonal_section.set_empty(
             icon_loader(36, "rgba(255,255,255,0.15)"),
@@ -239,11 +533,28 @@ class HomeView(QWidget):
 
         self._content.addStretch()
 
+        root_layout.addWidget(inner_widget)
+
         self._scroll.setWidget(container)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
         outer.addWidget(self._scroll)
+
+    @staticmethod
+    def _current_season_label() -> str:
+        from datetime import datetime
+        month = datetime.now().month
+        year = datetime.now().year
+        if month <= 3:
+            season = "Inverno"
+        elif month <= 6:
+            season = "Primavera"
+        elif month <= 9:
+            season = "Verão"
+        else:
+            season = "Outono"
+        return f"Temporada Atual — {season} {year}"
 
     def set_history_cards(self, items: list[dict[str, Any]]) -> None:
         if items:
@@ -277,6 +588,26 @@ class HomeView(QWidget):
                 "Sem resultados",
                 "Nao foi possivel carregar os dados",
             )
+
+    def remove_trending_card(self, title: str) -> None:
+        self.trending_section.remove_card(title)
+
+    def remove_seasonal_card(self, title: str) -> None:
+        self.seasonal_section.remove_card(title)
+
+    def trim_discover_sections(self, max_cards: int = 10) -> None:
+        self.trending_section.trim_to(max_cards)
+        self.seasonal_section.trim_to(max_cards)
+
+    def set_spotlight(self, card: dict, rank: int = 1) -> None:
+        self.spotlight.set_data(card, rank)
+        self.spotlight.show()
+
+    def set_spotlight_banner(self, path: str) -> None:
+        self.spotlight.set_banner(path)
+
+    def set_spotlight_cover(self, path: str) -> None:
+        self.spotlight.set_cover(path)
 
     def update_discover_cover(self, title: str, cover_path: str) -> None:
         self.trending_section.update_card_cover(title, cover_path)

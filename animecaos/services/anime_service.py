@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Sequence
 
@@ -13,6 +14,9 @@ log = logging.getLogger(__name__)
 
 class AnimeService:
     """Application service for anime search, episode loading and playback."""
+
+    # rep is a module-level singleton with mutable state — all access must be serialized.
+    _rep_lock = threading.Lock()
 
     def __init__(self, debug: bool = False, plugins: list[str] | None = None) -> None:
         self._debug = debug
@@ -39,29 +43,30 @@ class AnimeService:
         if not normalized_query:
             raise ValueError("Digite um termo de busca.")
 
-        self.ensure_plugins_loaded()
-        rep.reset_runtime_data()
-        rep.search_anime(normalized_query)
-        titles = rep.get_anime_titles()
+        with self._rep_lock:
+            self.ensure_plugins_loaded()
+            rep.reset_runtime_data()
+            rep.search_anime(normalized_query)
+            titles = rep.get_anime_titles()
 
-        if not titles:
-            return []
+            if not titles:
+                return []
 
-        # Validate in parallel: only return animes with at least one playable source
-        valid: list[str] = []
-        with ThreadPoolExecutor(max_workers=min(len(titles), 8)) as executor:
-            future_to_title = {
-                executor.submit(rep.is_playable, t): t for t in titles
-            }
-            for future in as_completed(future_to_title):
-                title = future_to_title[future]
-                try:
-                    if future.result():
-                        valid.append(title)
-                    else:
-                        log.debug("Filtrado (sem player valido): %s", title)
-                except Exception:
-                    log.debug("Filtrado (erro na validacao): %s", title)
+            # Validate playability while still holding the lock (rep state must stay intact).
+            valid: list[str] = []
+            with ThreadPoolExecutor(max_workers=min(len(titles), 8)) as executor:
+                future_to_title = {
+                    executor.submit(rep.is_playable, t): t for t in titles
+                }
+                for future in as_completed(future_to_title):
+                    title = future_to_title[future]
+                    try:
+                        if future.result():
+                            valid.append(title)
+                        else:
+                            log.debug("Filtrado (sem player valido): %s", title)
+                    except Exception:
+                        log.debug("Filtrado (erro na validacao): %s", title)
 
         return sorted(valid)
 

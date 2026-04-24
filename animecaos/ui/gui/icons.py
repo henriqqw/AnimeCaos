@@ -349,6 +349,36 @@ def icon_book(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
     return pm
 
 
+def icon_trash(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
+    """Lucide Trash-2 icon."""
+    pm, p, s, c = _begin(size, color)
+    # Horizontal lid line: M3 6h18
+    p.drawLine(QPointF(_s(3, s), _s(6, s)), QPointF(_s(21, s), _s(6, s)))
+    # Handle: M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2
+    handle = QPainterPath()
+    handle.moveTo(_s(8, s), _s(6, s))
+    handle.lineTo(_s(8, s), _s(4, s))
+    handle.arcTo(QRectF(_s(8, s), _s(2, s), _s(2, s), _s(2, s)), 180, -90)
+    handle.lineTo(_s(14, s), _s(2, s))
+    handle.arcTo(QRectF(_s(14, s), _s(2, s), _s(2, s), _s(2, s)), 270, -90)
+    handle.lineTo(_s(16, s), _s(6, s))
+    p.drawPath(handle)
+    # Body: M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6
+    body = QPainterPath()
+    body.moveTo(_s(19, s), _s(6, s))
+    body.lineTo(_s(19, s), _s(20, s))
+    body.arcTo(QRectF(_s(17, s), _s(20, s), _s(2, s), _s(2, s)), 0, -90)
+    body.lineTo(_s(7, s), _s(22, s))
+    body.arcTo(QRectF(_s(5, s), _s(20, s), _s(2, s), _s(2, s)), 270, -90)
+    body.lineTo(_s(5, s), _s(6, s))
+    p.drawPath(body)
+    # Inner lines: M10 11v6  M14 11v6
+    p.drawLine(QPointF(_s(10, s), _s(11, s)), QPointF(_s(10, s), _s(17, s)))
+    p.drawLine(QPointF(_s(14, s), _s(11, s)), QPointF(_s(14, s), _s(17, s)))
+    p.end()
+    return pm
+
+
 # ── Utility: create QIcon from pixmap function ───────────────────
 def make_icon(fn, size: int = 20, color: str = "#A7ACB5", **kwargs) -> QIcon:
     """Wrap an icon function into a QIcon."""

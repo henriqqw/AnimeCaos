@@ -449,15 +449,21 @@ class EpisodeRow(QFrame):
             "border: 1px solid rgba(212, 66, 66, 0.25); }"
         )
 
+        # Stop any previous pulse before creating a new one
+        if hasattr(self, "_pulse_anim") and self._pulse_anim is not None:
+            self._pulse_anim.stop()
+            self._pulse_anim = None
+
         # Pulsing animation on loading label
         self._pulse_effect = QGraphicsOpacityEffect(self._loading_label)
+        self._pulse_effect.setOpacity(1.0)
         self._loading_label.setGraphicsEffect(self._pulse_effect)
-        self._pulse_anim = QPropertyAnimation(self._pulse_effect, b"opacity")
+        self._pulse_anim = QPropertyAnimation(self._pulse_effect, b"opacity", self._loading_label)
         self._pulse_anim.setDuration(800)
         self._pulse_anim.setStartValue(1.0)
         self._pulse_anim.setEndValue(0.3)
         self._pulse_anim.setEasingCurve(QEasingCurve.Type.InOutSine)
-        self._pulse_anim.setLoopCount(-1)  # infinite loop
+        self._pulse_anim.setLoopCount(-1)
         self._pulse_anim.start()
 
     def hide_loading(self) -> None:

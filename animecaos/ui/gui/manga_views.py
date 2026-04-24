@@ -378,7 +378,7 @@ class ChapterRow(QFrame):
         self._dl_state = state
         if state == _DL_DONE:
             self._dl_btn.setIcon(QIcon())
-            self._dl_btn.setText("✓")
+            self._dl_btn.setText("OK")
             self._dl_btn.setStyleSheet(
                 "QPushButton { background: rgba(80,200,120,0.12); border: 1px solid rgba(80,200,120,0.3);"
                 " border-radius: 5px; color: #50C878; font-size: 12px; font-weight: 700; }"
@@ -496,7 +496,7 @@ class MangaDetailView(QWidget):
         ch_hdr_row.addWidget(ch_hdr)
         ch_hdr_row.addStretch()
 
-        self._dl_all_btn = QPushButton("⬇ Baixar todos")
+        self._dl_all_btn = QPushButton("Baixar todos")
         self._dl_all_btn.setFixedHeight(26)
         self._dl_all_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._dl_all_btn.setStyleSheet(
@@ -550,7 +550,7 @@ class MangaDetailView(QWidget):
         self._sel_count_lbl.setObjectName("MutedText")
         ab.addWidget(self._sel_count_lbl)
         ab.addStretch()
-        dl_sel_btn = QPushButton("⬇ Baixar selecionados")
+        dl_sel_btn = QPushButton("Baixar selecionados")
         dl_sel_btn.setObjectName("PrimaryButton")
         dl_sel_btn.setFixedHeight(32)
         dl_sel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -714,7 +714,7 @@ class PageWidget(QFrame):
 
     def set_image(self, data: bytes, view_width: int) -> None:
         pm = QPixmap()
-        if not pm.loadFromData(data) or pm.isNull():
+        if not data or not pm.loadFromData(data) or pm.isNull():
             self._placeholder.setText(f"Erro — pág. {self._index + 1}")
             return
         self._original_pm = pm
@@ -849,7 +849,7 @@ class MangaReaderView(QWidget):
     def set_reader_download_state(self, state: str, done: int = 0, total: int = 0) -> None:
         if state == _DL_DONE:
             self._reader_dl_btn.setIcon(QIcon())
-            self._reader_dl_btn.setText("✓")
+            self._reader_dl_btn.setText("OK")
             self._reader_dl_btn.setStyleSheet(
                 "QPushButton { background: rgba(80,200,120,0.12); border: 1px solid rgba(80,200,120,0.3);"
                 " border-radius: 5px; color: #50C878; font-size: 12px; font-weight: 700; }"
@@ -875,6 +875,50 @@ class MangaReaderView(QWidget):
 
     # ── Public API ───────────────────────────────────────────────
 
+    def load_local_chapter(
+        self,
+        pages: list[bytes],
+        chapter_label: str,
+        manga_title: str,
+    ) -> None:
+        """Load a chapter from local CBZ bytes — no network required."""
+        self._manga_service = None
+        self._manga_id = ""
+        self._manga_title = manga_title
+        self._chapter_id = chapter_label
+        self._chapter_index = 0
+        self._chapter_count = 1
+
+        self._ch_lbl.setText(chapter_label)
+        self._pg_lbl.setText("Carregando…")
+
+        # Hide online-only controls
+        self._prev_btn.setVisible(False)
+        self._next_btn.setVisible(False)
+        self._reader_dl_btn.setVisible(False)
+
+        self._page_urls = []
+        self._page_widgets = []
+        self._next_load = 0
+        self._active_loads = 0
+        self._active_workers.clear()
+        self._scroll.verticalScrollBar().setValue(0)
+        self._clear_pages()
+
+        if not pages:
+            self._pg_lbl.setText("Nenhuma página encontrada.")
+            return
+
+        vw = self._vp_width()
+        for i, data in enumerate(pages):
+            pw = PageWidget(i)
+            self._pl.addWidget(pw)
+            self._page_widgets.append(pw)
+            pw.set_image(data, vw)
+
+        total = len(pages)
+        self._pg_lbl.setText(f"{total} páginas")
+
     def load_chapter(
         self,
         manga_service,
@@ -893,6 +937,11 @@ class MangaReaderView(QWidget):
         self._chapter_index = chapter_index
         self._chapter_count = chapter_count
         self._current_cover_path = cover_path
+
+        # Restore controls that load_local_chapter may have hidden
+        self._prev_btn.setVisible(True)
+        self._next_btn.setVisible(True)
+        self._reader_dl_btn.setVisible(True)
 
         self._ch_lbl.setText(chapter.get("label", ""))
         self._pg_lbl.setText("Carregando…")

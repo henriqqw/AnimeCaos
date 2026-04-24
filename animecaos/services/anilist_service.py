@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 from datetime import datetime
+from enum import Enum
 from threading import RLock
 
 import requests
@@ -10,7 +12,60 @@ from bs4 import BeautifulSoup
 
 from animecaos.services.watchlist_service import _watchlist_dir
 
+log = logging.getLogger(__name__)
+
 APP_NAME = "AnimeCaos"
+
+
+class AniListStatus(str, Enum):
+    OK = "ok"
+    OFFLINE = "offline"             # 403 manutenção confirmada pela mensagem
+    IP_BLOCKED = "ip_blocked"       # 403 genérico / IP bloqueado
+    RATE_LIMITED = "rate_limited"   # 429 — inclui retry_after em segundos
+    AUTH_ERROR = "auth_error"       # 401 — token inválido ou expirado
+    SERVER_ERROR = "server_error"   # 5xx
+    UNKNOWN_ERROR = "unknown_error"
+
+    # Mensagens amigáveis exibidas na UI
+    def ui_title(self) -> str:
+        return {
+            AniListStatus.OK: "",
+            AniListStatus.OFFLINE: "AniList temporariamente offline",
+            AniListStatus.IP_BLOCKED: "AniList — acesso bloqueado",
+            AniListStatus.RATE_LIMITED: "AniList — limite de requisições atingido",
+            AniListStatus.AUTH_ERROR: "AniList — token expirado ou inválido",
+            AniListStatus.SERVER_ERROR: "AniList com instabilidade",
+            AniListStatus.UNKNOWN_ERROR: "AniList indisponível",
+        }[self]
+
+    def ui_description(self) -> str:
+        return {
+            AniListStatus.OK: "",
+            AniListStatus.OFFLINE: (
+                "Capas e seções de descoberta indisponíveis. "
+                "Pesquisa, episódios e player funcionam normalmente."
+            ),
+            AniListStatus.IP_BLOCKED: (
+                "Muitas requisições foram feitas. Capas e descoberta indisponíveis por enquanto. "
+                "Pesquisa, episódios e player funcionam normalmente."
+            ),
+            AniListStatus.RATE_LIMITED: (
+                "Limite de 90 req/min atingido. Capas e descoberta voltam automaticamente. "
+                "Pesquisa, episódios e player funcionam normalmente."
+            ),
+            AniListStatus.AUTH_ERROR: (
+                "Token AniList expirado (válido por 1 ano). Reconecte sua conta em Configurações. "
+                "Pesquisa, episódios e player funcionam normalmente."
+            ),
+            AniListStatus.SERVER_ERROR: (
+                "Servidores da AniList com instabilidade. Capas e descoberta indisponíveis temporariamente. "
+                "Pesquisa, episódios e player funcionam normalmente."
+            ),
+            AniListStatus.UNKNOWN_ERROR: (
+                "Capas e seções de descoberta indisponíveis. "
+                "Pesquisa, episódios e player funcionam normalmente."
+            ),
+        }[self]
 
 
 class AniListService:
@@ -26,7 +81,9 @@ class AniListService:
         self._trending_cache: list[dict] | None = None
         self._seasonal_cache: list[dict] | None = None
         self._cache_lock = RLock()
-        
+        self._api_status: AniListStatus = AniListStatus.OK
+        self._retry_after: int | None = None  # segundos restantes após 429
+
         self._query_template = """
         query ($search: String) {
           Media (search: $search, type: ANIME) {
@@ -42,6 +99,57 @@ class AniListService:
           }
         }
         """
+
+    @property
+    def is_offline(self) -> bool:
+        return self._api_status != AniListStatus.OK
+
+    @property
+    def api_status(self) -> AniListStatus:
+        return self._api_status
+
+    @property
+    def retry_after(self) -> int | None:
+        return self._retry_after
+
+    def _handle_error_response(self, resp: requests.Response, context: str) -> None:
+        """Parse error responses and set status + log accordingly."""
+        status = resp.status_code
+        try:
+            errors = resp.json().get("errors") or []
+            api_msg = errors[0].get("message", "") if errors else ""
+        except Exception:
+            api_msg = resp.text[:200]
+
+        if status == 401:
+            log.error("AniList %s — 401 Auth error: %s", context, api_msg)
+            self._api_status = AniListStatus.AUTH_ERROR
+
+        elif status == 403:
+            if "temporarily disabled" in api_msg.lower() or "stability" in api_msg.lower():
+                log.error("AniList %s — 403 Manutenção: %s", context, api_msg)
+                self._api_status = AniListStatus.OFFLINE
+            else:
+                log.error("AniList %s — 403 Acesso bloqueado: %s", context, api_msg)
+                self._api_status = AniListStatus.IP_BLOCKED
+
+        elif status == 429:
+            retry = resp.headers.get("Retry-After") or resp.headers.get("X-RateLimit-Reset")
+            self._retry_after = int(retry) if retry and retry.isdigit() else 60
+            reset_ts = resp.headers.get("X-RateLimit-Reset", "?")
+            log.warning(
+                "AniList %s — 429 Rate limit (90 req/min). Retry-After=%ss, Reset=%s",
+                context, self._retry_after, reset_ts,
+            )
+            self._api_status = AniListStatus.RATE_LIMITED
+
+        elif status >= 500:
+            log.error("AniList %s — %d Server error: %s", context, status, api_msg)
+            self._api_status = AniListStatus.SERVER_ERROR
+
+        else:
+            log.error("AniList %s — HTTP %d: %s", context, status, api_msg)
+            self._api_status = AniListStatus.UNKNOWN_ERROR
 
     def fetch_anime_info(self, query: str) -> dict[str, str | None]:
         """Fetches metadata for a given anime title."""
@@ -186,11 +294,17 @@ class AniListService:
                 json={"query": query, "variables": {"perPage": per_page}},
                 timeout=15,
             )
-            resp.raise_for_status()
+            if not resp.ok:
+                self._handle_error_response(resp, "fetch_trending")
+                return []
             items = resp.json().get("data", {}).get("Page", {}).get("media") or []
-        except Exception:
+        except requests.RequestException as exc:
+            log.error("AniList fetch_trending — erro de conexão: %s", exc)
+            self._api_status = AniListStatus.UNKNOWN_ERROR
             return []
 
+        self._api_status = AniListStatus.OK
+        self._retry_after = None
         result = [self._media_to_card(m) for m in items]
         with self._cache_lock:
             self._trending_cache = result
@@ -225,11 +339,17 @@ class AniListService:
                 }},
                 timeout=15,
             )
-            resp.raise_for_status()
+            if not resp.ok:
+                self._handle_error_response(resp, "fetch_seasonal")
+                return []
             items = resp.json().get("data", {}).get("Page", {}).get("media") or []
-        except Exception:
+        except requests.RequestException as exc:
+            log.error("AniList fetch_seasonal — erro de conexão: %s", exc)
+            self._api_status = AniListStatus.UNKNOWN_ERROR
             return []
 
+        self._api_status = AniListStatus.OK
+        self._retry_after = None
         result = [self._media_to_card(m) for m in items]
         with self._cache_lock:
             self._seasonal_cache = result

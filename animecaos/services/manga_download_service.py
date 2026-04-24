@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 import re
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+
+log = logging.getLogger(__name__)
 
 MANGA_DL_DIR = Path.home() / "Downloads" / "AnimeCaos" / "Manga"
 
@@ -71,7 +74,8 @@ class MangaDownloadService:
                     size = f.stat().st_size
                     with zipfile.ZipFile(f, "r") as zf:
                         page_count = len(zf.namelist())
-                except Exception:
+                except Exception as exc:
+                    log.warning("CBZ corrompido ou ilegível: %s — %s", f, exc)
                     size = 0
                     page_count = 0
                 entries.append(MangaDownloadEntry(

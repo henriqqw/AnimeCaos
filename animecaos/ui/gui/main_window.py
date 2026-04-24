@@ -31,7 +31,7 @@ from animecaos.services.anime_service import AnimeService
 from animecaos.services.discord_service import DiscordService
 from animecaos.services.downloads_service import DownloadEntry, DownloadsService
 from animecaos.services.history_service import HistoryEntry, HistoryService
-from animecaos.services.anilist_service import AniListService
+from animecaos.services.anilist_service import AniListService, AniListStatus
 from animecaos.services.anilist_auth_service import AniListAuthService
 from animecaos.services.config_service import ConfigService
 from animecaos.services.updater_service import UpdaterService
@@ -466,11 +466,13 @@ class MainWindow(QMainWindow):
         self._manga_detail_view.download_chapter_clicked.connect(self._on_manga_detail_dl_chapter)
         self._manga_detail_view.download_all_clicked.connect(self._on_manga_detail_dl_all)
         self._manga_detail_view.download_selected_clicked.connect(self._on_manga_detail_dl_selected)
-        self._manga_reader_view.back_clicked.connect(self._navigate_to_manga_detail_current)
+        self._reader_from_downloads: bool = False
+        self._manga_reader_view.back_clicked.connect(self._on_manga_reader_back)
         self._manga_reader_view.chapter_requested.connect(self._on_manga_chapter_requested)
         self._manga_reader_view.progress_changed.connect(self._on_manga_progress_changed)
         self._manga_reader_view.download_chapter_clicked.connect(self._on_manga_reader_dl_chapter)
         self._downloads_view.manga_delete_clicked.connect(self._on_manga_download_delete)
+        self._downloads_view.manga_open_clicked.connect(self._on_manga_download_open)
 
     def _bind_shortcuts(self) -> None:
         QShortcut(QKeySequence("Ctrl+F"), self, self._focus_search)
@@ -733,8 +735,9 @@ class MainWindow(QMainWindow):
         def _prefetch_next():
             try:
                 self._anime_service.resolve_player_url(anime, episode_index + 1)
-            except Exception:
-                pass
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).debug("Prefetch ep %d falhou: %s", episode_index + 1, exc)
         threading.Thread(target=_prefetch_next, daemon=True).start()
 
         # Dismiss overlay from worker thread before blocking on player
@@ -1067,6 +1070,15 @@ class MainWindow(QMainWindow):
         seasonal = payload.get("seasonal") or []
         self._home_view.set_trending_cards(trending)
         self._home_view.set_seasonal_cards(seasonal)
+        status = self._anilist_service.api_status
+        if self._anilist_service.is_offline:
+            desc = status.ui_description()
+            retry = self._anilist_service.retry_after
+            if retry is not None:
+                desc = f"Aguarde ~{retry}s antes de tentar novamente. " + desc
+            self._home_view.show_anilist_offline_banner(status.ui_title(), desc)
+        else:
+            self._home_view.hide_anilist_offline_banner()
         # Populate cover_cache from already-downloaded covers — no extra AniList calls.
         for card in trending + seasonal:
             title = card.get("title", "")
@@ -1499,13 +1511,21 @@ class MainWindow(QMainWindow):
         self._breadcrumb.setText("  >  Manga")
         self._manga_home_view.set_history(self._manga_history_service.load_entries())
 
+    def _on_manga_reader_back(self) -> None:
+        if self._reader_from_downloads:
+            self._reader_from_downloads = False
+            self._push_nav(_VIEW_DOWNLOADS)
+            self._stack.slide_to(_VIEW_DOWNLOADS)
+            self._breadcrumb.setText("  >  Downloads")
+        else:
+            self._navigate_to_manga_detail_current()
+
     def _navigate_to_manga_detail_current(self) -> None:
-        if self._current_manga:
+        manga = self._current_manga
+        if manga:
             self._push_nav(_VIEW_MANGA_DETAIL)
             self._stack.slide_to(_VIEW_MANGA_DETAIL)
-            self._breadcrumb.setText(
-                f"  >  Manga  >  {self._current_manga.get('title', '')}"
-            )
+            self._breadcrumb.setText(f"  >  Manga  >  {manga.get('title', '')}")
 
     def _on_manga_search(self, query: str) -> None:
         self._manga_home_view.show_searching(query)
@@ -1617,6 +1637,7 @@ class MainWindow(QMainWindow):
         mid = self._current_manga.get("id", "")
         cover_path = self._manga_cover_cache.get(mid)
 
+        self._reader_from_downloads = False
         self._push_nav(_VIEW_MANGA_READER)
         self._stack.slide_to(_VIEW_MANGA_READER)
         self._breadcrumb.setText("  >  Manga  >  Leitor")
@@ -1825,6 +1846,38 @@ class MainWindow(QMainWindow):
         self._manga_download_service.delete(entry)
         self._append_log(f"Manga: download removido — {entry.chapter_label}")
         self._refresh_downloads_view()
+
+    def _on_manga_download_open(self, entry: object) -> None:
+        from animecaos.services.manga_download_service import MangaDownloadEntry
+        if not isinstance(entry, MangaDownloadEntry):
+            return
+        self._reader_from_downloads = True
+        self._append_log(f"Manga: abrindo local — {entry.manga_title} / {entry.chapter_label}")
+        self._set_status(f"Abrindo {entry.chapter_label}…")
+
+        def _load(e=entry):
+            return self._manga_download_service.read_pages(e.file_path), e
+
+        worker = FunctionWorker(_load)
+        self._metadata_workers.add(worker)
+        worker.signals.succeeded.connect(self._on_manga_local_pages_loaded)
+        worker.signals.failed.connect(lambda _: self._set_status("Erro ao abrir capítulo."))
+        worker.signals.finished.connect(lambda w=worker: self._metadata_workers.discard(w))
+        self._thread_pool.start(worker)
+
+    def _on_manga_local_pages_loaded(self, payload: object) -> None:
+        if not isinstance(payload, tuple):
+            return
+        pages, entry = payload
+        self._push_nav(_VIEW_MANGA_READER)
+        self._stack.slide_to(_VIEW_MANGA_READER)
+        self._breadcrumb.setText(f"  >  Downloads  >  {entry.manga_title}")
+        self._manga_reader_view.load_local_chapter(
+            pages=pages,
+            chapter_label=entry.chapter_label,
+            manga_title=entry.manga_title,
+        )
+        self._set_status(f"Lendo {entry.chapter_label} — {len(pages)} páginas")
 
     # ── TASK RUNNER ──────────────────────────────────────────────
 

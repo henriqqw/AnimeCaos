@@ -60,13 +60,16 @@ from .components import (
 )
 from .icons import (
     icon_arrow_left,
+    icon_book,
     icon_clock,
     icon_folder,
     icon_loader,
     icon_monitor,
     icon_search,
     icon_search_x,
+    icon_trash,
     icon_user,
+    icon_x,
 )
 from animecaos.services.downloads_service import DownloadEntry
 from animecaos.services.manga_download_service import MangaDownloadEntry
@@ -82,35 +85,40 @@ class AnimatedButton(QPushButton):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._effect = QGraphicsOpacityEffect(self)
-        self._effect.setOpacity(1.0)
-        self._anim = QPropertyAnimation(self._effect, b"opacity", self)
-        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
-        self._anim.finished.connect(self._on_anim_finished)
+        self._effect: QGraphicsOpacityEffect | None = None
+        self._anim: QPropertyAnimation | None = None
 
-    def _on_anim_finished(self) -> None:
-        if self._effect.opacity() >= 1.0:
-            self.setGraphicsEffect(None)
-
-    def _attach_effect(self) -> None:
-        if self.graphicsEffect() is None:
+    def _ensure_effect(self) -> QGraphicsOpacityEffect:
+        """Return active effect, recreating if Qt deleted the previous one."""
+        if self._effect is None or not self._effect.parent():
+            self._effect = QGraphicsOpacityEffect(self)
             self._effect.setOpacity(1.0)
             self.setGraphicsEffect(self._effect)
+            self._anim = QPropertyAnimation(self._effect, b"opacity", self)
+            self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+            self._anim.finished.connect(self._on_anim_finished)
+        return self._effect
+
+    def _on_anim_finished(self) -> None:
+        if self._effect and self._effect.opacity() >= 1.0:
+            self.setGraphicsEffect(None)
+            self._effect = None
+            self._anim = None
 
     def mousePressEvent(self, event):
-        self._attach_effect()
+        effect = self._ensure_effect()
         self._anim.stop()
         self._anim.setDuration(80)
-        self._anim.setStartValue(self._effect.opacity())
+        self._anim.setStartValue(effect.opacity())
         self._anim.setEndValue(0.55)
         self._anim.start()
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
-        self._attach_effect()
+        effect = self._ensure_effect()
         self._anim.stop()
         self._anim.setDuration(160)
-        self._anim.setStartValue(self._effect.opacity())
+        self._anim.setStartValue(effect.opacity())
         self._anim.setEndValue(1.0)
         self._anim.start()
         super().mouseReleaseEvent(event)
@@ -119,6 +127,61 @@ class AnimatedButton(QPushButton):
 # ═══════════════════════════════════════════════════════════════════
 #  HOME VIEW
 # ═══════════════════════════════════════════════════════════════════
+
+class _AniListOfflineBanner(QFrame):
+    """Dismissible warning banner shown when AniList API is unavailable."""
+
+    dismissed = Signal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setStyleSheet(
+            "QFrame { background: rgba(212,100,50,0.15); border: 1px solid rgba(212,100,50,0.4);"
+            " border-radius: 10px; }"
+        )
+
+        row = QHBoxLayout(self)
+        row.setContentsMargins(16, 12, 12, 12)
+        row.setSpacing(12)
+
+        self._icon = QLabel("!")
+        self._icon.setStyleSheet("color: #D46432; font-size: 18px; font-weight: 900; background: transparent; border: none;")
+        self._icon.setFixedWidth(22)
+        row.addWidget(self._icon)
+
+        text_col = QVBoxLayout()
+        text_col.setSpacing(2)
+        self._title_lbl = QLabel()
+        self._title_lbl.setStyleSheet(
+            "color: #F2C97D; font-size: 13px; font-weight: 700; background: transparent; border: none;"
+        )
+        self._desc_lbl = QLabel()
+        self._desc_lbl.setStyleSheet(
+            "color: rgba(242,201,125,0.75); font-size: 12px; background: transparent; border: none;"
+        )
+        self._desc_lbl.setWordWrap(True)
+        text_col.addWidget(self._title_lbl)
+        text_col.addWidget(self._desc_lbl)
+        row.addLayout(text_col, 1)
+
+        close_btn = QPushButton("x")
+        close_btn.setFixedSize(24, 24)
+        close_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        close_btn.setStyleSheet(
+            "QPushButton { background: transparent; border: none; color: rgba(242,201,125,0.6);"
+            " font-size: 14px; } QPushButton:hover { color: #F2C97D; }"
+        )
+        close_btn.clicked.connect(self._dismiss)
+        row.addWidget(close_btn, 0, Qt.AlignmentFlag.AlignTop)
+
+    def update_status(self, title: str, description: str) -> None:
+        self._title_lbl.setText(title)
+        self._desc_lbl.setText(description)
+
+    def _dismiss(self) -> None:
+        self.hide()
+        self.dismissed.emit()
+
 
 class HomeView(QWidget):
     """Landing view with Continue Watching section."""
@@ -139,6 +202,10 @@ class HomeView(QWidget):
         self._content = QVBoxLayout(container)
         self._content.setContentsMargins(24, 16, 24, 24)
         self._content.setSpacing(28)
+
+        self._offline_banner = _AniListOfflineBanner()
+        self._offline_banner.hide()
+        self._content.addWidget(self._offline_banner)
 
         # ── Continue Watching ──
         self.history_section = HorizontalCardScroll("Continue Assistindo")
@@ -214,6 +281,13 @@ class HomeView(QWidget):
     def update_discover_cover(self, title: str, cover_path: str) -> None:
         self.trending_section.update_card_cover(title, cover_path)
         self.seasonal_section.update_card_cover(title, cover_path)
+
+    def show_anilist_offline_banner(self, title: str, description: str) -> None:
+        self._offline_banner.update_status(title, description)
+        self._offline_banner.show()
+
+    def hide_anilist_offline_banner(self) -> None:
+        self._offline_banner.hide()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -1519,6 +1593,7 @@ class _AnimeGroupCard(QFrame):
 
 class _MangaChapterRow(QFrame):
     delete_clicked = Signal(object)
+    open_clicked   = Signal(object)
 
     def __init__(self, entry: MangaDownloadEntry, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -1555,15 +1630,27 @@ class _MangaChapterRow(QFrame):
         )
         row.addWidget(cbz_badge)
 
-        del_btn = QPushButton("\u2715")
-        del_btn.setFixedSize(24, 24)
+        read_btn = QPushButton("Ler")
+        read_btn.setFixedHeight(26)
+        read_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        read_btn.setStyleSheet(
+            "QPushButton { color: #7EB3FF; background: rgba(100,160,255,0.10);"
+            " border: 1px solid rgba(100,160,255,0.25); border-radius: 4px;"
+            " font-size: 11px; padding: 0 10px; }"
+            "QPushButton:hover { background: rgba(100,160,255,0.22); border-color: rgba(100,160,255,0.5); }"
+        )
+        read_btn.clicked.connect(lambda checked=False, e=entry: self.open_clicked.emit(e))
+        row.addWidget(read_btn)
+
+        del_btn = QPushButton("Remover")
+        del_btn.setFixedHeight(26)
         del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        del_btn.setToolTip("Remover")
         del_btn.setStyleSheet(
-            "QPushButton { color: #4B5563; background: transparent;"
-            " border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; font-size: 10px; }"
-            "QPushButton:hover { color: #E57373; border-color: rgba(229,115,115,0.35);"
-            " background: rgba(229,115,115,0.06); }"
+            "QPushButton { color: #B06060; background: rgba(180,60,60,0.08);"
+            " border: 1px solid rgba(180,60,60,0.22); border-radius: 4px;"
+            " font-size: 11px; padding: 0 10px; }"
+            "QPushButton:hover { color: #E57373; border-color: rgba(229,115,115,0.5);"
+            " background: rgba(229,115,115,0.15); }"
         )
         del_btn.clicked.connect(lambda checked=False, e=entry: self.delete_clicked.emit(e))
         row.addWidget(del_btn)
@@ -1571,6 +1658,7 @@ class _MangaChapterRow(QFrame):
 
 class _MangaGroupCard(QFrame):
     delete_clicked = Signal(object)
+    open_clicked   = Signal(object)
 
     def __init__(
         self,
@@ -1627,6 +1715,7 @@ class _MangaGroupCard(QFrame):
         for i, entry in enumerate(entries):
             r = _MangaChapterRow(entry)
             r.delete_clicked.connect(self.delete_clicked.emit)
+            r.open_clicked.connect(self.open_clicked.emit)
             content.addWidget(r)
             if i >= _MAX_VISIBLE_EPS:
                 r.setVisible(False)
@@ -1718,10 +1807,11 @@ def _make_scroll_panel() -> tuple[QScrollArea, QWidget, QVBoxLayout]:
 class DownloadsView(QWidget):
     """Offline library — Anime and Manga tabs."""
 
-    play_clicked        = Signal(object)
-    delete_clicked      = Signal(object)
-    open_folder_clicked = Signal()
+    play_clicked         = Signal(object)
+    delete_clicked       = Signal(object)
+    open_folder_clicked  = Signal()
     manga_delete_clicked = Signal(object)
+    manga_open_clicked   = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -1764,10 +1854,10 @@ class DownloadsView(QWidget):
         tab_row = QHBoxLayout()
         tab_row.setContentsMargins(0, 0, 0, 0)
         tab_row.setSpacing(0)
-        self._tab_anime = QPushButton("📺  Anime")
+        self._tab_anime = QPushButton("Anime")
         self._tab_anime.setFixedHeight(36)
         self._tab_anime.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._tab_manga = QPushButton("📖  Manga")
+        self._tab_manga = QPushButton("Manga")
         self._tab_manga.setFixedHeight(36)
         self._tab_manga.setCursor(Qt.CursorShape.PointingHandCursor)
         tab_row.addWidget(self._tab_anime)
@@ -1905,6 +1995,7 @@ class DownloadsView(QWidget):
             cover = (cover_cache or {}).get(manga_title)
             card = _MangaGroupCard(manga_title, entries, cover)
             card.delete_clicked.connect(self.manga_delete_clicked.emit)
+            card.open_clicked.connect(self.manga_open_clicked.emit)
             self._manga_cards[manga_title] = card
             self._manga_layout.addWidget(card)
         self._manga_layout.addStretch()

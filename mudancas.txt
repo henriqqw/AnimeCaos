@@ -1,0 +1,74 @@
+Histórico de Mudanças - AnimeCaos v0.1.4
+Data: 2026-06-28
+
+==============================================================
+MUDANÇAS FEITAS EM RELAÇÃO À VERSÃO 0.1.3 (BACKUP)
+==============================================================
+
+--------------------------------------------------------------
+1. sidebar.py — Indicador animado na sidebar + manga oculto
+--------------------------------------------------------------
+- NOVO: Classe `ActiveIndicator` — pequena "pílula" vermelha
+  que indica o item ativo da sidebar com animação suave.
+- NOVO: `QPropertyAnimation` na sidebar para animar o indicador
+  entre os botões ao navegar.
+- NOVO: `resizeEvent` recalcula a posição do indicador ao
+  redimensionar a janela.
+- NOVO: `_move_indicator_to()` e `_move_indicator_to_checked()`
+  controlam o movimento animado do indicador.
+- OCULTADO: Botão "Manga" agora fica escondido na sidebar
+  (`self._buttons["manga"].hide()`) para não confundir o usuário
+  enquanto a funcionalidade não está pronta.
+
+--------------------------------------------------------------
+2. main_window.py — Campo de busca expansível
+--------------------------------------------------------------
+- NOVO: Classe `ExpandingSearchInput` (herda de QLineEdit):
+  o campo de busca se expande de 300px → 450px suavemente ao
+  receber foco, e encolhe ao perder o foco, usando
+  `QPropertyAnimation`.
+- ALTERADO: `self._search_input` agora é uma instância de
+  `ExpandingSearchInput` em vez de `QLineEdit` simples.
+
+--------------------------------------------------------------
+3. views.py — Backdrop desfocado na página de detalhes do anime
+--------------------------------------------------------------
+- NOVO: Campo `_backdrop_pixmap` na `AnimeDetailView`.
+- NOVO: Método `_create_blurred_backdrop(cover_path)`:
+  usa a capa do anime para gerar um fundo embaçado (efeito
+  pixelate + escala) com gradiente escurecido (vignette) na
+  parte superior da tela de detalhes.
+- NOVO: `paintEvent` sobrescrito para desenhar o backdrop
+  atrás do conteúdo da view de detalhes.
+
+--------------------------------------------------------------
+4. components.py — AnimeCard com hover animado e badge flutuante
+--------------------------------------------------------------
+- NOVO: Classe `AnimeCover` — widget customizado para exibir
+  a capa do anime com:
+  * Zoom suave (5%) ao passar o mouse (hover).
+  * Overlay escuro + ícone de play (círculo vermelho + triângulo)
+    ao fazer hover.
+  * `QLabel#FloatingBadge` flutuante no canto superior direito
+    (ex: "DUB", "LEG").
+  * Bordas arredondadas via `QPainterPath`.
+- ALTERADO: `AnimeCard` agora usa `AnimeCover` no lugar de
+  `QLabel` simples para a capa do anime.
+- ALTERADO: `title_label` agora tem altura fixa de 36px
+  (antes era máximo de 34px) para alinhamento perfeito no grid.
+
+--------------------------------------------------------------
+5. theme.py — Novos estilos CSS
+--------------------------------------------------------------
+- NOVO: Estilo `QLabel#FloatingBadge` para o badge flutuante
+  nas capas dos animes (fundo vermelho semi-transparente).
+- ALTERADO: Botão de hover com `background-color: rgba(255,
+  255, 255, 0.09)` para feedback visual mais suave.
+
+--------------------------------------------------------------
+6. Versão e metadados
+--------------------------------------------------------------
+- animecaos/__init__.py: "0.1.3" → "0.1.4"
+- README.md: badge de versão atualizado para v0.1.4
+- setup.iss: AppVersion e OutputBaseFilename atualizados para 0.1.4
+- com.animecaos.App.metainfo.xml: release 0.1.4 com data 2026-06-28

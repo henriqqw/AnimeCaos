@@ -144,6 +144,103 @@ class EmptyState(QWidget):
             layout.addWidget(sub_label)
 
 
+# ── Anime Cover with Hover Animation & Floating Badge ────────────
+
+class AnimeCover(QWidget):
+    """Cover widget displaying pixmap with hover zoom animation and overlay elements."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._pixmap = QPixmap()
+        self._hover_factor = 0.0
+
+        self._anim = QPropertyAnimation(self, b"hover_factor", self)
+        self._anim.setDuration(220)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        # Floating badge (semi-transparent)
+        self.badge_lbl = QLabel(self)
+        self.badge_lbl.setObjectName("FloatingBadge")
+        self.badge_lbl.hide()
+
+    @Property(float)
+    def hover_factor(self) -> float:
+        return self._hover_factor
+
+    @hover_factor.setter
+    def hover_factor(self, val: float) -> None:
+        self._hover_factor = val
+        self.update()
+
+    def set_pixmap(self, pixmap: QPixmap) -> None:
+        self._pixmap = pixmap
+        self.update()
+
+    def set_badge(self, text: str) -> None:
+        if text:
+            self.badge_lbl.setText(text)
+            self.badge_lbl.show()
+            self.badge_lbl.adjustSize()
+            self._position_badge()
+        else:
+            self.badge_lbl.hide()
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._position_badge()
+
+    def _position_badge(self) -> None:
+        if self.badge_lbl.isVisible():
+            bx = self.width() - self.badge_lbl.width() - 6
+            by = 6
+            self.badge_lbl.move(bx, by)
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
+        w = self.width()
+        h = self.height()
+
+        clip = QPainterPath()
+        clip.addRoundedRect(0, 0, w, h, 8, 8)
+        painter.setClipPath(clip)
+
+        if not self._pixmap.isNull():
+            scale = 1.0 + 0.05 * self._hover_factor
+            sw = int(w * scale)
+            sh = int(h * scale)
+            sx = (w - sw) // 2
+            sy = (h - sh) // 2
+            painter.drawPixmap(sx, sy, sw, sh, self._pixmap)
+        else:
+            painter.fillRect(0, 0, w, h, QColor(255, 255, 255, 12))
+
+        # Hover overlay: play button + vignette
+        if self._hover_factor > 0.0:
+            opacity = int(100 * self._hover_factor)
+            painter.fillRect(0, 0, w, h, QColor(0, 0, 0, opacity))
+
+            center_x = w // 2
+            center_y = h // 2
+            radius = 20
+
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(212, 66, 66, int(230 * self._hover_factor)))
+            painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
+
+            painter.setBrush(QColor(255, 255, 255, int(255 * self._hover_factor)))
+            triangle = QPainterPath()
+            triangle.moveTo(center_x - 4, center_y - 6)
+            triangle.lineTo(center_x + 7, center_y)
+            triangle.lineTo(center_x - 4, center_y + 6)
+            triangle.closeSubpath()
+            painter.drawPath(triangle)
+
+        painter.end()
+
+
 # ── Anime Card ───────────────────────────────────────────────────
 
 class AnimeCard(QFrame):
@@ -167,42 +264,33 @@ class AnimeCard(QFrame):
         layout.setContentsMargins(6, 6, 6, 8)
         layout.setSpacing(6)
 
-        # Cover image
-        self.cover_label = QLabel()
+        # Custom Cover image widget with hover animations & floating badge
+        self.cover_label = AnimeCover(self)
         self.cover_label.setFixedSize(self.CARD_WIDTH - 12, self.COVER_HEIGHT)
-        self.cover_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.cover_label.setStyleSheet(
-            "background: rgba(255,255,255,0.05); border-radius: 8px;"
-        )
-        self.cover_label.setText("")
+        
+        badge_text = data.get("badge", "")
+        self.cover_label.set_badge(badge_text)
 
         cover_path = data.get("cover_path")
         if cover_path and os.path.exists(str(cover_path)):
             self._set_cover(str(cover_path))
         else:
-            # Dynamic placeholder cover based on title
             title = data.get("title", "")
             if title:
-                self.cover_label.setPixmap(
+                self.cover_label.set_pixmap(
                     generate_dynamic_cover(title, self.CARD_WIDTH - 12, self.COVER_HEIGHT)
                 )
         layout.addWidget(self.cover_label)
 
-        # Title (max 2 lines)
+        # Title (fixed height of 36px for perfect grid alignment)
         self.title_label = QLabel(data.get("title", ""))
         self.title_label.setWordWrap(True)
-        self.title_label.setMaximumHeight(34)
+        self.title_label.setFixedHeight(36)
         self.title_label.setStyleSheet(
             "font-size: 12px; font-weight: 500; color: #E6E7EA;"
         )
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         layout.addWidget(self.title_label)
-
-        # Badge (optional)
-        badge_text = data.get("badge", "")
-        if badge_text:
-            badge = QLabel(badge_text)
-            badge.setObjectName("Caption")
-            layout.addWidget(badge)
 
         layout.addStretch()
 
@@ -222,20 +310,24 @@ class AnimeCard(QFrame):
         y = (scaled.height() - h) // 2
         cropped = scaled.copy(x, y, w, h)
 
-        rounded = QPixmap(w, h)
-        rounded.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(rounded)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        clip = QPainterPath()
-        clip.addRoundedRect(0, 0, w, h, 8, 8)
-        painter.setClipPath(clip)
-        painter.drawPixmap(0, 0, cropped)
-        painter.end()
-
-        self.cover_label.setPixmap(rounded)
+        self.cover_label.set_pixmap(cropped)
 
     def set_cover_from_path(self, path: str) -> None:
         self._set_cover(path)
+
+    def enterEvent(self, event) -> None:
+        self.cover_label._anim.stop()
+        self.cover_label._anim.setStartValue(self.cover_label.hover_factor)
+        self.cover_label._anim.setEndValue(1.0)
+        self.cover_label._anim.start()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        self.cover_label._anim.stop()
+        self.cover_label._anim.setStartValue(self.cover_label.hover_factor)
+        self.cover_label._anim.setEndValue(0.0)
+        self.cover_label._anim.start()
+        super().leaveEvent(event)
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:

@@ -1170,6 +1170,7 @@ class AnimeDetailView(QWidget):
     def set_anime(self, name: str) -> None:
         self._current_anime = name
         self._title_label.setText(name)
+        self._backdrop_pixmap = None
         # Show dynamic cover immediately while real cover loads async
         if name:
             self._cover_label.setPixmap(generate_dynamic_cover(name, 200, 280, radius=12))
@@ -1182,6 +1183,7 @@ class AnimeDetailView(QWidget):
         self._clear_episodes()
         self._loading_label.setVisible(True)
         self._episodes_empty.setVisible(False)
+        self.update()
 
     def set_metadata(self, description: str | None, cover_path: str | None) -> None:
         if description:
@@ -1191,6 +1193,60 @@ class AnimeDetailView(QWidget):
 
         if cover_path and os.path.exists(cover_path):
             self._set_cover(cover_path)
+            self._create_blurred_backdrop(cover_path)
+
+    def _create_blurred_backdrop(self, cover_path: str) -> None:
+        try:
+            pm = QPixmap(cover_path)
+            if pm.isNull():
+                self._backdrop_pixmap = None
+                self.update()
+                return
+
+            # Scale way down to heavily pixelate
+            small = pm.scaled(
+                32, 45,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation
+            )
+
+            # Scale back up to interpolate/blur
+            blurred = small.scaled(
+                1200, 380,
+                Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+                Qt.TransformationMode.SmoothTransformation
+            )
+
+            # Apply dark vignetted overlay to merge backdrop into standard background
+            self._backdrop_pixmap = QPixmap(blurred.size())
+            self._backdrop_pixmap.fill(Qt.GlobalColor.transparent)
+
+            painter = QPainter(self._backdrop_pixmap)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.drawPixmap(0, 0, blurred)
+
+            # Vignette gradient
+            grad = QLinearGradient(0, 0, 0, self._backdrop_pixmap.height())
+            grad.setColorAt(0.0, QColor(11, 12, 15, 110))
+            grad.setColorAt(0.6, QColor(11, 12, 15, 190))
+            grad.setColorAt(1.0, QColor(11, 12, 15, 255))
+
+            painter.fillRect(self._backdrop_pixmap.rect(), grad)
+            painter.end()
+        except Exception:
+            self._backdrop_pixmap = None
+        
+        self.update()
+
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        if hasattr(self, "_backdrop_pixmap") and self._backdrop_pixmap is not None:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            rect = self.rect()
+            draw_height = min(350, rect.height())
+            painter.drawPixmap(0, 0, rect.width(), draw_height, self._backdrop_pixmap)
+            painter.end()
 
     def _set_cover(self, path: str) -> None:
         w, h = 200, 280

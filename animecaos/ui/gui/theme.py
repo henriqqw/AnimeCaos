@@ -136,6 +136,16 @@ def build_stylesheet() -> str:
         padding: 2px 8px;
     }}
 
+    QLabel#FloatingBadge {{
+        font-size: 10px;
+        font-weight: 700;
+        color: #FFFFFF;
+        background-color: rgba(212, 66, 66, 0.90);
+        border: 1px solid rgba(212, 66, 66, 0.50);
+        border-radius: 4px;
+        padding: 2px 6px;
+    }}
+
     QLabel#Breadcrumb {{
         color: {TEXT_MUTED};
         font-size: 13px;
@@ -164,6 +174,7 @@ def build_stylesheet() -> str:
 
     QLineEdit:focus, QPlainTextEdit:focus, QListWidget:focus {{
         border: 1px solid {ACCENT};
+        background-color: rgba(255, 255, 255, 0.09);
     }}
 
     QListWidget::item {{

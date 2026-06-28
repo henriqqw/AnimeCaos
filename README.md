@@ -7,7 +7,7 @@ Assista anime no desktop, sem anúncios, sem abrir navegador.
 
 [Website](https://animecaos.vercel.app) · [Instagram](https://www.instagram.com/getanimecaos/) · [Twitter](https://x.com/getanimecaos)
 
-![Version](https://img.shields.io/badge/version-v0.1.3-red.svg)
+![Version](https://img.shields.io/badge/version-v0.1.4-red.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 

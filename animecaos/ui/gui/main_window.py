@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Any, Callable
 
-from PySide6.QtCore import Qt, QThreadPool, Signal, QSize, QTimer
+from PySide6.QtCore import Qt, QThreadPool, Signal, QSize, QTimer, QEasingCurve, QPropertyAnimation
 from PySide6.QtGui import QIcon, QMouseEvent, QPixmap, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -181,6 +181,50 @@ class LogView(QWidget):
         self.progress_bar.setMaximumHeight(10)
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
+
+
+class ExpandingSearchInput(QLineEdit):
+    """QLineEdit that smoothly expands to 450px when focused and shrinks back to 300px when it loses focus."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setMinimumWidth(300)
+        self.setMaximumWidth(300)
+
+        # Animations for expanding/shrinking width
+        self._anim_min = QPropertyAnimation(self, b"minimumWidth", self)
+        self._anim_min.setDuration(220)
+        self._anim_min.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self._anim_max = QPropertyAnimation(self, b"maximumWidth", self)
+        self._anim_max.setDuration(220)
+        self._anim_max.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+    def focusInEvent(self, event) -> None:
+        self._anim_min.stop()
+        self._anim_min.setStartValue(self.minimumWidth())
+        self._anim_min.setEndValue(450)
+        self._anim_min.start()
+
+        self._anim_max.stop()
+        self._anim_max.setStartValue(self.maximumWidth())
+        self._anim_max.setEndValue(450)
+        self._anim_max.start()
+
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event) -> None:
+        self._anim_min.stop()
+        self._anim_min.setStartValue(self.minimumWidth())
+        self._anim_min.setEndValue(300)
+        self._anim_min.start()
+
+        self._anim_max.stop()
+        self._anim_max.setStartValue(self.maximumWidth())
+        self._anim_max.setEndValue(300)
+        self._anim_max.start()
+
+        super().focusOutEvent(event)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -413,10 +457,8 @@ class MainWindow(QMainWindow):
         search_container = QHBoxLayout()
         search_container.setSpacing(0)
 
-        self._search_input = QLineEdit()
+        self._search_input = ExpandingSearchInput()
         self._search_input.setPlaceholderText("Pesquisar anime...  (Ctrl+F)")
-        self._search_input.setMinimumWidth(300)
-        self._search_input.setMaximumWidth(500)
         layout.addWidget(self._search_input)
 
         self._search_btn = AnimatedButton()

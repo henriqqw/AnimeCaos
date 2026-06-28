@@ -4,7 +4,7 @@ Only Home, Search, Log, and Account — favorites and history are part of Home.
 """
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal, QSize
+from PySide6.QtCore import Qt, Signal, QSize, QPoint, QEasingCurve, QPropertyAnimation, QTimer
 from PySide6.QtGui import QCursor, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -32,6 +32,17 @@ def _dual_icon(fn, size: int = _ICON_SIZE) -> QIcon:
     icon.addPixmap(fn(size, _COLOR_ON),  QIcon.Mode.Active,   QIcon.State.Off)
     icon.addPixmap(fn(size, _COLOR_ON),  QIcon.Mode.Selected, QIcon.State.Off)
     return icon
+
+
+class ActiveIndicator(QWidget):
+    """Small vertical pill indicator shown next to the active sidebar item."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setStyleSheet("background-color: #D44242; border-radius: 2px;")
+        self.setFixedWidth(4)
+        self.setFixedHeight(18)
 
 
 class SidebarNav(QFrame):
@@ -67,6 +78,7 @@ class SidebarNav(QFrame):
         # Manga
         self._buttons["manga"] = self._make_btn(_dual_icon(icon_book), "Manga")
         layout.addWidget(self._buttons["manga"], 0, Qt.AlignmentFlag.AlignHCenter)
+        self._buttons["manga"].hide()
 
         layout.addStretch()
 
@@ -78,8 +90,19 @@ class SidebarNav(QFrame):
         self._buttons["log"] = self._make_btn(_dual_icon(icon_terminal), "Log de eventos")
         layout.addWidget(self._buttons["log"], 0, Qt.AlignmentFlag.AlignHCenter)
 
+        # Active indicator marker setup
+        self._indicator = ActiveIndicator(self)
+        self._indicator.show()
+
+        self._anim = QPropertyAnimation(self._indicator, b"pos", self)
+        self._anim.setDuration(220)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
         self._buttons["home"].setChecked(True)
         self._group.buttonClicked.connect(self._on_button_clicked)
+        
+        # Defer indicator placement until layout is calculated
+        QTimer.singleShot(0, lambda: self._move_indicator_to_checked(animate=False))
 
     def _make_btn(self, icon: QIcon, tooltip: str) -> QPushButton:
         btn = AnimatedButton()
@@ -93,7 +116,34 @@ class SidebarNav(QFrame):
         self._group.addButton(btn)
         return btn
 
+    def _move_indicator_to(self, btn: QPushButton, animate: bool = True) -> None:
+        if not btn:
+            return
+        target_x = 4
+        btn_pos = btn.pos()
+        target_y = btn_pos.y() + (btn.height() - self._indicator.height()) // 2
+        target_pos = QPoint(target_x, target_y)
+
+        if animate:
+            self._anim.stop()
+            self._anim.setStartValue(self._indicator.pos())
+            self._anim.setEndValue(target_pos)
+            self._anim.start()
+        else:
+            self._indicator.move(target_pos)
+
+    def _move_indicator_to_checked(self, animate: bool = True) -> None:
+        for btn in self._group.buttons():
+            if btn.isChecked():
+                self._move_indicator_to(btn, animate=animate)
+                break
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._move_indicator_to_checked(animate=False)
+
     def _on_button_clicked(self, btn: QPushButton) -> None:
+        self._move_indicator_to(btn, animate=True)
         for key, b in self._buttons.items():
             if b is btn:
                 self.nav_changed.emit(key)
@@ -103,6 +153,7 @@ class SidebarNav(QFrame):
         btn = self._buttons.get(key)
         if btn:
             btn.setChecked(True)
+            self._move_indicator_to(btn, animate=True)
 
     def set_account_connected(self, connected: bool) -> None:
         pass

@@ -1,12 +1,12 @@
 [Setup]
 AppName=AnimeCaos
-AppVersion=0.1.3
+AppVersion=0.1.4
 AppPublisher=AnimeCaos
 AppPublisherURL=https://animecaos.vercel.app
 DefaultDirName={autopf}\AnimeCaos
 DefaultGroupName=AnimeCaos
 OutputDir=installer
-OutputBaseFilename=Setup_AnimeCaos_v0.1.3
+OutputBaseFilename=Setup_AnimeCaos_v0.1.4
 Compression=lzma2/ultra
 SolidCompression=yes
 SetupIconFile=public\icon.ico

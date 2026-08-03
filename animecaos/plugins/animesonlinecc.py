@@ -12,19 +12,20 @@ from selenium.webdriver.support.wait import WebDriverWait
 from animecaos.core.loader import PluginInterface
 from animecaos.core.repository import rep
 
-from .utils import driver_session, validate_player_src
-from .player_cache import cache_player_url, get_cached_player_url
+from .driver_pool import driver_session, validate_player_src
+from .url_cache import cache_player_url, get_cached_player_url
 
 log = logging.getLogger(__name__)
 
-REQUEST_TIMEOUT_SECONDS = 15
+REQUEST_TIMEOUT_SECONDS = 6
 HEADERS = {"User-Agent": "Mozilla/5.0 (animecaos)"}
 
 _SESSION = requests.Session()
 _SESSION.headers.update(HEADERS)
 _retry = Retry(total=2, backoff_factor=0.3, status_forcelist=[500, 502, 503, 504])
-_SESSION.mount("https://", HTTPAdapter(max_retries=_retry))
-_SESSION.mount("http://", HTTPAdapter(max_retries=_retry))
+_adapter = HTTPAdapter(max_retries=_retry, pool_connections=20, pool_maxsize=20)
+_SESSION.mount("https://", _adapter)
+_SESSION.mount("http://", _adapter)
 
 
 
@@ -100,7 +101,7 @@ class AnimesOnlineCC(PluginInterface):
     def is_episode_playable(url_episode: str) -> bool:
         """Fast HTTP check: look for blogger iframe in raw HTML."""
         try:
-            response = _SESSION.get(url_episode, timeout=REQUEST_TIMEOUT_SECONDS)
+            response = _SESSION.get(url_episode, timeout=3.5)
             if response.status_code != 200:
                 return False
             return "blogger.com/video" not in response.text

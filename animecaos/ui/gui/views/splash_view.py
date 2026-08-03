@@ -42,13 +42,14 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QWidget
 
 from animecaos import __version__
+from animecaos.core.paths import get_base_path
 
 
-def _icon_path() -> str:
-    try:
-        base = sys._MEIPASS
-    except AttributeError:
-        base = os.path.abspath(".")
+def _app_icon_path() -> str:
+    base = str(get_base_path())
+    path = os.path.join(base, "assets", "icons", "icon.png")
+    if os.path.exists(path):
+        return path
     return os.path.join(base, "public", "icon.png")
 
 
@@ -89,7 +90,7 @@ class SplashScreen(QWidget):
         self._closing = False
 
         # Load icon
-        self._icon = QPixmap(_icon_path())
+        self._icon = QPixmap(_app_icon_path())
         if not self._icon.isNull():
             self._icon = self._icon.scaled(
                 QSize(64, 64),
@@ -116,8 +117,8 @@ class SplashScreen(QWidget):
         self.update()
         if self._closing and v <= 0:
             self._timer.stop()
-            self.close()
             self.finished.emit()
+            self.close()
 
     masterOpacity = Property(float, _get_opacity, _set_opacity)
 
@@ -143,6 +144,8 @@ class SplashScreen(QWidget):
     def finish(self) -> None:
         """Trigger smooth fade-out then emit finished()."""
         self._closing = True
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
+        self.show()
         self._fade.stop()
         self._fade.setDuration(_FADE_OUT_MS)
         self._fade.setStartValue(self._opacity)

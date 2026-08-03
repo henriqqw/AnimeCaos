@@ -14,19 +14,20 @@ from selenium.webdriver.support.wait import WebDriverWait
 from animecaos.core.loader import PluginInterface
 from animecaos.core.repository import rep
 
-from .utils import driver_session, validate_player_src
-from .player_cache import cache_player_url, get_cached_player_url
+from .driver_pool import driver_session, validate_player_src
+from .url_cache import cache_player_url, get_cached_player_url
 
 log = logging.getLogger(__name__)
 
-REQUEST_TIMEOUT_SECONDS = 15
+REQUEST_TIMEOUT_SECONDS = 6
 HEADERS = {"User-Agent": "Mozilla/5.0 (animecaos)"}
 
 _SESSION = requests.Session()
 _SESSION.headers.update(HEADERS)
 _retry = Retry(total=2, backoff_factor=0.3, status_forcelist=[500, 502, 503, 504])
-_SESSION.mount("https://", HTTPAdapter(max_retries=_retry))
-_SESSION.mount("http://", HTTPAdapter(max_retries=_retry))
+_adapter = HTTPAdapter(max_retries=_retry, pool_connections=20, pool_maxsize=20)
+_SESSION.mount("https://", _adapter)
+_SESSION.mount("http://", _adapter)
 
 
 def _is_video_url(url: str) -> bool:
@@ -109,7 +110,7 @@ class AnimeFire(PluginInterface):
         # Video API:   https://animefire.io/video/{slug}/{ep}
         try:
             api_url = url_episode.replace("/animes/", "/video/")
-            response = _SESSION.get(api_url, timeout=REQUEST_TIMEOUT_SECONDS)
+            response = _SESSION.get(api_url, timeout=3.5)
             if response.status_code != 200:
                 return False
             data = response.json().get("data", [])

@@ -15,8 +15,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .components import generate_dynamic_cover
-from .icons import icon_skip_back, icon_skip_forward, icon_x
+from .anime_card import generate_dynamic_cover
+from animecaos.ui.gui.icons import icon_skip_back, icon_skip_forward, icon_x
 
 
 class MiniPlayer(QFrame):

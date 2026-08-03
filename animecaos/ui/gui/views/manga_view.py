@@ -21,9 +21,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .icons import icon_arrow_left, icon_download, icon_search
-from .views import AnimatedButton
-from .workers import FunctionWorker
+from animecaos.ui.gui.icons import icon_arrow_left, icon_download, icon_search
+from animecaos.ui.gui.widgets.animated_button import AnimatedButton
+from animecaos.ui.gui.workers import FunctionWorker
 
 
 def _zinnes_logo_path() -> str:
@@ -278,172 +278,40 @@ class MangaHomeView(QWidget):
         outer.setContentsMargins(24, 20, 24, 20)
         outer.setSpacing(14)
 
-        title = QLabel("Manga")
+        outer.addStretch()
+
+        title = QLabel("Em Breve")
         title.setObjectName("SectionTitleLarge")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         outer.addWidget(title)
 
-        sub = QLabel("Leia mangás com tradução em português via MangaDex")
+        sub = QLabel("A página de mangás está em construção.\nFique ligado, em breve estará disponível.")
         sub.setObjectName("MutedText")
+        sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sub.setWordWrap(True)
         outer.addWidget(sub)
 
-        outer.addSpacing(4)
-        outer.addWidget(ZinnesBanner())
-        outer.addSpacing(4)
-
-        # Search row
-        row = QHBoxLayout()
-        self._input = QLineEdit()
-        self._input.setPlaceholderText("Pesquisar mangá...")
-        self._input.setMinimumWidth(300)
-        row.addWidget(self._input, 1)
-
-        self._btn = AnimatedButton()
-        self._btn.setObjectName("PrimaryButton")
-        self._btn.setIcon(QIcon(icon_search(16, "#F2F3F5")))
-        self._btn.setIconSize(QSize(16, 16))
-        self._btn.setText(" Buscar")
-        self._btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        row.addWidget(self._btn)
-        outer.addLayout(row)
-
-        self._input.returnPressed.connect(self._on_search)
-        self._btn.clicked.connect(self._on_search)
-
-        # Scrollable content
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-
-        content = QWidget()
-        self._cv = QVBoxLayout(content)
-        self._cv.setContentsMargins(0, 0, 0, 0)
-        self._cv.setSpacing(6)
-
-        # History section
-        self._hist_title = QLabel("Continuar Lendo")
-        self._hist_title.setObjectName("SectionTitle")
-        self._hist_title.hide()
-        self._cv.addWidget(self._hist_title)
-
-        self._hist_area = QWidget()
-        self._hist_v = QVBoxLayout(self._hist_area)
-        self._hist_v.setContentsMargins(0, 0, 0, 0)
-        self._hist_v.setSpacing(6)
-        self._cv.addWidget(self._hist_area)
-
-        # Results section
-        self._res_title = QLabel("")
-        self._res_title.setObjectName("SectionTitle")
-        self._res_title.hide()
-        self._cv.addWidget(self._res_title)
-
-        self._res_area = QWidget()
-        self._res_v = QVBoxLayout(self._res_area)
-        self._res_v.setContentsMargins(0, 0, 0, 0)
-        self._res_v.setSpacing(6)
-        self._cv.addWidget(self._res_area)
-
-        self._empty = QLabel("Nenhum resultado encontrado.")
-        self._empty.setObjectName("MutedText")
-        self._empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._empty.hide()
-        self._cv.addWidget(self._empty)
-
-        self._cv.addStretch()
-        scroll.setWidget(content)
-        outer.addWidget(scroll, 1)
+        outer.addStretch()
 
         self._cards: dict[str, MangaCard] = {}
 
     def _on_search(self) -> None:
-        q = self._input.text().strip()
-        if q:
-            self.search_requested.emit(q)
+        pass
 
     def show_searching(self, query: str) -> None:
-        self._clear_results()
-        self._res_title.setText(f'Buscando "{query}"...')
-        self._res_title.show()
-        self._empty.hide()
+        pass
 
     def set_results(self, mangas: list[dict], query: str) -> None:
-        self._clear_results()
-        if not mangas:
-            self._res_title.setText(f'Sem resultados para "{query}".')
-            self._res_title.show()
-            self._empty.show()
-            return
-        self._res_title.setText(f'{len(mangas)} resultado(s) para "{query}"')
-        self._res_title.show()
-        for m in mangas:
-            card = MangaCard(m)
-            card.clicked.connect(self.manga_clicked)
-            self._res_v.addWidget(card)
-            self._cards[m["id"]] = card
+        pass
 
     def set_history(self, entries: list) -> None:
-        self._clear_layout(self._hist_v)
-        if not entries:
-            self._hist_title.hide()
-            return
-        self._hist_title.show()
-        for entry in entries:
-            self._hist_v.addWidget(self._make_history_row(entry))
+        pass
 
     def update_card_cover(self, manga_id: str, path: str) -> None:
-        if manga_id in self._cards:
-            self._cards[manga_id].set_cover(path)
+        pass
 
     def mark_unavailable(self, manga_id: str) -> None:
-        if manga_id in self._cards:
-            self._cards[manga_id].set_unavailable()
-
-    def _make_history_row(self, entry) -> QFrame:
-        frame = QFrame()
-        frame.setObjectName("GlassPanel")
-        frame.setCursor(Qt.CursorShape.PointingHandCursor)
-        frame.setFixedHeight(72)
-
-        row = QHBoxLayout(frame)
-        row.setContentsMargins(12, 8, 12, 8)
-        row.setSpacing(12)
-
-        cover = QLabel()
-        cover.setFixedSize(44, 58)
-        cover.setStyleSheet("background: rgba(255,255,255,0.08); border-radius: 4px;")
-        if entry.cover_path:
-            pm = QPixmap(entry.cover_path)
-            if not pm.isNull():
-                cover.setPixmap(
-                    pm.scaled(44, 58, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                )
-        row.addWidget(cover)
-
-        info = QVBoxLayout()
-        info.setSpacing(2)
-        t = QLabel(entry.manga_title)
-        t.setObjectName("CardTitle")
-        info.addWidget(t)
-        s = QLabel(entry.chapter_label)
-        s.setObjectName("MutedText")
-        info.addWidget(s)
-        info.addStretch()
-        row.addLayout(info, 1)
-
-        frame.mousePressEvent = lambda e, en=entry: self.history_clicked.emit(en)
-        return frame
-
-    def _clear_results(self) -> None:
-        self._clear_layout(self._res_v)
-        self._cards.clear()
-        self._res_title.hide()
-        self._empty.hide()
-
-    def _clear_layout(self, layout) -> None:
-        while layout.count():
-            item = layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        pass
 
 
 # ═══════════════════════════════════════════════════════════════════

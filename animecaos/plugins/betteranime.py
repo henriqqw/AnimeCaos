@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 from animecaos.core.repository import rep
 from animecaos.core.loader import PluginInterface
-from .utils import make_driver
+from .driver_pool import make_driver
 
 log = logging.getLogger(__name__)
 

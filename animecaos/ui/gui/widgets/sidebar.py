@@ -14,8 +14,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .icons import icon_book, icon_download, icon_folder, icon_home, icon_search, icon_terminal, icon_user
-from .views import AnimatedButton
+from animecaos.ui.gui.icons import icon_book, icon_download, icon_folder, icon_home, icon_search, icon_terminal, icon_user
+from animecaos.ui.gui.widgets.animated_button import AnimatedButton
 
 
 _ICON_SIZE = 20

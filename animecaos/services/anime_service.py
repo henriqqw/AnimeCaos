@@ -85,13 +85,18 @@ class AnimeService:
         if not anime:
             return []
 
-        self.ensure_plugins_loaded()
-        rep.search_episodes(anime)
-        episode_titles = rep.get_episode_list(anime)
-        if episode_titles:
-            return episode_titles
-
-        return self.synthetic_episode_titles(anime)
+        with self._rep_lock:
+            self.ensure_plugins_loaded()
+            # If the rep doesn't know this anime (e.g. after reset_runtime_data),
+            # we need to re-search so that anime_to_urls is populated.
+            if not rep.anime_to_urls.get(anime):
+                rep.reset_runtime_data()
+                rep.search_anime(anime)
+            rep.search_episodes(anime)
+            episode_titles = rep.get_episode_list(anime)
+            if episode_titles:
+                return episode_titles
+            return self.synthetic_episode_titles(anime)
 
     def synthetic_episode_titles(self, anime: str) -> list[str]:
         return [f"Episodio {index}" for index in range(1, self.get_episode_count(anime) + 1)]
@@ -109,8 +114,11 @@ class AnimeService:
     def resolve_player_url(self, anime: str, episode_index: int) -> str:
         if episode_index < 0:
             raise ValueError("Indice de episodio invalido.")
-        self.ensure_plugins_loaded()
-        return rep.search_player(anime, episode_index + 1)
+        with self._rep_lock:
+            self.ensure_plugins_loaded()
+            if not rep.anime_episodes_urls.get(anime):
+                self.fetch_episode_titles(anime)
+            return rep.search_player(anime, episode_index + 1)
 
     def play_url(self, url: str) -> dict[str, bool]:
         return play_video(url, self._debug)

@@ -1,1 +1,1 @@
-"""PySide6 GUI layer."""
+from .app import run_gui

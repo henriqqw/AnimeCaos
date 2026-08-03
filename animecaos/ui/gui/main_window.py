@@ -41,151 +41,12 @@ from animecaos.services.manga_service import MangaService
 from animecaos.services.manga_history_service import MangaHistoryEntry, MangaHistoryService
 from animecaos.services.manga_download_service import MangaDownloadService
 
-from .animated_stack import AnimatedStackedWidget
-from .download_overlay import DownloadOverlay
-from .icons import icon_search, icon_terminal
-from .mini_player import MiniPlayer
-from .play_overlay import PlayOverlay
-from .sidebar import SidebarNav
-from .views import AccountView, AnimeDetailView, AnimatedButton, DownloadsView, HomeView, SearchView
-from .manga_views import MangaHomeView, MangaDetailView, MangaReaderView
-from .workers import FunctionWorker, DownloadWorker, MangaDownloadWorker, UpdaterCheckWorker
+from animecaos.ui.gui.icons import icon_search, icon_terminal
+from animecaos.ui.gui.widgets import AnimatedStackedWidget, AnimatedButton, MiniPlayer, PlayOverlay, SidebarNav
+from animecaos.ui.gui.overlays import DownloadOverlay, UpdateDialog
+from animecaos.ui.gui.views import AccountView, AnimeDetailView, DownloadsView, HomeView, SearchView, MangaHomeView, MangaDetailView, MangaReaderView, LogView
+from animecaos.ui.gui.workers import FunctionWorker, DownloadWorker, MangaDownloadWorker, UpdaterCheckWorker
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  UPDATE DIALOG
-# ═══════════════════════════════════════════════════════════════════
-
-class UpdateDialog(QDialog):
-    def __init__(self, parent: QWidget, latest_version: str, release_notes: str) -> None:
-        super().__init__(parent)
-        self.setWindowTitle("Atualizacao Disponivel")
-        self.setFixedSize(500, 480)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
-        self.setObjectName("UpdateDialog")
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(20)
-
-        header_layout = QHBoxLayout()
-        header_layout.setSpacing(16)
-
-        try:
-            base_path = sys._MEIPASS
-        except AttributeError:
-            base_path = os.path.abspath(".")
-        icon_path = os.path.join(base_path, "public", "icon.png")
-
-        icon_label = QLabel()
-        pixmap = QPixmap(icon_path).scaled(
-            48, 48, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
-        )
-        icon_label.setPixmap(pixmap)
-        header_layout.addWidget(icon_label)
-
-        title_layout = QVBoxLayout()
-        title_layout.setSpacing(2)
-        title = QLabel("Nova versao disponivel!")
-        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #F2F3F5;")
-        version_badge = QLabel(f"v{latest_version}")
-        version_badge.setStyleSheet("""
-            background-color: rgba(212, 66, 66, 0.2); color: #D44242;
-            border: 1px solid rgba(212, 66, 66, 0.4); border-radius: 4px;
-            padding: 2px 8px; font-size: 11px; font-weight: 700;
-        """)
-        badge_container = QHBoxLayout()
-        badge_container.addWidget(version_badge)
-        badge_container.addStretch()
-        title_layout.addWidget(title)
-        title_layout.addLayout(badge_container)
-        header_layout.addLayout(title_layout)
-        layout.addLayout(header_layout)
-
-        notes_title = QLabel("Notas da Versao:")
-        notes_title.setObjectName("MutedText")
-        notes_title.setStyleSheet("font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;")
-        layout.addWidget(notes_title)
-
-        self.notes_browser = QTextBrowser()
-        self.notes_browser.setHtml(self._format_notes(release_notes))
-        self.notes_browser.setOpenExternalLinks(True)
-        self.notes_browser.setStyleSheet("""
-            background-color: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px; padding: 12px; color: #E6E7EA; line-height: 1.5;
-        """)
-        layout.addWidget(self.notes_browser, 1)
-
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(12)
-        self.btn_ignore = QPushButton("Lembrar depois")
-        self.btn_ignore.setFixedHeight(38)
-        self.btn_ignore.clicked.connect(self.reject)
-        self.btn_update = QPushButton("Atualizar Agora")
-        self.btn_update.setObjectName("PrimaryButton")
-        self.btn_update.setFixedHeight(38)
-        self.btn_update.setCursor(Qt.PointingHandCursor)
-        self.btn_update.clicked.connect(self.accept)
-        actions_layout.addWidget(self.btn_ignore, 1)
-        actions_layout.addWidget(self.btn_update, 2)
-        layout.addLayout(actions_layout)
-
-    def _format_notes(self, notes: str) -> str:
-        html = notes
-        html = re.sub(r'^### (.*)$', r'<h3 style="color: #F2F3F5; margin-top: 10px; margin-bottom: 5px;">\1</h3>', html, flags=re.MULTILINE)
-        html = re.sub(r'^## (.*)$', r'<h2 style="color: #F2F3F5; margin-top: 12px; margin-bottom: 6px;">\1</h2>', html, flags=re.MULTILINE)
-        html = re.sub(r'^# (.*)$', r'<h1 style="color: #F2F3F5; margin-top: 14px; margin-bottom: 8px;">\1</h1>', html, flags=re.MULTILINE)
-        html = re.sub(r'\*\*(.*?)\*\*', r'<b style="color: #ffffff;">\1</b>', html)
-        html = re.sub(r'^- (.*)$', r'<li style="margin-left: 10px; margin-bottom: 3px;">\1</li>', html, flags=re.MULTILINE)
-        html = re.sub(r'<img .*?src="(.*?)".*?>', r'<br/><a href="\1" style="color: #D44242; text-decoration: none;">[Ver Screenshot]</a><br/>', html)
-        html = html.replace('\n', '<br/>')
-        return f'<div style="font-family: Segoe UI, sans-serif; font-size: 13px;">{html}</div>'
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  LOG VIEW
-# ═══════════════════════════════════════════════════════════════════
-
-class LogView(QWidget):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 16, 24, 24)
-        layout.setSpacing(12)
-
-        title = QLabel("Log de Eventos")
-        title.setObjectName("SectionTitleLarge")
-        layout.addWidget(title)
-
-        subtitle = QLabel("Registro de atividades da aplicacao")
-        subtitle.setObjectName("MutedText")
-        layout.addWidget(subtitle)
-
-        self.log_output = QPlainTextEdit()
-        self.log_output.setReadOnly(True)
-        self.log_output.setMaximumBlockCount(400)
-        layout.addWidget(self.log_output, 1)
-
-        url_row = QHBoxLayout()
-        url_label = QLabel("Ultima URL:")
-        url_label.setObjectName("MutedText")
-        url_row.addWidget(url_label)
-        self.url_output = QLineEdit()
-        self.url_output.setReadOnly(True)
-        url_row.addWidget(self.url_output, 1)
-        layout.addLayout(url_row)
-
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setMaximumHeight(10)
-        self.progress_bar.setVisible(False)
-        layout.addWidget(self.progress_bar)
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  MAIN WINDOW
-# ═══════════════════════════════════════════════════════════════════
 
 # View indices
 _VIEW_HOME = 0
@@ -695,11 +556,25 @@ class MainWindow(QMainWindow):
             self._detail_view.set_episodes(self._episode_titles, self._current_episode_index)
             return
 
-        self._run_task(
-            status_message=f"Carregando episodios de '{anime}'...",
-            task=lambda: (anime, self._anime_service.fetch_episode_titles(anime)),
-            on_success=self._on_episodes_finished,
-        )
+        # Use a dedicated worker that bypasses the _busy guard.
+        # Episodes must always load regardless of whether a search task is finishing.
+        def _start() -> None:
+            worker = FunctionWorker(lambda: (anime, self._anime_service.fetch_episode_titles(anime)))
+            self._active_workers.add(worker)
+            worker.signals.succeeded.connect(self._on_episodes_finished)
+            worker.signals.failed.connect(
+                lambda err, a=anime: (
+                    self._set_status(f"Falha ao carregar episodios de '{a}'."),
+                    self._append_log(f"Erro episodios '{a}': {err.splitlines()[0] if err else '?'}"),
+                )
+            )
+            worker.signals.finished.connect(lambda w=worker: self._active_workers.discard(w))
+            self._set_status(f"Carregando episodios de '{anime}'...")
+            self._thread_pool.start(worker)
+
+        # Defer one event-loop cycle so any finishing busy-task can clear first
+        QTimer.singleShot(50, _start)
+
 
     def _on_episodes_finished(self, payload: object) -> None:
         if not isinstance(payload, tuple) or len(payload) != 2:
@@ -730,7 +605,12 @@ class MainWindow(QMainWindow):
             return
         self._current_episode_index = index
 
+        if self._busy:
+            self._set_status("Aguarde a tarefa atual finalizar.")
+            return
+
         self._append_log(f"Resolvendo player: \"{anime}\" Ep {index + 1}...")
+        self._detail_view.set_episode_loading(index, True)
 
         # Show overlay popup
         self._play_overlay.show_loading(anime, index)
@@ -802,6 +682,7 @@ class MainWindow(QMainWindow):
 
         self._detail_view.highlight_episode(episode_index)
         self._detail_view.scroll_to_episode(episode_index)
+        self._detail_view.clear_loading()
 
         try:
             self._history_service.save_entry(anime, episode_index, episode_sources)
@@ -1270,17 +1151,17 @@ class MainWindow(QMainWindow):
             self._append_log(f"Discover: '{original_title}' sem resultados.")
             return
 
-        self._set_status(f"{len(titles)} resultado(s) para '{query}'.")
-
-        # Apply AniList cover (already downloaded) to all results that lack one
+        # Apply AniList cover to matching title only (if any)
         if anilist_cover and os.path.exists(anilist_cover):
+            clean_original = self._clean_anilist_key(original_title).lower()
             for t in titles:
-                if t not in self._cover_cache:
-                    self._cover_cache[t] = anilist_cover
-                    self._search_view.update_card_cover(t, anilist_cover)
-        else:
-            # Fallback: fetch covers per title AND via original query
-            self._fetch_covers_for_results(titles, query)
+                if self._clean_anilist_key(t).lower() == clean_original:
+                    if t not in self._cover_cache:
+                        self._cover_cache[t] = anilist_cover
+                        self._search_view.update_card_cover(t, anilist_cover)
+
+        # Fetch distinct covers for each result title
+        self._fetch_covers_for_results(titles, query)
 
         self._append_log(f"Discover: {len(titles)} resultado(s) para '{original_title}'.")
 
@@ -1528,43 +1409,27 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _clean_anilist_key(title: str) -> str:
-        """Derive the AniList search key from a scraper title (mirrors fetch_anime_info logic)."""
+        """Derive the AniList search key from a scraper title."""
         clean = title.replace("(Dublado)", "").replace("(Legendado)", "").strip()
-        if " - " in clean:
-            clean = clean.split(" - ")[0].strip()
-        return clean.lower()
+        return clean
 
     def _fetch_covers_for_results(self, titles: list[str], search_query: str) -> None:
-        """Group titles by cleaned AniList key → one fetch per group (avoids rate-limiting).
-        Cover is applied to all titles in the group simultaneously.
+        """Fetch a cover for each title individually so similar-but-distinct titles
+        (e.g. different seasons/parts) each get their own correct AniList cover.
         """
         missing = [t for t in titles if t not in self._cover_cache]
         if not missing:
             return
 
-        groups: dict[str, list[str]] = {}
-        for t in missing:
-            key = self._clean_anilist_key(t)
-            groups.setdefault(key, []).append(t)
+        for title in missing:
+            self._fetch_cover_for_title(title)
 
-        for clean_key, group_titles in groups.items():
-            self._fetch_cover_for_group(clean_key, group_titles)
-
-        # Extra: user query as fallback — in case scraper titles don't match any group key
-        if search_query and self._clean_anilist_key(search_query) not in groups:
-            def _qfetch(q: str = search_query, ts: list = list(missing)) -> tuple:
-                info = self._anilist_service.fetch_anime_info(q)
-                return info, q, ts
-            qworker = FunctionWorker(_qfetch)
-            self._metadata_workers.add(qworker)
-            qworker.signals.succeeded.connect(self._on_query_cover_fetched)
-            qworker.signals.finished.connect(lambda w=qworker: self._metadata_workers.discard(w))
-            self._thread_pool.start(qworker)
-
-    def _fetch_cover_for_group(self, clean_key: str, group_titles: list[str]) -> None:
-        def task(k: str = clean_key, ts: list = list(group_titles)) -> tuple:
+    def _fetch_cover_for_title(self, title: str) -> None:
+        """Fetch cover for a single title — uses the title as AniList key."""
+        clean_key = self._clean_anilist_key(title)
+        def task(k: str = clean_key, t: str = title) -> tuple:
             info = self._anilist_service.fetch_anime_info(k)
-            return info, ts
+            return info, [t]
         worker = FunctionWorker(task)
         self._metadata_workers.add(worker)
         worker.signals.succeeded.connect(self._on_group_cover_fetched)
@@ -1581,28 +1446,10 @@ class MainWindow(QMainWindow):
         if not cover or not os.path.exists(str(cover)):
             return
         for t in group_titles:
-            if t not in self._cover_cache:
-                self._cover_cache[t] = str(cover)
-                self._home_view.update_card_cover(t, str(cover))
-                self._home_view.update_discover_cover(t, str(cover))
-                self._search_view.update_card_cover(t, str(cover))
-
-    def _on_query_cover_fetched(self, payload: object) -> None:
-        if not isinstance(payload, tuple) or len(payload) != 3:
-            return
-        info, query, titles = payload
-        if not isinstance(info, dict) or not isinstance(titles, list):
-            return
-        cover = info.get("cover_path")
-        if not cover or not os.path.exists(str(cover)):
-            return
-        # Apply to ALL titles that still have no cover (query-level fallback)
-        for t in [str(t) for t in titles]:
-            if t not in self._cover_cache:
-                self._cover_cache[t] = str(cover)
-                self._home_view.update_card_cover(t, str(cover))
-                self._home_view.update_discover_cover(t, str(cover))
-                self._search_view.update_card_cover(t, str(cover))
+            self._cover_cache[t] = str(cover)
+            self._home_view.update_card_cover(t, str(cover))
+            self._home_view.update_discover_cover(t, str(cover))
+            self._search_view.update_card_cover(t, str(cover))
 
     def _fetch_card_metadata(self, anime: str) -> None:
         if anime in self._cover_cache:
@@ -2026,6 +1873,7 @@ class MainWindow(QMainWindow):
     def _on_task_failed(self, error_text: str) -> None:
         self._play_overlay.dismiss()
         self._download_overlay.dismiss()
+        self._detail_view.clear_loading()
         self._append_log(f"Erro: {error_text.splitlines()[0] if error_text else 'Erro desconhecido'}")
         self._set_status("Falha na operacao.")
         summary = error_text.splitlines()[0] if error_text else "Erro inesperado."

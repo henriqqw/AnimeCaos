@@ -40,7 +40,7 @@ modules:
     sources:
       - type: archive
         url: https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-linux64.tar.gz
-        sha256: 79b2e77edd02c0ec890395140d7cdc04a7ff0ec64503e62a0b74f88674ef1313
+        sha256: 0bde38707eb0a686a20c6bd50f4adcc7d60d4f73c60eb83ee9e0db8f65823e04
         strip-components: 0
 
   - name: geckodriver-aarch64

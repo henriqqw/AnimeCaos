@@ -399,6 +399,13 @@ class SearchView(QWidget):
         self._grid_container.setVisible(False)
         self._skeleton.start()
 
+    def stop_loading(self) -> None:
+        """Stop the skeleton animation without touching results — used when a
+        search fails, so the loading state doesn't spin forever. The error
+        itself is surfaced elsewhere (status bar / error dialog)."""
+        self._skeleton.stop()
+        self._grid_container.setVisible(True)
+
     def set_results(self, items: list[dict[str, Any]], query: str = "") -> None:
         self._skeleton.stop()
         self._welcome.setVisible(False)

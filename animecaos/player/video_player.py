@@ -12,9 +12,24 @@ def _build_referer(url: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}/"
 
 
+# mpv's human-readable exit message changed across versions:
+#   mpv < 0.29 (2018): "Exiting... (End of file)"
+#   mpv >= 0.29 (current): "Exiting... (Eof reached)"
+# Check both so natural-end detection works regardless of the bundled/system
+# mpv version — this is the only signal autoplay uses to advance to the next
+# episode, so a stale/incomplete match here silently breaks autoplay.
+_EOF_LOG_MARKERS = ("Exiting... (Eof reached)", "Exiting... (End of file)")
+
+
+def _detect_natural_eof(log: str) -> bool:
+    """True only if mpv reported reaching the real end of the video — NOT
+    just that the user watched it for a while and then closed the player."""
+    return any(marker in log for marker in _EOF_LOG_MARKERS)
+
+
 def play_video(url: str, debug: bool = False) -> dict[str, bool]:
     if debug:
-        return {"eof": False}
+        return {"eof": False, "watched": False}
 
     if not url:
         raise RuntimeError("Caminho de video invalido.")
@@ -74,11 +89,16 @@ def play_video(url: str, debug: bool = False) -> dict[str, bool]:
         except OSError:
             pass
 
-    # Natural EOF: user let the episode finish (or skipped to the end).
-    eof_natural = "Exiting... (End of file)" in log
+    # Natural EOF: the episode actually played through to its end. This is
+    # the only condition that should trigger autoplay to the next episode —
+    # closing the player manually must never advance, no matter how long it
+    # was open for.
+    eof_natural = _detect_natural_eof(log)
 
-    # Watched long enough: player was open >= 30 s (wall-clock).
-    # MPV only stays alive while the video is open, so wall-clock ≈ watch time.
-    # 30 s is enough to confirm intentional viewing without being too strict.
+    # Watched long enough: player was open >= 30 s (wall-clock), or reached a
+    # natural EOF faster than that (short episode/OP). Used only to decide
+    # whether to sync progress to AniList — intentionally more lenient than
+    # eof_natural since a spurious progress update is low-stakes, unlike
+    # autoplay jumping to a episode the user didn't ask for.
     watched = eof_natural or elapsed >= 30.0
-    return {"eof": watched}
+    return {"eof": eof_natural, "watched": watched}

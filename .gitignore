@@ -82,8 +82,7 @@ cache/
 # Claude / Local tooling
 # -------------------------------
 .claude/
-DOCS/
-docs/
+.playwright-mcp/
 
 # -------------------------------
 # Landing (Next.js)

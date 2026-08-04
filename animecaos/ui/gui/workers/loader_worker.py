@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import re
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from PySide6.QtCore import QObject, Signal
 
 from animecaos.services.anime_service import AnimeService
 from animecaos.services.anilist_service import AniListService
+
+_SPOTLIGHT_COUNT = 5
 
 
 class LoaderWorker(QObject):
@@ -81,30 +84,49 @@ class LoaderWorker(QObject):
             seasonal = self._filter_section(seasonal_raw, 10, 0.55, 0.25)
             self.progress_changed.emit(0.80)
 
-            # Step 5: find spotlight
-            self.status_changed.emit("Selecionando destaque da temporada...")
-            spotlight = None
-            for i, candidate in enumerate(trending[:6]):
-                try:
-                    if self._card_available(candidate):
-                        spotlight = self._anilist.fetch_spotlight_extras(candidate)
-                        spotlight["_rank"] = i + 1
-                        break
-                except Exception:
-                    pass
+            # Step 5: find spotlights for the hero carousel
+            self.status_changed.emit("Selecionando destaques da temporada...")
+            spotlights = self._collect_spotlights(trending)
             self.progress_changed.emit(0.95)
 
             self.status_changed.emit("Preparando interface...")
             self.load_finished.emit({
                 "trending": trending,
                 "seasonal": seasonal,
-                "spotlight": spotlight,
+                "spotlights": spotlights,
             })
         except Exception as exc:
             self.status_changed.emit("Pronto!")
             self.load_finished.emit({
                 "trending": [],
                 "seasonal": [],
-                "spotlight": None,
+                "spotlights": [],
                 "_error": str(exc),
             })
+
+    def _collect_spotlights(self, trending: list[dict]) -> list[dict]:
+        """trending here is already availability-filtered (see
+        _filter_section above), so just take the first _SPOTLIGHT_COUNT and
+        fetch each one's extras (banner/description) in parallel — those are
+        independent AniList calls, so this stays close to the cost of
+        fetching a single spotlight instead of N times as long."""
+        chosen = [(i + 1, card) for i, card in enumerate(trending[:_SPOTLIGHT_COUNT])]
+        if not chosen:
+            return []
+
+        results: dict[int, dict] = {}
+        with ThreadPoolExecutor(max_workers=min(len(chosen), 5)) as executor:
+            futures = {
+                executor.submit(self._anilist.fetch_spotlight_extras, card): rank
+                for rank, card in chosen
+            }
+            for future in as_completed(futures):
+                rank = futures[future]
+                try:
+                    extras = future.result()
+                    extras["_rank"] = rank
+                    results[rank] = extras
+                except Exception:
+                    pass
+
+        return [results[rank] for rank, _ in chosen if rank in results]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -11,6 +12,15 @@ from animecaos.player.video_player import play_video
 
 log = logging.getLogger(__name__)
 
+# Worst-case time to wait for the shared `rep` lock before giving up. Bounds
+# every search/play/download so a stuck network call (or hung Selenium page
+# load) fails loudly instead of freezing the whole app forever.
+REP_LOCK_TIMEOUT_SECONDS = 25.0
+
+
+class OperationBusyError(RuntimeError):
+    """Raised when another anime operation is still in progress after the lock timeout."""
+
 
 class AnimeService:
     """Application service for anime search, episode loading and playback."""
@@ -18,10 +28,28 @@ class AnimeService:
     # rep is a module-level singleton with mutable state — all access must be serialized.
     _rep_lock = threading.Lock()
 
-    def __init__(self, debug: bool = False, plugins: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        debug: bool = False,
+        plugins: list[str] | None = None,
+        rep_lock_timeout: float = REP_LOCK_TIMEOUT_SECONDS,
+    ) -> None:
         self._debug = debug
         self._plugins_loaded = False
         self._selected_plugins = plugins
+        self._rep_lock_timeout = rep_lock_timeout
+
+    @contextlib.contextmanager
+    def _locked(self):
+        acquired = self._rep_lock.acquire(timeout=self._rep_lock_timeout)
+        if not acquired:
+            raise OperationBusyError(
+                "Outra operacao ainda esta em andamento. Tente novamente em instantes."
+            )
+        try:
+            yield
+        finally:
+            self._rep_lock.release()
 
     def ensure_plugins_loaded(self) -> None:
         if self._plugins_loaded:
@@ -43,7 +71,7 @@ class AnimeService:
         normalized = query.strip()
         if not normalized:
             return False
-        with self._rep_lock:
+        with self._locked():
             self.ensure_plugins_loaded()
             rep.reset_runtime_data()
             rep.search_anime(normalized)
@@ -54,7 +82,7 @@ class AnimeService:
         if not normalized_query:
             raise ValueError("Digite um termo de busca.")
 
-        with self._rep_lock:
+        with self._locked():
             self.ensure_plugins_loaded()
             rep.reset_runtime_data()
             rep.search_anime(normalized_query)
@@ -85,18 +113,25 @@ class AnimeService:
         if not anime:
             return []
 
-        with self._rep_lock:
-            self.ensure_plugins_loaded()
-            # If the rep doesn't know this anime (e.g. after reset_runtime_data),
-            # we need to re-search so that anime_to_urls is populated.
-            if not rep.anime_to_urls.get(anime):
-                rep.reset_runtime_data()
-                rep.search_anime(anime)
-            rep.search_episodes(anime)
-            episode_titles = rep.get_episode_list(anime)
-            if episode_titles:
-                return episode_titles
-            return self.synthetic_episode_titles(anime)
+        with self._locked():
+            return self._fetch_episode_titles_unlocked(anime)
+
+    def _fetch_episode_titles_unlocked(self, anime: str) -> list[str]:
+        """Body of fetch_episode_titles(), assuming _rep_lock is already held
+        by the caller. Never call this without holding the lock first — and
+        never call fetch_episode_titles() from inside an already-locked
+        section, since _rep_lock is not reentrant."""
+        self.ensure_plugins_loaded()
+        # If the rep doesn't know this anime (e.g. after reset_runtime_data),
+        # we need to re-search so that anime_to_urls is populated.
+        if not rep.anime_to_urls.get(anime):
+            rep.reset_runtime_data()
+            rep.search_anime(anime)
+        rep.search_episodes(anime)
+        episode_titles = rep.get_episode_list(anime)
+        if episode_titles:
+            return episode_titles
+        return self.synthetic_episode_titles(anime)
 
     def synthetic_episode_titles(self, anime: str) -> list[str]:
         return [f"Episodio {index}" for index in range(1, self.get_episode_count(anime) + 1)]
@@ -114,10 +149,10 @@ class AnimeService:
     def resolve_player_url(self, anime: str, episode_index: int) -> str:
         if episode_index < 0:
             raise ValueError("Indice de episodio invalido.")
-        with self._rep_lock:
+        with self._locked():
             self.ensure_plugins_loaded()
             if not rep.anime_episodes_urls.get(anime):
-                self.fetch_episode_titles(anime)
+                self._fetch_episode_titles_unlocked(anime)
             return rep.search_player(anime, episode_index + 1)
 
     def play_url(self, url: str) -> dict[str, bool]:

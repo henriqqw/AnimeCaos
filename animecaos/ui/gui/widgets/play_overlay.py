@@ -15,11 +15,13 @@ from PySide6.QtCore import (
     Qt,
     QTimer,
     Property,
+    Signal,
     Slot,
 )
 from PySide6.QtGui import (
     QColor,
     QConicalGradient,
+    QCursor,
     QFont,
     QPainter,
     QPainterPath,
@@ -33,16 +35,21 @@ _RING_STROKE = 3.0
 _WIDTH = 380
 _HEIGHT = 220
 _FADE_MS = 200
+_BTN_W = 120
+_BTN_H = 36
 
 
 class PlayOverlay(QWidget):
     """Frameless overlay shown during episode playback loading."""
+
+    cancel_requested = Signal()
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
         self.setFixedSize(_WIDTH, _HEIGHT)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setVisible(False)
+        self.setMouseTracking(True)
 
         self._opacity = 0.0
         self._ring_angle = 0.0
@@ -51,6 +58,7 @@ class PlayOverlay(QWidget):
         self._status_text = "Abrindo player..."
         self._elapsed_ms = 0
         self._closing = False
+        self._hover_cancel = False
 
         self._status_messages: list[tuple[int, str]] = [
             (0,     "Abrindo player..."),
@@ -106,6 +114,7 @@ class PlayOverlay(QWidget):
     @Slot()
     def dismiss(self) -> None:
         self._closing = True
+        self._hover_cancel = False
         self._fade.stop()
         self._fade.setStartValue(self._opacity)
         self._fade.setEndValue(0.0)
@@ -117,6 +126,30 @@ class PlayOverlay(QWidget):
             x = (p.width() - _WIDTH) // 2
             y = (p.height() - _HEIGHT) // 2
             self.move(x, y)
+
+    # ── Cancel button ──
+    def _primary_btn_rect(self) -> QRectF:
+        x = (self.width() - _BTN_W) / 2
+        y = self.height() - 44
+        return QRectF(x, y, _BTN_W, _BTN_H)
+
+    def mouseMoveEvent(self, event) -> None:
+        pos = event.position() if hasattr(event, 'position') else event.localPos()
+        hovered = self._primary_btn_rect().contains(pos)
+        if hovered != self._hover_cancel:
+            self._hover_cancel = hovered
+            self.update()
+        self.setCursor(QCursor(
+            Qt.CursorShape.PointingHandCursor if hovered else Qt.CursorShape.ArrowCursor
+        ))
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        pos = event.position() if hasattr(event, 'position') else event.localPos()
+        if self._primary_btn_rect().contains(pos):
+            self.cancel_requested.emit()
+            self.dismiss()
 
     # ── Animation tick ──
     def _tick(self) -> None:
@@ -209,5 +242,24 @@ class PlayOverlay(QWidget):
 
         status_rect = QRectF(20, ring_y + _RING_RADIUS + 62, w - 40, 20)
         p.drawText(status_rect, Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop, self._status_text)
+
+        # ── Cancel button ──
+        btn_rect = self._primary_btn_rect()
+        btn_path = QPainterPath()
+        btn_path.addRoundedRect(btn_rect, 10, 10)
+        if self._hover_cancel:
+            p.fillPath(btn_path, QColor(255, 255, 255, int(22 * a)))
+            p.setPen(QPen(QColor(255, 255, 255, int(45 * a)), 1.0))
+        else:
+            p.fillPath(btn_path, QColor(255, 255, 255, int(14 * a)))
+            p.setPen(QPen(QColor(255, 255, 255, int(35 * a)), 1.0))
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawRoundedRect(btn_rect, 10, 10)
+
+        btn_font = QFont("Segoe UI", 12)
+        btn_font.setWeight(QFont.Weight.DemiBold)
+        p.setFont(btn_font)
+        p.setPen(QColor(200, 203, 210, int(230 * a)))
+        p.drawText(btn_rect, Qt.AlignmentFlag.AlignCenter, "Cancelar")
 
         p.end()

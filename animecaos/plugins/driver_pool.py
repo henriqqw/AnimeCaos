@@ -23,6 +23,11 @@ _driver_pool: dict[str, webdriver.Remote] = {}
 _pool_locks: dict[str, threading.Lock] = {}
 _pool_meta_lock = threading.Lock()
 
+# Bounds driver.get(...) so a hung/slow site raises TimeoutException instead
+# of blocking the caller (and the AnimeService rep lock it's holding) for
+# Selenium's much larger default page-load timeout.
+PAGE_LOAD_TIMEOUT_SECONDS = 20
+
 
 def _get_plugin_lock(plugin_name: str) -> threading.Lock:
     with _pool_meta_lock:
@@ -214,18 +219,23 @@ def make_driver() -> webdriver.Remote:
     # Firefox directly — avoids cross-sandbox Marionette IPC failures.
     # Detection: env var (set by runtime) OR presence of the bundled binary.
     if os.environ.get("FLATPAK_ID") or os.path.isfile("/app/bin/geckodriver"):
-        return _make_flatpak_driver(options)
+        driver = _make_flatpak_driver(options)
+        driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT_SECONDS)
+        return driver
 
     try:
         if is_firefox_installed_as_snap():
             service = FirefoxService(executable_path="/snap/bin/geckodriver")
-            return webdriver.Firefox(options=options, service=service)
-
-        gd_path = get_bin_path("geckodriver")
-        if gd_path != "geckodriver":
-            service = FirefoxService(executable_path=gd_path)
-            return webdriver.Firefox(options=options, service=service)
-
-        return webdriver.Firefox(options=options)
+            driver = webdriver.Firefox(options=options, service=service)
+        else:
+            gd_path = get_bin_path("geckodriver")
+            if gd_path != "geckodriver":
+                service = FirefoxService(executable_path=gd_path)
+                driver = webdriver.Firefox(options=options, service=service)
+            else:
+                driver = webdriver.Firefox(options=options)
     except WebDriverException as exc:
         raise RuntimeError("Firefox/geckodriver nao encontrado.") from exc
+
+    driver.set_page_load_timeout(PAGE_LOAD_TIMEOUT_SECONDS)
+    return driver

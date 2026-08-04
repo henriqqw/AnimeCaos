@@ -263,9 +263,8 @@ class HomeView(QWidget):
         self.trending_section.trim_to(max_cards)
         self.seasonal_section.trim_to(max_cards)
 
-    def set_spotlight(self, card: dict, rank: int = 1) -> None:
-        self.spotlight.set_data(card, rank)
-        self.spotlight.show()
+    def set_spotlights(self, cards: list[dict]) -> None:
+        self.spotlight.set_cards(cards)
 
     def set_spotlight_banner(self, path: str) -> None:
         self.spotlight.set_banner(path)

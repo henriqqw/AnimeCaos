@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
 
 from animecaos.services.anime_service import AnimeService
 from animecaos.services.discord_service import DiscordService
-from animecaos.services.downloads_service import DownloadEntry, DownloadsService
+from animecaos.services.downloads_service import DownloadEntry, DownloadsService, sanitize_anime_filename
 from animecaos.services.history_service import HistoryEntry, HistoryService
 from animecaos.services.anilist_service import AniListService, AniListStatus
 from animecaos.services.anilist_auth_service import AniListAuthService
@@ -87,6 +87,14 @@ class MainWindow(QMainWindow):
         self._active_workers: set[FunctionWorker] = set()
         self._metadata_workers: set[FunctionWorker] = set()
         self._busy = False
+        # _run_task() tasks run on real OS threads that cannot be killed. When
+        # the user cancels, we can reset the UI immediately, but the orphaned
+        # task keeps running until it naturally returns (bounded by the
+        # AnimeService lock/Selenium timeouts). _task_token identifies the
+        # "current" task; _cancelled_tokens marks ones whose result must be
+        # ignored when it eventually arrives.
+        self._task_token = 0
+        self._cancelled_tokens: set[int] = set()
         self._current_anime: str | None = None
         self._episodes_anime: str | None = None
         self._current_episode_index = -1
@@ -207,6 +215,7 @@ class MainWindow(QMainWindow):
 
         # Overlays (render on top of everything)
         self._play_overlay = PlayOverlay(root)
+        self._play_overlay.cancel_requested.connect(self._on_play_cancel)
         self._download_overlay = DownloadOverlay(root)
         self._download_overlay.cancel_requested.connect(self._on_download_cancel)
         self._active_download_worker: DownloadWorker | None = None
@@ -655,6 +664,7 @@ class MainWindow(QMainWindow):
             "player_url": player_url,
             "episode_sources": self._anime_service.get_episode_sources(anime),
             "eof": playback_result.get("eof", False),
+            "watched": playback_result.get("watched", False),
         }
 
     def _on_play_finished(self, payload: object) -> None:
@@ -698,9 +708,10 @@ class MainWindow(QMainWindow):
         else:
             self._reload_history(silent=True)
 
-        # Only sync to AniList when the episode played to natural EOF.
-        # Quit mid-episode → eof=False → no spurious progress update.
-        if self._anilist_auth_service.is_authenticated() and payload.get("eof"):
+        # Sync to AniList once the episode was meaningfully watched (natural
+        # EOF, or open >= 30s). Autoplay below uses the stricter "eof" flag —
+        # only a real natural end should jump to the next episode.
+        if self._anilist_auth_service.is_authenticated() and payload.get("watched"):
             media_id = self._anilist_service.get_media_id(anime)
             ep = episode_index + 1
             total = len(self._episode_titles)
@@ -771,11 +782,17 @@ class MainWindow(QMainWindow):
             self._download_overlay.show_error("Falha ao resolver URL do episodio.")
             return
         anime, episode_index, player_url = payload
-        safe_anime = "".join(c for c in anime if c.isalnum() or c in " -_").strip()
+        safe_anime = sanitize_anime_filename(anime)
         out_name = f"{safe_anime} - EP{episode_index + 1}.%(ext)s"
         download_dir = os.path.join(os.path.expanduser("~"), "Downloads", "AnimeCaos")
         os.makedirs(download_dir, exist_ok=True)
         out_template = os.path.join(download_dir, out_name)
+
+        # Persist the real title (+ a known-good cover) next to the download —
+        # scan() reads this back instead of re-deriving the title from the
+        # sanitized filename, which loses characters like "()" and ":" and
+        # otherwise breaks the cover lookup for any such anime.
+        self._downloads_service.write_metadata(anime, cover_path=self._cover_cache.get(anime))
 
         self._download_overlay.set_downloading()
         self._current_download_dir = download_dir
@@ -819,8 +836,7 @@ class MainWindow(QMainWindow):
         if self._active_download_worker:
             self._active_download_worker.cancel()
             self._active_download_worker = None
-        if self._busy:
-            self._set_busy(False)
+        self._cancel_current_task()
         self._download_overlay.dismiss()
         self._append_log("Download cancelado pelo usuario.")
         self._set_status("Download cancelado.")
@@ -910,7 +926,39 @@ class MainWindow(QMainWindow):
 
     def _refresh_downloads_view(self) -> None:
         groups = self._downloads_service.group_by_anime()
-        self._downloads_view.set_downloads(groups, self._cover_cache)
+
+        # Self-heal downloads made before metadata sidecars existed: if a
+        # currently-known real title (e.g. from browsing this session)
+        # sanitizes to the same on-disk name, adopt it and write the sidecar
+        # so this only needs to happen once.
+        backfilled = False
+        for anime in list(groups.keys()):
+            if anime in self._cover_cache:
+                continue
+            match = next(
+                (real for real in self._cover_cache if sanitize_anime_filename(real) == anime),
+                None,
+            )
+            if match:
+                self._downloads_service.write_metadata(match, cover_path=self._cover_cache.get(match))
+                backfilled = True
+        if backfilled:
+            groups = self._downloads_service.group_by_anime()
+
+        # Prefer the in-memory cover cache; fall back to the cover path saved
+        # alongside the download itself (see write_metadata()) for anime the
+        # user hasn't browsed to yet this session, before resorting to a
+        # fresh network fetch.
+        covers = dict(self._cover_cache)
+        for anime, entries in groups.items():
+            if anime in covers:
+                continue
+            sidecar_cover = next((e.cover_path for e in entries if e.cover_path), None)
+            if sidecar_cover and os.path.exists(sidecar_cover):
+                covers[anime] = sidecar_cover
+                self._cover_cache[anime] = sidecar_cover
+
+        self._downloads_view.set_downloads(groups, covers)
         for anime in groups:
             if anime not in self._cover_cache:
                 self._fetch_card_metadata(anime)
@@ -989,23 +1037,52 @@ class MainWindow(QMainWindow):
         worker.signals.finished.connect(lambda w=worker: self._metadata_workers.discard(w))
         self._thread_pool.start(worker)
 
+    _SPOTLIGHT_COUNT = 5
+    _SPOTLIGHT_SCAN = 12
+
     def _fetch_discover_data(self) -> dict:
         trending = self._anilist_service.fetch_trending(per_page=25)
         seasonal = self._anilist_service.fetch_seasonal(per_page=25)
-        spotlight = None
-        spotlight_rank = 1
-        for i, candidate in enumerate(trending[:8]):
-            if self._spotlight_candidate_available(candidate):
-                spotlight = self._anilist_service.fetch_spotlight_extras(candidate)
-                spotlight_rank = i + 1
-                break
-        if spotlight is not None:
-            spotlight["_rank"] = spotlight_rank
+        spotlights = self._collect_spotlights(trending)
         return {
             "trending": trending,
             "seasonal": seasonal,
-            "spotlight": spotlight,
+            "spotlights": spotlights,
         }
+
+    def _collect_spotlights(self, trending: list[dict]) -> list[dict]:
+        """Pick up to _SPOTLIGHT_COUNT available candidates from the top of
+        `trending` for the hero carousel, ranked by their original trending
+        position. Availability checks stay sequential (they hit the scraper
+        through AnimeService's shared rep lock); fetching each one's extras
+        (banner/description) is parallelized since those are independent
+        AniList calls, keeping wall-clock close to a single fetch."""
+        candidates: list[tuple[int, dict]] = []
+        for i, candidate in enumerate(trending[: self._SPOTLIGHT_SCAN]):
+            if len(candidates) >= self._SPOTLIGHT_COUNT:
+                break
+            if self._spotlight_candidate_available(candidate):
+                candidates.append((i + 1, candidate))
+
+        if not candidates:
+            return []
+
+        results: dict[int, dict] = {}
+        with ThreadPoolExecutor(max_workers=min(len(candidates), 5)) as executor:
+            futures = {
+                executor.submit(self._anilist_service.fetch_spotlight_extras, card): rank
+                for rank, card in candidates
+            }
+            for future in as_completed(futures):
+                rank = futures[future]
+                try:
+                    extras = future.result()
+                    extras["_rank"] = rank
+                    results[rank] = extras
+                except Exception:
+                    pass
+
+        return [results[rank] for rank, _ in candidates if rank in results]
 
     def _spotlight_candidate_available(self, card: dict) -> bool:
         """Quick check: does the scraper return any results for this anime?"""
@@ -1033,15 +1110,10 @@ class MainWindow(QMainWindow):
             return
         trending = payload.get("trending") or []
         seasonal = payload.get("seasonal") or []
-        spotlight = payload.get("spotlight")
+        spotlights = payload.get("spotlights") or []
         self._home_view.set_trending_cards(trending)
         self._home_view.set_seasonal_cards(seasonal)
-        if spotlight:
-            rank = spotlight.get("_rank", 1)
-            self._home_view.set_spotlight(spotlight, rank=rank)
-            banner_path = spotlight.get("banner_path")
-            if banner_path and os.path.exists(str(banner_path)):
-                self._home_view.set_spotlight_banner(str(banner_path))
+        self._home_view.set_spotlights(spotlights)
         status = self._anilist_service.api_status
         if self._anilist_service.is_offline:
             desc = status.ui_description()
@@ -1060,14 +1132,14 @@ class MainWindow(QMainWindow):
 
         # Background availability filter — remove cards the scraper can't find.
         # Runs after display so UI appears immediately; unavailable cards vanish quietly.
-        spotlight_title = (spotlight or {}).get("title", "")
-        self._start_discover_availability_check(trending, seasonal, spotlight_title)
+        spotlight_titles = {s.get("title", "") for s in spotlights if s.get("title")}
+        self._start_discover_availability_check(trending, seasonal, spotlight_titles)
 
     def _start_discover_availability_check(
         self,
         trending: list[dict],
         seasonal: list[dict],
-        spotlight_title: str,
+        spotlight_titles: set[str],
     ) -> None:
         """Spawn a background thread that checks each discover card and removes unavailable ones."""
         tagged = [("trending", c) for c in trending] + [("seasonal", c) for c in seasonal]
@@ -1079,7 +1151,7 @@ class MainWindow(QMainWindow):
                 futures = {
                     pool.submit(self._card_is_available, card): (section, card.get("title", ""))
                     for section, card in tagged
-                    if card.get("title") and card.get("title") != spotlight_title
+                    if card.get("title") and card.get("title") not in spotlight_titles
                 }
                 for future in as_completed(futures):
                     section, title = futures[future]
@@ -1891,18 +1963,36 @@ class MainWindow(QMainWindow):
         if self._busy:
             self._set_status("Aguarde a tarefa atual finalizar.")
             return
+        self._task_token += 1
+        token = self._task_token
         self._set_busy(True, status_message)
         worker = FunctionWorker(task)
         self._active_workers.add(worker)
-        worker.signals.succeeded.connect(on_success)
-        worker.signals.failed.connect(self._on_task_failed)
-        worker.signals.finished.connect(lambda current=worker: self._on_task_finished(current))
+        worker.signals.succeeded.connect(
+            lambda result, t=token: self._on_task_succeeded(t, result, on_success)
+        )
+        worker.signals.failed.connect(lambda err, t=token: self._on_task_failed(t, err))
+        worker.signals.finished.connect(
+            lambda current=worker, t=token: self._on_task_finished(current, t)
+        )
         self._thread_pool.start(worker)
 
-    def _on_task_failed(self, error_text: str) -> None:
+    def _on_task_succeeded(
+        self, token: int, result: object, on_success: Callable[[object], None]
+    ) -> None:
+        if token in self._cancelled_tokens:
+            self._cancelled_tokens.discard(token)
+            return
+        on_success(result)
+
+    def _on_task_failed(self, token: int, error_text: str) -> None:
+        if token in self._cancelled_tokens:
+            self._cancelled_tokens.discard(token)
+            return
         self._play_overlay.dismiss()
         self._download_overlay.dismiss()
         self._detail_view.clear_loading()
+        self._search_view.stop_loading()
         if getattr(self, "_download_cancelled", False):
             self._set_status("Download cancelado.")
             return
@@ -1911,10 +2001,29 @@ class MainWindow(QMainWindow):
         summary = error_text.splitlines()[0] if error_text else "Erro inesperado."
         QMessageBox.critical(self, "Erro", summary)
 
-
-    def _on_task_finished(self, worker: FunctionWorker) -> None:
+    def _on_task_finished(self, worker: FunctionWorker, token: int) -> None:
         self._active_workers.discard(worker)
+        # Only clear busy if this is still the current task — an orphaned,
+        # already-cancelled task finishing late must not clobber the busy
+        # state of a newer task the user has since started.
+        if token == self._task_token:
+            self._set_busy(False)
+
+    def _cancel_current_task(self) -> None:
+        """Reset the UI immediately. The FunctionWorker keeps running on its
+        OS thread in the background — Python threads cannot be killed — but
+        its eventual result is ignored via _cancelled_tokens (see
+        _on_task_succeeded/_on_task_failed/_on_task_finished)."""
+        if self._task_token:
+            self._cancelled_tokens.add(self._task_token)
         self._set_busy(False)
+
+    def _on_play_cancel(self) -> None:
+        self._cancel_current_task()
+        self._play_overlay.dismiss()
+        self._detail_view.clear_loading()
+        self._append_log("Reproducao cancelada pelo usuario.")
+        self._set_status("Reproducao cancelada.")
 
     def _set_busy(self, busy: bool, status_message: str = "") -> None:
         self._busy = busy

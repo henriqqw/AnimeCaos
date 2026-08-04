@@ -115,7 +115,10 @@ class AnimesOnlineCC(PluginInterface):
             return cached
 
         with driver_session(AnimesOnlineCC.name) as driver:
-            driver.get(url_episode)
+            try:
+                driver.get(url_episode)
+            except TimeoutException as exc:
+                raise RuntimeError("Site demorou demais para responder (AnimesOnlineCC).") from exc
             try:
                 iframe = WebDriverWait(driver, 10).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, "iframe[src]"))

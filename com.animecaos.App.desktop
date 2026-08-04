@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Animecaos
+Comment=Assistente para streaming de animes
+Exec=animecaos
+Icon=com.animecaos.App
+Terminal=false
+Type=Application
+Categories=AudioVideo;Video;Network;
+Keywords=anime;streaming;video;
+StartupNotify=true

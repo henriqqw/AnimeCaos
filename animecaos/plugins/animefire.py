@@ -3,6 +3,8 @@ import re
 import unicodedata
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from bs4 import BeautifulSoup
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
@@ -12,12 +14,19 @@ from selenium.webdriver.support.wait import WebDriverWait
 from animecaos.core.loader import PluginInterface
 from animecaos.core.repository import rep
 
-from .utils import make_driver, validate_player_src
+from .utils import driver_session, validate_player_src
+from .player_cache import cache_player_url, get_cached_player_url
 
 log = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT_SECONDS = 15
 HEADERS = {"User-Agent": "Mozilla/5.0 (animecaos)"}
+
+_SESSION = requests.Session()
+_SESSION.headers.update(HEADERS)
+_retry = Retry(total=2, backoff_factor=0.3, status_forcelist=[500, 502, 503, 504])
+_SESSION.mount("https://", HTTPAdapter(max_retries=_retry))
+_SESSION.mount("http://", HTTPAdapter(max_retries=_retry))
 
 
 def _is_video_url(url: str) -> bool:
@@ -45,7 +54,7 @@ class AnimeFire(PluginInterface):
             return
 
         url = f"https://animefire.io/pesquisar/{slug}"
-        response = requests.get(url, timeout=REQUEST_TIMEOUT_SECONDS, headers=HEADERS)
+        response = _SESSION.get(url, timeout=REQUEST_TIMEOUT_SECONDS)
         if response.status_code == 404:
             return
         response.raise_for_status()
@@ -81,7 +90,7 @@ class AnimeFire(PluginInterface):
 
     @staticmethod
     def search_episodes(anime: str, url: str, params):
-        response = requests.get(url, timeout=REQUEST_TIMEOUT_SECONDS, headers=HEADERS)
+        response = _SESSION.get(url, timeout=REQUEST_TIMEOUT_SECONDS)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -100,7 +109,7 @@ class AnimeFire(PluginInterface):
         # Video API:   https://animefire.io/video/{slug}/{ep}
         try:
             api_url = url_episode.replace("/animes/", "/video/")
-            response = requests.get(api_url, timeout=REQUEST_TIMEOUT_SECONDS, headers=HEADERS)
+            response = _SESSION.get(api_url, timeout=REQUEST_TIMEOUT_SECONDS)
             if response.status_code != 200:
                 return False
             data = response.json().get("data", [])
@@ -110,39 +119,62 @@ class AnimeFire(PluginInterface):
 
     @staticmethod
     def search_player_src(url_episode: str) -> str:
-        driver = make_driver()
+        cached = get_cached_player_url(AnimeFire.name, url_episode)
+        if cached:
+            return cached
+
+        result = AnimeFire._resolve_player(url_episode)
+        cache_player_url(AnimeFire.name, url_episode, result)
+        return result
+
+    @staticmethod
+    def _resolve_player(url_episode: str) -> str:
+        # Fast path: JSON API — avoids Selenium entirely when it works.
+        api_url = url_episode.replace("/animes/", "/video/")
         try:
+            resp = _SESSION.get(api_url, timeout=REQUEST_TIMEOUT_SECONDS)
+            if resp.status_code == 200:
+                for entry in resp.json().get("data", []):
+                    src = (entry.get("src") or entry.get("url") or entry.get("link")
+                           or entry.get("file") or entry.get("video") or entry.get("hd") or entry.get("sd"))
+                    if src and _is_video_url(src):
+                        return validate_player_src(src, AnimeFire.name)
+        except Exception as exc:
+            log.debug("animefire: API falhou, usando Selenium: %s", exc)
+
+        with driver_session(AnimeFire.name) as driver:
             driver.get(url_episode)
 
-            # 1) Try direct <video> element on the page
+            # Combined wait: video element OR iframe (avoids two sequential 10s waits)
             try:
-                video = WebDriverWait(driver, 10).until(
-                    EC.visibility_of_element_located((By.ID, "my-video_html5_api"))
+                WebDriverWait(driver, 12).until(
+                    lambda d: (
+                        d.find_elements(By.ID, "my-video_html5_api")
+                        or d.find_elements(By.CSS_SELECTOR, "iframe[src]")
+                    )
                 )
-                src = video.get_property("src") or video.get_attribute("src")
+            except TimeoutException as exc:
+                raise RuntimeError("Iframe/video nao encontrado no AnimeFire.") from exc
+
+            videos = driver.find_elements(By.ID, "my-video_html5_api")
+            if videos:
+                src = videos[0].get_property("src") or videos[0].get_attribute("src")
                 if src and _is_video_url(src):
                     return validate_player_src(src, AnimeFire.name)
-            except TimeoutException:
-                pass
 
-            # 2) Try iframe — navigate inside to extract the real video URL
-            try:
-                iframe = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.CSS_SELECTOR, "iframe[src]"))
-                )
-                iframe_src = iframe.get_property("src") or iframe.get_attribute("src")
+            iframes = driver.find_elements(By.CSS_SELECTOR, "iframe[src]")
+            if iframes:
+                iframe_src = iframes[0].get_property("src") or iframes[0].get_attribute("src")
                 if iframe_src:
                     if "blogger.com/video.g" in iframe_src:
                         raise RuntimeError("Hospedagem de video nao disponivel para este episodio.")
 
-                    # If the iframe src itself is a direct video URL, use it
                     if _is_video_url(iframe_src):
                         return validate_player_src(iframe_src, AnimeFire.name)
 
-                    # Otherwise, navigate inside the iframe and look for <video>
-                    driver.switch_to.frame(iframe)
+                    driver.switch_to.frame(iframes[0])
                     try:
-                        inner_video = WebDriverWait(driver, 10).until(
+                        inner_video = WebDriverWait(driver, 6).until(
                             EC.presence_of_element_located((By.TAG_NAME, "video"))
                         )
                         inner_src = (
@@ -152,9 +184,7 @@ class AnimeFire(PluginInterface):
                         if inner_src and _is_video_url(inner_src):
                             return validate_player_src(inner_src, AnimeFire.name)
 
-                        # Check <source> children
-                        source = inner_video.find_elements(By.TAG_NAME, "source")
-                        for s in source:
+                        for s in inner_video.find_elements(By.TAG_NAME, "source"):
                             s_src = s.get_property("src") or s.get_attribute("src")
                             if s_src and _is_video_url(s_src):
                                 return validate_player_src(s_src, AnimeFire.name)
@@ -163,15 +193,9 @@ class AnimeFire(PluginInterface):
                     finally:
                         driver.switch_to.default_content()
 
-                    # Last resort: return iframe src and let mpv/yt-dlp try
                     return validate_player_src(iframe_src, AnimeFire.name)
 
-            except TimeoutException as exc:
-                raise RuntimeError("Iframe/video nao encontrado no AnimeFire.") from exc
-
             raise RuntimeError("Fonte de video nao encontrada no AnimeFire.")
-        finally:
-            driver.quit()
 
 
 def load(languages_dict):

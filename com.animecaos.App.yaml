@@ -1,0 +1,109 @@
+app-id: com.animecaos.App
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+command: animecaos
+
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+  - --filesystem=home
+  # Needed for flatpak-spawn --host (calls mpv/firefox outside the sandbox)
+  - --talk-name=org.freedesktop.Flatpak
+  # geckodriver creates Firefox profile in /tmp; host Firefox needs the same path
+  - --filesystem=/tmp
+
+build-options:
+  build-args:
+    - --share=network
+  env:
+    PIP_DISABLE_PIP_VERSION_CHECK: '1'
+
+modules:
+  # Python dependencies installed to /app/lib/python3.12/site-packages/
+  - name: python-deps
+    buildsystem: simple
+    build-commands:
+      - python3 -m ensurepip --upgrade || true
+      - python3 -m pip install --prefix=/app beautifulsoup4==4.12.3 fuzzywuzzy==0.18.0 python-Levenshtein==0.26.1 requests==2.32.3 selenium==4.26.1 "PySide6==6.10.2" yt-dlp Pillow
+
+  # geckodriver binary (runs inside sandbox, communicates with host Firefox via localhost)
+  - name: geckodriver-x86_64
+    buildsystem: simple
+    only-arches:
+      - x86_64
+    build-commands:
+      - install -Dm755 geckodriver /app/bin/geckodriver
+    sources:
+      - type: archive
+        url: https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-linux64.tar.gz
+        sha256: 79b2e77edd02c0ec890395140d7cdc04a7ff0ec64503e62a0b74f88674ef1313
+        strip-components: 0
+
+  - name: geckodriver-aarch64
+    buildsystem: simple
+    only-arches:
+      - aarch64
+    build-commands:
+      - install -Dm755 geckodriver /app/bin/geckodriver
+    sources:
+      - type: archive
+        url: https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-linux-aarch64.tar.gz
+        sha256: af2edce2ef3ea3289dc77ef0df4e642b382b15ef8293f188ffee782a2ccfb370
+        strip-components: 0
+
+  - name: animecaos
+    buildsystem: simple
+    build-commands:
+      # App source
+      - mkdir -p /app/lib/animecaos-app
+      - cp -r animecaos /app/lib/animecaos-app/
+      - cp main.py /app/lib/animecaos-app/
+      - cp -r public /app/lib/animecaos-app/
+      # Host-delegation wrappers for mpv and firefox
+      - install -Dm755 mpv-wrapper.sh /app/bin/mpv
+      - install -Dm755 firefox-wrapper.sh /app/bin/firefox
+      # Main launcher
+      - install -Dm755 animecaos-launcher.sh /app/bin/animecaos
+      # Resize icon and write directly to /app/ — avoids rofiles-fuse issues with temp paths
+      - PYTHONPATH=/app/lib/python3.12/site-packages python3 -c "import os; from PIL import Image; img=Image.open('public/icon.png'); os.makedirs('/app/share/icons/hicolor/256x256/apps',exist_ok=True); os.makedirs('/app/share/icons/hicolor/512x512/apps',exist_ok=True); img.resize((256,256),Image.Resampling.LANCZOS).save('/app/share/icons/hicolor/256x256/apps/com.animecaos.App.png'); img.resize((512,512),Image.Resampling.LANCZOS).save('/app/share/icons/hicolor/512x512/apps/com.animecaos.App.png')"
+      # Desktop integration
+      - install -Dm644 com.animecaos.App.desktop /app/share/applications/com.animecaos.App.desktop
+      - install -Dm644 com.animecaos.App.metainfo.xml /app/share/metainfo/com.animecaos.App.metainfo.xml
+    sources:
+      - type: dir
+        path: .
+      - type: script
+        dest-filename: animecaos-launcher.sh
+        commands:
+          # Both paths required: app code + pip-installed packages (selenium, PySide6, etc.)
+          - export PYTHONPATH=/app/lib/animecaos-app:/app/lib/python3.12/site-packages
+          - export PATH=/app/bin:$PATH
+          - exec /usr/bin/python3 /app/lib/animecaos-app/main.py "$@"
+      - type: script
+        dest-filename: mpv-wrapper.sh
+        commands:
+          - if flatpak-spawn --host which mpv > /dev/null 2>&1; then
+          - "  exec flatpak-spawn --host mpv \"$@\""
+          - elif flatpak-spawn --host flatpak info io.mpv.Mpv > /dev/null 2>&1; then
+          - "  exec flatpak-spawn --host flatpak run io.mpv.Mpv \"$@\""
+          - else
+          - "  echo 'mpv nao encontrado. Instale: sudo apt install mpv  ou  flatpak install flathub io.mpv.Mpv' >&2"
+          - "  exit 1"
+          - fi
+      - type: script
+        dest-filename: firefox-wrapper.sh
+        commands:
+          - if flatpak-spawn --host which firefox > /dev/null 2>&1; then
+          - "  exec flatpak-spawn --host firefox \"$@\""
+          - elif flatpak-spawn --host flatpak info org.mozilla.firefox > /dev/null 2>&1; then
+          - "  exec flatpak-spawn --host flatpak run org.mozilla.firefox \"$@\""
+          - elif flatpak-spawn --host snap list firefox > /dev/null 2>&1; then
+          - "  exec flatpak-spawn --host /snap/bin/firefox \"$@\""
+          - else
+          - "  echo 'Firefox nao encontrado. Instale: sudo apt install firefox  ou  flatpak install flathub org.mozilla.firefox' >&2"
+          - "  exit 1"
+          - fi

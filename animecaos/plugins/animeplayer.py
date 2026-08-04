@@ -13,7 +13,7 @@ from selenium.webdriver.support.wait import WebDriverWait
 from animecaos.core.loader import PluginInterface
 from animecaos.core.repository import rep
 
-from .utils import make_driver
+from .utils import driver_session, make_driver
 
 log = logging.getLogger(__name__)
 
@@ -104,7 +104,6 @@ class AnimePlayer(PluginInterface):
                 episode_titles.append(ep_title)
                 episode_links.append(a["href"])
 
-            # Episodes come in reverse order (newest first) — reverse to get 1, 2, 3...
             episode_titles.reverse()
             episode_links.reverse()
 
@@ -118,8 +117,7 @@ class AnimePlayer(PluginInterface):
 
     @staticmethod
     def search_player_src(url_episode: str) -> str:
-        driver = make_driver()
-        try:
+        with driver_session(AnimePlayer.name) as driver:
             driver.get(url_episode)
             time.sleep(4)
 
@@ -133,14 +131,11 @@ class AnimePlayer(PluginInterface):
 
             proxy_url = _build_proxy_url(data_src)
             if proxy_url:
-                # The proxy is behind Cloudflare anti-bot — only works inside their browser.
                 raise RuntimeError(
                     "Hospedagem de video protegida por Cloudflare (animeplayer/blogger)."
                 )
 
             return data_src
-        finally:
-            driver.quit()
 
 
 def load(languages_dict):

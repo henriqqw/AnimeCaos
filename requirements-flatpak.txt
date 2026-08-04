@@ -1,0 +1,7 @@
+beautifulsoup4==4.12.3
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.26.1
+requests==2.32.3
+selenium==4.26.1
+PySide6==6.10.2
+yt-dlp>=2023.1.1

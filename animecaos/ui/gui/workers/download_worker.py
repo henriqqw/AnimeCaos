@@ -22,15 +22,19 @@ class DownloadWorker(QRunnable):
     def cancel(self):
         self._is_cancelled = True
         if self._process:
-            self._process.terminate()
+            try:
+                self._process.kill()
+            except Exception:
+                pass
 
     @Slot()
     def run(self) -> None:
+        import os
         import subprocess
         from animecaos.core.paths import get_bin_path
         try:
             flags = 0
-            if __import__("os").name == "nt":
+            if os.name == "nt":
                 flags = subprocess.CREATE_NO_WINDOW
                 
             from urllib.parse import urlparse
@@ -55,11 +59,12 @@ class DownloadWorker(QRunnable):
                     break
                 if line:
                     self.signals.progress.emit(line.strip())
-            self._process.stdout.close()
+            if self._process.stdout:
+                self._process.stdout.close()
             return_code = self._process.wait()
             
             if self._is_cancelled:
-                 self.signals.failed.emit("Download cancelado.")
+                self.signals.failed.emit("Download cancelado.")
             elif return_code == 0:
                 self.signals.succeeded.emit(self._output_template)
             else:
@@ -69,4 +74,17 @@ class DownloadWorker(QRunnable):
         except Exception as exc:
             self.signals.failed.emit(str(exc))
         finally:
+            if self._is_cancelled:
+                try:
+                    import glob
+                    base_path = self._output_template.rsplit('.', 1)[0]
+                    for f in glob.glob(f"{base_path}*"):
+                        if f.endswith(".part") or f.endswith(".ytdl"):
+                            try:
+                                os.remove(f)
+                            except OSError:
+                                pass
+                except Exception:
+                    pass
             self.signals.finished.emit()
+

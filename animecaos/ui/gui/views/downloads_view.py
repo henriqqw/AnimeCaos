@@ -467,11 +467,30 @@ class DownloadsView(QWidget):
         self._tab_anime = QPushButton("Anime")
         self._tab_anime.setFixedHeight(36)
         self._tab_anime.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        # Manga tab wrapper with "Em Breve" badge
+        manga_tab_wrapper = QWidget()
+        manga_tab_wrapper.setStyleSheet("background: transparent;")
+        manga_tab_h = QHBoxLayout(manga_tab_wrapper)
+        manga_tab_h.setContentsMargins(0, 0, 0, 0)
+        manga_tab_h.setSpacing(4)
         self._tab_manga = QPushButton("Manga")
         self._tab_manga.setFixedHeight(36)
-        self._tab_manga.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._tab_manga.setCursor(Qt.CursorShape.ForbiddenCursor)
+        self._tab_manga.setEnabled(False)
+        manga_soon_badge = QLabel("Em Breve")
+        manga_soon_badge.setStyleSheet(
+            "background: rgba(212,66,66,0.15); color: #D44242;"
+            " border: 1px solid rgba(212,66,66,0.35); border-radius: 8px;"
+            " font-size: 9px; font-weight: 700; padding: 1px 6px;"
+        )
+        manga_soon_badge.setAlignment(Qt.AlignmentFlag.AlignVCenter)
+        manga_soon_badge.setFixedHeight(16)
+        manga_tab_h.addWidget(self._tab_manga)
+        manga_tab_h.addWidget(manga_soon_badge, 0, Qt.AlignmentFlag.AlignVCenter)
+
         tab_row.addWidget(self._tab_anime)
-        tab_row.addWidget(self._tab_manga)
+        tab_row.addWidget(manga_tab_wrapper)
         tab_row.addStretch()
         hv.addLayout(tab_row)
 
@@ -502,7 +521,7 @@ class DownloadsView(QWidget):
         self._manga_cards: dict[str, _MangaGroupCard] = {}
 
         self._tab_anime.clicked.connect(lambda: self._switch_tab("anime"))
-        self._tab_manga.clicked.connect(lambda: self._switch_tab("manga"))
+        # Manga tab is disabled (Em Breve) — no click connection
         self._switch_tab("anime")
 
     # ── Tab switching ─────────────────────────────────────────────
@@ -513,7 +532,11 @@ class DownloadsView(QWidget):
         self._anime_scroll.setVisible(anime_on)
         self._manga_scroll.setVisible(not anime_on)
         self._tab_anime.setStyleSheet(_TAB_ACTIVE if anime_on else _TAB_IDLE)
-        self._tab_manga.setStyleSheet(_TAB_ACTIVE if not anime_on else _TAB_IDLE)
+        self._tab_manga.setStyleSheet(
+            "QPushButton { color: #3A3F52; background: transparent;"
+            " border: none; border-bottom: 2px solid transparent; border-radius: 0;"
+            " font-size: 13px; padding: 0 20px; }"
+        )
         self._stats_lbl.setText(self._anime_stats if anime_on else self._manga_stats)
         self._open_btn.setVisible(anime_on)
 

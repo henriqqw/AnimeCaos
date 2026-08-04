@@ -145,14 +145,29 @@ class AnimeCard(QFrame):
         self.cover_label.setPixmap(rounded)
 
     def set_cover_from_path(self, path: str) -> None:
+        # Guard: if the file is unreadable or corrupted, QPixmap will be null.
+        # In that case keep whatever is currently shown (the dynamic gradient
+        # fallback) rather than wiping the cover label blank.
+        from PySide6.QtGui import QPixmap as _QPixmap
+        if not path or _QPixmap(path).isNull():
+            return
         self._set_cover(path)
+
 
     def mousePressEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
-            self.clicked.emit(self.data)
+            self._press_pos = event.position()
         super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton and hasattr(self, "_press_pos"):
+            delta = (event.position() - self._press_pos).manhattanLength()
+            if delta < 6 and self.rect().contains(event.position().toPoint()):
+                self.clicked.emit(self.data)
+        super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event) -> None:
         if event.button() == Qt.MouseButton.LeftButton:
             self.double_clicked.emit(self.data)
         super().mouseDoubleClickEvent(event)
+

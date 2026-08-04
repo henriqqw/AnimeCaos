@@ -195,6 +195,20 @@ def icon_arrow_left(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
     return pm
 
 
+# ── Icon: ArrowRight (forward) ────────────────────────────────────
+def icon_arrow_right(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
+    pm, p, s, c = _begin(size, color)
+    p.drawLine(QPointF(_s(5, s), _s(12, s)), QPointF(_s(19, s), _s(12, s)))
+    path = QPainterPath()
+    path.moveTo(_s(12, s), _s(5, s))
+    path.lineTo(_s(19, s), _s(12, s))
+    path.lineTo(_s(12, s), _s(19, s))
+    p.drawPath(path)
+    p.end()
+    return pm
+
+
+
 # ── Icon: Terminal (log/console) ──────────────────────────────────
 def icon_terminal(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
     pm, p, s, c = _begin(size, color)

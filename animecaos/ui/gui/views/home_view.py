@@ -164,16 +164,6 @@ class HomeView(QWidget):
 
         self._content.addWidget(self._offline_banner)
 
-        # ── Continue Watching ──
-        self.history_section = HorizontalCardScroll("Continue Assistindo")
-        self.history_section.card_clicked.connect(self.history_clicked.emit)
-        self.history_section.set_empty(
-            icon_clock(36, "rgba(255,255,255,0.15)"),
-            "Nenhum historico",
-            "Os animes que voce assistir aparecerao aqui",
-        )
-        self._content.addWidget(self.history_section)
-
         # ── Em Alta ──
         self.trending_section = HorizontalCardScroll("Em Alta")
         self.trending_section.card_clicked.connect(self.discover_clicked.emit)
@@ -183,6 +173,16 @@ class HomeView(QWidget):
             "",
         )
         self._content.addWidget(self.trending_section)
+
+        # ── Continue Watching ──
+        self.history_section = HorizontalCardScroll("Continue Assistindo")
+        self.history_section.card_clicked.connect(self.history_clicked.emit)
+        self.history_section.set_empty(
+            icon_clock(36, "rgba(255,255,255,0.15)"),
+            "Nenhum historico",
+            "Os animes que voce assistir aparecerao aqui",
+        )
+        self._content.addWidget(self.history_section)
 
         # ── Temporada Atual ──
         self._seasonal_title = self._current_season_label()

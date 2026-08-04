@@ -210,6 +210,7 @@ class MainWindow(QMainWindow):
         self._download_overlay = DownloadOverlay(root)
         self._download_overlay.cancel_requested.connect(self._on_download_cancel)
         self._active_download_worker: DownloadWorker | None = None
+        self._download_cancelled: bool = False
 
         self.update_progress_signal.connect(self._log_view.progress_bar.setValue)
         self.update_status_signal.connect(self._status_label.setText)
@@ -276,6 +277,7 @@ class MainWindow(QMainWindow):
 
         self._search_input = QLineEdit()
         self._search_input.setPlaceholderText("Pesquisar anime...  (Ctrl+F)")
+        self._search_input.setClearButtonEnabled(True)
         self._search_input.setMinimumWidth(300)
         self._search_input.setMaximumWidth(500)
         layout.addWidget(self._search_input)
@@ -294,6 +296,7 @@ class MainWindow(QMainWindow):
 
     def _bind_events(self) -> None:
         self._search_input.returnPressed.connect(self._on_search_clicked)
+        self._search_input.textChanged.connect(self._on_search_text_changed)
         self._search_btn.clicked.connect(self._on_search_clicked)
 
         self._sidebar.nav_changed.connect(self._on_nav_changed)
@@ -527,6 +530,10 @@ class MainWindow(QMainWindow):
 
         self._fetch_covers_for_results(titles, self._last_search_query)
 
+    def _on_search_text_changed(self, text: str) -> None:
+        if not text.strip() and self._stack.currentIndex() == _VIEW_SEARCH:
+            self._search_view.reset_to_welcome()
+
     # ── CARD CLICKS ──────────────────────────────────────────────
 
     def _on_anime_card_clicked(self, data: dict) -> None:
@@ -736,10 +743,15 @@ class MainWindow(QMainWindow):
         if not anime:
             return
 
+        if self._active_download_worker:
+            self._set_status("Ja existe um download em andamento.")
+            return
+
         if self._busy:
             self._set_status("Aguarde a tarefa atual finalizar.")
             return
 
+        self._download_cancelled = False
         # Show download overlay immediately
         self._download_overlay.show_resolving(anime, index)
 
@@ -750,6 +762,10 @@ class MainWindow(QMainWindow):
         )
 
     def _start_download_worker(self, payload: object) -> None:
+        if self._download_cancelled:
+            self._append_log("Download cancelado pelo usuario.")
+            return
+
         if not isinstance(payload, tuple) or len(payload) != 3:
             self._set_status("Falha ao resolver url de download.")
             self._download_overlay.show_error("Falha ao resolver URL do episodio.")
@@ -773,12 +789,16 @@ class MainWindow(QMainWindow):
         self._thread_pool.start(worker)
 
     def _on_download_progress(self, line: str) -> None:
+        if self._download_cancelled:
+            return
         self._download_overlay.update_progress(line)
         if "[download]" in line or "100%" in line:
             self._set_status(f"Download: {line[:50].strip()}")
 
     def _on_download_success(self, path: str) -> None:
         self._active_download_worker = None
+        if self._download_cancelled:
+            return
         download_dir = getattr(self, "_current_download_dir", "")
         self._download_overlay.show_done(download_dir)
         self._append_log(f"Download concluido — salvo em: {download_dir}")
@@ -786,16 +806,25 @@ class MainWindow(QMainWindow):
 
     def _on_download_failed(self, error: str) -> None:
         self._active_download_worker = None
+        if "cancelado" in error.lower() or self._download_cancelled:
+            self._download_overlay.dismiss()
+            self._set_status("Download cancelado.")
+            return
         self._download_overlay.show_error(error)
         self._append_log(f"Download falhou: {error}")
         self._set_status("Erro no download.")
 
     def _on_download_cancel(self) -> None:
+        self._download_cancelled = True
         if self._active_download_worker:
             self._active_download_worker.cancel()
             self._active_download_worker = None
-            self._append_log("Download cancelado.")
-            self._set_status("Download cancelado.")
+        if self._busy:
+            self._set_busy(False)
+        self._download_overlay.dismiss()
+        self._append_log("Download cancelado pelo usuario.")
+        self._set_status("Download cancelado.")
+
 
     # ── HISTORY ──────────────────────────────────────────────────
 
@@ -1874,10 +1903,14 @@ class MainWindow(QMainWindow):
         self._play_overlay.dismiss()
         self._download_overlay.dismiss()
         self._detail_view.clear_loading()
+        if getattr(self, "_download_cancelled", False):
+            self._set_status("Download cancelado.")
+            return
         self._append_log(f"Erro: {error_text.splitlines()[0] if error_text else 'Erro desconhecido'}")
         self._set_status("Falha na operacao.")
         summary = error_text.splitlines()[0] if error_text else "Erro inesperado."
         QMessageBox.critical(self, "Erro", summary)
+
 
     def _on_task_finished(self, worker: FunctionWorker) -> None:
         self._active_workers.discard(worker)

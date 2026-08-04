@@ -47,8 +47,22 @@ class _FlowLayout(QVBoxLayout):
             self._widgets.remove(widget)
 
     def clear_all(self) -> None:
-        for w in self._widgets:
-            self._grid.removeWidget(w)
+        # Destroy the old flow_widget+grid entirely so that QGridLayout does not
+        # retain residual row/column structure (empty rows would keep taking up
+        # vertical space and shift subsequent cards to wrong positions).
+        if self._flow_widget is not None:
+            super().removeWidget(self._flow_widget)
+            self._flow_widget.setParent(None)
+            self._flow_widget.deleteLater()
+
+        # Create a completely fresh container + grid.
+        self._flow_widget = QWidget()
+        self._flow_widget.setStyleSheet("background: transparent;")
+        self._grid = QGridLayout(self._flow_widget)
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        self._grid.setSpacing(self._spacing)
+        super().addWidget(self._flow_widget)
+
         self._widgets.clear()
         self._row = 0
         self._col = 0
@@ -428,9 +442,11 @@ class SearchView(QWidget):
 
     def _clear_cards(self) -> None:
         for card in self._cards:
-            self._grid_layout.removeWidget(card)
             card.setParent(None)
             card.deleteLater()
         self._cards.clear()
+        # Reset grid counters AND recreate the internal QGridLayout so there are
+        # no residual empty rows/columns that would offset the next search results.
+        self._grid_layout.clear_all()
 
 

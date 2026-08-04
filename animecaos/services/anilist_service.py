@@ -458,14 +458,30 @@ class AniListService:
         ext = url.split(".")[-1] if "." in url[-6:] else "jpg"
         cover_path = self._cache_dir / f"{url_hash}.{ext}"
         if cover_path.exists():
-            return str(cover_path)
+            # Validate cached file: must be > 1 KB.
+            # A partial/interrupted download leaves a 0-byte or tiny file that
+            # causes QPixmap.isNull() == True and renders a blank white card.
+            try:
+                if cover_path.stat().st_size > 1024:
+                    return str(cover_path)
+            except OSError:
+                pass
+            # File is corrupted or too small — delete and re-download.
+            try:
+                cover_path.unlink(missing_ok=True)
+            except OSError:
+                pass
         try:
             resp = requests.get(url, timeout=10)
             resp.raise_for_status()
-            cover_path.write_bytes(resp.content)
-            return str(cover_path)
+            # Only save if response looks like a real image (> 1 KB).
+            if len(resp.content) > 1024:
+                cover_path.write_bytes(resp.content)
+                return str(cover_path)
+            return None
         except Exception:
             return None
+
 
     @staticmethod
     def _current_season() -> tuple[str, int]:

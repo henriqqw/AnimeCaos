@@ -70,12 +70,17 @@ modules:
       - install -Dm755 animecaos-launcher.sh /app/bin/animecaos
       # Resize icon and write directly to /app/ — avoids rofiles-fuse issues with temp paths
       - PYTHONPATH=/app/lib/python3.12/site-packages python3 -c "import os; from PIL import Image; img=Image.open('public/icon.png'); os.makedirs('/app/share/icons/hicolor/256x256/apps',exist_ok=True); os.makedirs('/app/share/icons/hicolor/512x512/apps',exist_ok=True); img.resize((256,256),Image.Resampling.LANCZOS).save('/app/share/icons/hicolor/256x256/apps/com.animecaos.App.png'); img.resize((512,512),Image.Resampling.LANCZOS).save('/app/share/icons/hicolor/512x512/apps/com.animecaos.App.png')"
-      # Desktop integration
-      - install -Dm644 com.animecaos.App.desktop /app/share/applications/com.animecaos.App.desktop
-      - install -Dm644 com.animecaos.App.metainfo.xml /app/share/metainfo/com.animecaos.App.metainfo.xml
+      # Desktop integration — the `type: dir path: ..` source below copies the
+      # whole repo root flat, so deploy/ (where these two files actually live)
+      # shows up as a literal subdirectory here, not merged into the root.
+      - install -Dm644 deploy/com.animecaos.App.desktop /app/share/applications/com.animecaos.App.desktop
+      - install -Dm644 deploy/com.animecaos.App.metainfo.xml /app/share/metainfo/com.animecaos.App.metainfo.xml
     sources:
+      # This manifest lives in deploy/, but animecaos/, main.py and public/
+      # are all at the repo root — flatpak-builder resolves `path` relative
+      # to the manifest's own directory, so it must point one level up.
       - type: dir
-        path: .
+        path: ..
       - type: script
         dest-filename: animecaos-launcher.sh
         commands:

@@ -1,4 +1,4 @@
-import os
+import re
 import sys
 import shutil
 import urllib.request
@@ -8,9 +8,14 @@ from pathlib import Path
 
 YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
 GECKODRIVER_URL = "https://github.com/mozilla/geckodriver/releases/download/v0.36.0/geckodriver-v0.36.0-win64.zip"
-MPV_URL = "https://sourceforge.net/projects/mpv-player-windows/files/64bit/mpv-x86_64-20231231-git-aa8f108.7z/download"
+MPV_URL = "https://sourceforge.net/projects/mpv-player-windows/files/64bit/mpv-x86_64-20260607-git-71ebd08.7z/download"
 
-BASE_DIR = Path(os.path.abspath("."))
+# This script lives in deploy/, but every path below (bin/, dist/, main.py,
+# public/, setup.iss's own SourceDir, ...) is relative to the repo root —
+# resolve from the script's own location so it works no matter what the
+# current working directory is when it's invoked.
+DEPLOY_DIR = Path(__file__).resolve().parent
+BASE_DIR = DEPLOY_DIR.parent
 BIN_DIR = BASE_DIR / "bin"
 TEMP_DIR = BASE_DIR / "temp_build"
 
@@ -77,27 +82,32 @@ def run_pyinstaller():
         "--add-data=public/icon.png;public",
         "--add-data=public/icon.ico;public",
         "--add-data=bin;bin",
-        # plugins
+        # plugins (loaded dynamically via importlib in core/loader.py, so
+        # PyInstaller's static import analysis can't discover them on its own)
         "--hidden-import=animecaos.plugins.animefire",
         "--hidden-import=animecaos.plugins.animesonlinecc",
         "--hidden-import=animecaos.plugins.betteranime",
-        "--hidden-import=animecaos.plugins.player_cache",
+        "--hidden-import=animecaos.plugins.url_cache",
         # services
         "--hidden-import=animecaos.services.config_service",
         "--hidden-import=animecaos.services.anilist_auth_service",
         "--hidden-import=animecaos.services.anilist_service",
+        "--hidden-import=animecaos.services.anilist_rate_limiter",
         "--hidden-import=animecaos.services.discord_service",
         "--hidden-import=animecaos.services.downloads_service",
         "--hidden-import=animecaos.services.history_service",
         "--hidden-import=animecaos.services.updater_service",
         "--hidden-import=animecaos.services.watchlist_service",
         "--hidden-import=animecaos.services.anime_service",
+        "--hidden-import=animecaos.services.manga_service",
+        "--hidden-import=animecaos.services.manga_download_service",
+        "--hidden-import=animecaos.services.manga_history_service",
         # optional deps loaded at runtime
         "--hidden-import=pypresence",
         "main.py",
     ]
 
-    subprocess.run(cmd, check=True)
+    subprocess.run(cmd, check=True, cwd=BASE_DIR)
 
 
 def make_update_zip():
@@ -107,11 +117,13 @@ def make_update_zip():
         print("  AVISO: dist/AnimeCaos/ nao encontrada, pulando zip.")
         return
 
-    try:
-        from animecaos import __version__
-        version = __version__
-    except Exception:
-        version = "0.0.0"
+    # Read the version by regex instead of `from animecaos import __version__`:
+    # this script's own directory (deploy/) is what ends up on sys.path[0],
+    # not the repo root, so that import would silently fail and default to
+    # "0.0.0" — read the source file directly instead.
+    init_text = (BASE_DIR / "animecaos" / "__init__.py").read_text(encoding="utf-8")
+    match = re.search(r'__version__\s*=\s*["\']([^"\']+)["\']', init_text)
+    version = match.group(1) if match else "0.0.0"
 
     zip_name = f"AnimeCaos_v{version}_windows.zip"
     zip_path = BASE_DIR / "installer" / zip_name
@@ -123,14 +135,16 @@ def make_update_zip():
                 zf.write(file, file.relative_to(dist_dir))
 
     print(f"  Zip gerado: installer/{zip_name}")
-    print(f"  → Suba esse arquivo no GitHub Release para o auto-update funcionar.")
+    print(f"  -> Suba esse arquivo no GitHub Release para o auto-update funcionar.")
 
 
 def run_inno_setup():
     print("\n[3/3] Gerando instalador com Inno Setup...")
+    import os as _os
     iscc_candidates = [
         Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"),
         Path(r"C:\Program Files\Inno Setup 6\ISCC.exe"),
+        Path(_os.environ.get("LOCALAPPDATA", "")) / "Programs" / "Inno Setup 6" / "ISCC.exe",
     ]
     iscc = next((p for p in iscc_candidates if p.exists()), None)
     if not iscc:
@@ -138,7 +152,7 @@ def run_inno_setup():
         print("  Instale em https://jrsoftware.org/isinfo.php e rode novamente,")
         print("  ou compile setup.iss manualmente.")
         return
-    subprocess.run([str(iscc), "setup.iss"], check=True)
+    subprocess.run([str(iscc), str(DEPLOY_DIR / "setup.iss")], check=True, cwd=BASE_DIR)
     installer_dir = BASE_DIR / "installer"
     installers = list(installer_dir.glob("Setup_AnimeCaos_*.exe"))
     if installers:
@@ -146,12 +160,12 @@ def run_inno_setup():
 
 
 if __name__ == "__main__":
-    print("=== AnimeCaos — Windows Release Build ===")
+    print("=== AnimeCaos - Windows Release Build ===")
     setup_binaries()
     run_pyinstaller()
     make_update_zip()
     run_inno_setup()
     print("\n=== Build concluido! ===")
     print("  EXE:        dist/AnimeCaos/AnimeCaos.exe")
-    print("  Auto-update: installer/AnimeCaos_v*_windows.zip  ← sobe esse no GitHub Release")
-    print("  Instalador:  installer/Setup_AnimeCaos_*.exe     ← para novos usuarios")
+    print("  Auto-update: installer/AnimeCaos_v*_windows.zip  -> sobe esse no GitHub Release")
+    print("  Instalador:  installer/Setup_AnimeCaos_*.exe     -> para novos usuarios")

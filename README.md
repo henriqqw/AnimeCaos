@@ -7,7 +7,7 @@ Assista anime no desktop, sem anúncios, sem abrir navegador.
 
 [Website](https://animecaos.vercel.app) · [Instagram](https://www.instagram.com/getanimecaos/) · [Twitter](https://x.com/getanimecaos)
 
-![Version](https://img.shields.io/badge/version-v0.1.3-red.svg)
+![Version](https://img.shields.io/badge/version-v2.0.0-red.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
@@ -18,14 +18,15 @@ Assista anime no desktop, sem anúncios, sem abrir navegador.
 <div align="center">
   <table>
     <tr>
-      <td><img src="https://github.com/user-attachments/assets/cfbcf158-3a6b-412f-9b6e-2131c9249ce5" alt="pesquisar" width="310"/></td>
-      <td><img src="https://github.com/user-attachments/assets/7dd5a9da-8f54-4252-be9c-6763458ab2c5" alt="pesquisado" width="310"/></td>
-      <td><img src="https://github.com/user-attachments/assets/2df8f8c7-1cf2-4d75-8a94-6d6c5a857753" alt="home" width="310"/></td>
+      <td><img src="public/Screenshot_1.png" alt="home" width="310"/></td>
+      <td><img src="public/Screenshot_2.png" alt="busca" width="310"/></td>
+      <td><img src="public/Screenshot_4.png" alt="detalhes do anime" width="310"/></td>
+      <td><img src="public/Screenshot_6.png" alt="player mpv" width="310"/></td>
     </tr>
     <tr>
-      <td><img src="https://github.com/user-attachments/assets/1c0c2a71-c3ef-401d-8530-414c3692876f" alt="anilist" width="310"/></td>
-      <td><img src="https://github.com/user-attachments/assets/7cabccb1-ed90-45f8-9af4-d231cf8f84b0" alt="downloads" width="310"/></td>
-      <td><img src="https://github.com/user-attachments/assets/57c5b171-52fd-44e5-be6d-22344a83952a" alt="anime_eps" width="310"/></td>
+      <td><img src="public/Screenshot_7.png" alt="minha lista" width="310"/></td>
+      <td><img src="public/Screenshot_8.png" alt="downloads" width="310"/></td>
+      <td><img src="public/Screenshot_9.png" alt="conta e integracoes" width="310"/></td>
     </tr>
   </table>
 </div>
@@ -116,7 +117,7 @@ python main.py
 
 ```bash
 git clone https://github.com/henriqqw/AnimeCaos.git
-cd AnimeCaos
+cd AnimeCaos/deploy
 chmod +x build-flatpak.sh
 ./build-flatpak.sh
 
@@ -128,10 +129,10 @@ flatpak run com.animecaos.App
 ## Build Windows (.exe)
 
 ```bash
-python build_release.py
+python deploy/build_release.py
 ```
 
-O executável fica em `dist/Animecaos`.
+O executável fica em `dist/AnimeCaos`.
 
 ---
 

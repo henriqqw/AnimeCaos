@@ -45,6 +45,43 @@ _TITLE_MAX_LINES = 2
 _TITLE_PIXEL_SIZE = 38
 _TITLE_WEIGHT = QFont.Weight.ExtraBold  # matches the "font-weight: 800" in the title's stylesheet
 
+# Matches _MetaBadge's stylesheet ("padding: 4px 14px; font-size: 12px") so
+# width estimates line up with what actually gets painted.
+_BADGE_FONT_PX = 12
+_BADGE_H_PADDING = 14 * 2
+_BADGE_SPACING = 8
+_BADGE_ROW_SPACING = 6
+
+
+def layout_badges_into_rows(
+    tags: list[str], metrics: QFontMetrics, max_width: int
+) -> list[list[str]]:
+    """Greedily wrap badge tags into as many rows as needed so the total
+    width of any row never exceeds `max_width`. Most cards only produce 4
+    badges (format/duration/score/"HD"), which fit on one row, but a card
+    with BOTH a known score AND episode count gets a 5th ("N eps") that can
+    overflow — this is what turns that into a second row instead of content
+    getting clipped past the hero's visible edge."""
+    if not tags:
+        return []
+
+    rows: list[list[str]] = []
+    current_row: list[str] = []
+    current_width = 0.0
+    for tag in tags:
+        badge_width = metrics.horizontalAdvance(tag) + _BADGE_H_PADDING
+        needed = badge_width if not current_row else current_width + _BADGE_SPACING + badge_width
+        if current_row and needed > max_width:
+            rows.append(current_row)
+            current_row = [tag]
+            current_width = badge_width
+        else:
+            current_row.append(tag)
+            current_width = needed
+    if current_row:
+        rows.append(current_row)
+    return rows
+
 
 def wrap_and_elide_lines(
     text: str, metrics: QFontMetrics, max_width: int, max_lines: int
@@ -201,6 +238,8 @@ class SpotlightBanner(QWidget):
         self._bg_pixmap: QPixmap | None = None
         self._prev_bg_pixmap: QPixmap | None = None
         self._meta_badges: list[_MetaBadge] = []
+        self._meta_row_widgets: list[QWidget] = []
+        self._current_tags: list[str] = []
         self._fade = 1.0
 
         content_widget = QWidget(self)
@@ -267,10 +306,16 @@ class SpotlightBanner(QWidget):
         content.addWidget(desc_wrapper)
         content.addSpacing(20)
 
-        self._meta_row = QHBoxLayout()
-        self._meta_row.setSpacing(8)
-        self._meta_row.setContentsMargins(0, 0, 0, 0)
-        content.addLayout(self._meta_row)
+        # Badge rows are rebuilt per-card (see _layout_meta_badges): a plain
+        # single-row QHBoxLayout let a card with 5 badges (format/duration/
+        # score/episodes/"HD") overflow past the hero's visible width and
+        # get clipped mid-glyph by the crossfade's QGraphicsOpacityEffect.
+        self._meta_container = QWidget()
+        self._meta_container.setStyleSheet("background: transparent;")
+        self._meta_rows_layout = QVBoxLayout(self._meta_container)
+        self._meta_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self._meta_rows_layout.setSpacing(_BADGE_ROW_SPACING)
+        content.addWidget(self._meta_container)
         content.addSpacing(24)
 
         btn_row = QHBoxLayout()
@@ -356,6 +401,7 @@ class SpotlightBanner(QWidget):
         if self._raw_pixmap:
             self._build_bg()
         self._update_title_display()
+        self._layout_meta_badges()
 
         arrow_y = h // 2 - 20
         self._prev_arrow.move(16, arrow_y)
@@ -481,10 +527,11 @@ class SpotlightBanner(QWidget):
             self.anilist_clicked.emit(int(anilist_id))
 
     def _rebuild_meta_badges(self, card: dict) -> None:
-        for b in self._meta_badges:
-            b.deleteLater()
-        self._meta_badges.clear()
+        self._current_tags = self._compute_meta_tags(card)
+        self._layout_meta_badges()
 
+    @staticmethod
+    def _compute_meta_tags(card: dict) -> list[str]:
         tags: list[str] = []
         fmt = card.get("format")
         if fmt:
@@ -499,12 +546,37 @@ class SpotlightBanner(QWidget):
         if episodes:
             tags.append(f"{episodes} eps")
         tags.append("HD")
+        return tags
 
-        for tag in tags:
-            badge = _MetaBadge(tag)
-            self._meta_row.addWidget(badge)
-            self._meta_badges.append(badge)
-        self._meta_row.addStretch()
+    def _layout_meta_badges(self) -> None:
+        for row_widget in self._meta_row_widgets:
+            row_widget.setParent(None)
+            row_widget.deleteLater()
+        self._meta_row_widgets.clear()
+        self._meta_badges.clear()
+
+        if not self._current_tags:
+            return
+
+        font = QFont("Segoe UI")
+        font.setPixelSize(_BADGE_FONT_PX)
+        metrics = QFontMetrics(font)
+        max_width = max(100, self._content_widget.width() - 40)
+        rows = layout_badges_into_rows(self._current_tags, metrics, max_width)
+
+        for row_tags in rows:
+            row_widget = QWidget()
+            row_widget.setStyleSheet("background: transparent;")
+            row_layout = QHBoxLayout(row_widget)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(_BADGE_SPACING)
+            for tag in row_tags:
+                badge = _MetaBadge(tag)
+                row_layout.addWidget(badge)
+                self._meta_badges.append(badge)
+            row_layout.addStretch()
+            self._meta_rows_layout.addWidget(row_widget)
+            self._meta_row_widgets.append(row_widget)
 
     def _load_image(self, path: str, animate: bool) -> None:
         raw = QPixmap(path)

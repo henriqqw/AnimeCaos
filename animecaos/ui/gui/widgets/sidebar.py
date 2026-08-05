@@ -1,6 +1,6 @@
 """
 Sidebar navigation with Lucide icon buttons.
-Only Home, Search, Log, and Account — favorites and history are part of Home.
+Home, Search, Lista (watchlist), Downloads, Manga, Account, Log.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from animecaos.ui.gui.icons import icon_book, icon_download, icon_folder, icon_home, icon_search, icon_terminal, icon_user
+from animecaos.ui.gui.icons import icon_book, icon_bookmark, icon_download, icon_home, icon_search, icon_terminal, icon_user
 from animecaos.ui.gui.widgets.animated_button import AnimatedButton
 
 
@@ -60,8 +60,12 @@ class SidebarNav(QFrame):
         self._buttons["search"] = self._make_btn(_dual_icon(icon_search), "Buscar")
         layout.addWidget(self._buttons["search"], 0, Qt.AlignmentFlag.AlignHCenter)
 
+        # Lista (watchlist)
+        self._buttons["list"] = self._make_btn(_dual_icon(icon_bookmark), "Minha Lista")
+        layout.addWidget(self._buttons["list"], 0, Qt.AlignmentFlag.AlignHCenter)
+
         # Downloads
-        self._buttons["downloads"] = self._make_btn(_dual_icon(icon_folder), "Downloads")
+        self._buttons["downloads"] = self._make_btn(_dual_icon(icon_download), "Downloads")
         layout.addWidget(self._buttons["downloads"], 0, Qt.AlignmentFlag.AlignHCenter)
 
         # Manga

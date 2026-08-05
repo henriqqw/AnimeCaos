@@ -44,6 +44,37 @@ def _slugify_query(query: str) -> str:
     return slug
 
 
+def _quality_rank(label: object) -> int:
+    """Numeric resolution from a label like "720p" — -1 (lowest priority,
+    not "excluded") when the label is missing/unparseable, so a nameless
+    entry still loses to any labeled quality but is still picked as a last
+    resort over having no source at all."""
+    match = re.search(r"(\d+)", str(label or ""))
+    return int(match.group(1)) if match else -1
+
+
+def _pick_best_source(data: list) -> str | None:
+    """Each entry in the video API's "data" list is a separate quality
+    option (e.g. {"src": ..., "label": "360p"}), typically listed lowest
+    quality first. Always return the highest resolution available with a
+    valid direct video URL — falling back to whatever exists if 1080p/720p
+    aren't offered for that episode."""
+    candidates: list[tuple[int, str]] = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        src = (entry.get("src") or entry.get("hd") or entry.get("url")
+               or entry.get("link") or entry.get("file") or entry.get("video")
+               or entry.get("sd"))
+        if src and _is_video_url(src):
+            candidates.append((_quality_rank(entry.get("label")), src))
+
+    if not candidates:
+        return None
+    candidates.sort(key=lambda c: c[0], reverse=True)
+    return candidates[0][1]
+
+
 class AnimeFire(PluginInterface):
     languages = ["pt-br"]
     name = "animefire"
@@ -135,13 +166,9 @@ class AnimeFire(PluginInterface):
         try:
             resp = _SESSION.get(api_url, timeout=REQUEST_TIMEOUT_SECONDS)
             if resp.status_code == 200:
-                for entry in resp.json().get("data", []):
-                    # Prefer HD keys first, then generic src/url, then SD as last resort.
-                    src = (entry.get("hd") or entry.get("src") or entry.get("url")
-                           or entry.get("link") or entry.get("file") or entry.get("video")
-                           or entry.get("sd"))
-                    if src and _is_video_url(src):
-                        return validate_player_src(src, AnimeFire.name)
+                best = _pick_best_source(resp.json().get("data", []))
+                if best:
+                    return validate_player_src(best, AnimeFire.name)
         except Exception as exc:
             log.debug("animefire: API falhou, usando Selenium: %s", exc)
 

@@ -12,6 +12,8 @@ from PySide6.QtCore import (
 )
 from PySide6.QtWidgets import QStackedWidget, QGraphicsOpacityEffect, QWidget
 
+from animecaos.ui.gui.widgets.anime_card import AnimeCard
+
 
 class AnimatedStackedWidget(QStackedWidget):
     """QStackedWidget with cross-fade transitions between views."""
@@ -31,6 +33,13 @@ class AnimatedStackedWidget(QStackedWidget):
 
     def slide_to(self, index: int) -> None:
         """Animate transition to the view at *index*."""
+        # A card's expanded hover panel is reparented onto the top-level
+        # window (see AnimeCard._show_preview) rather than living inside the
+        # page that spawned it, so switching pages doesn't hide it by itself
+        # — if the mouse stayed still over the card, it would otherwise keep
+        # floating on top of whatever page comes next.
+        AnimeCard.suppress_previews()
+
         if index == self.currentIndex() or self._animating:
             return
         if index < 0 or index >= self.count():

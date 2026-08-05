@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 import requests
 
+from animecaos.services import anilist_rate_limiter
 from animecaos.services.config_service import ConfigService
 
 log = logging.getLogger(__name__)
@@ -185,6 +186,7 @@ class AniListAuthService:
           }
         }"""
         try:
+            anilist_rate_limiter.wait_for_slot()
             resp = requests.post(
                 _ANILIST_API,
                 json={"query": query},
@@ -249,6 +251,7 @@ class AniListAuthService:
           }
         }"""
         try:
+            anilist_rate_limiter.wait_for_slot()
             resp = requests.post(
                 _ANILIST_API,
                 json={"query": query, "variables": {"userId": user_id}},
@@ -292,6 +295,7 @@ class AniListAuthService:
           }
         }"""
         try:
+            anilist_rate_limiter.wait_for_slot()
             resp = requests.post(
                 _ANILIST_API,
                 json={"query": mutation, "variables": {

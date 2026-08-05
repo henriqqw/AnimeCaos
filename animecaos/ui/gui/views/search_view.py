@@ -9,9 +9,12 @@ from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QRectF, QTimer, Qt,
 from PySide6.QtGui import QColor, QConicalGradient, QCursor, QFont, QLinearGradient, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QScrollArea, QVBoxLayout, QWidget
 
-from animecaos.ui.gui.icons import icon_search, icon_search_x
+from animecaos.ui.gui.icons import icon_instagram, icon_search, icon_search_x, icon_x_logo
 from animecaos.ui.gui.widgets.anime_card import AnimeCard
 from animecaos.ui.gui.widgets.empty_state import EmptyState
+
+INSTAGRAM_URL = "https://www.instagram.com/getanimecaos/"
+X_URL = "https://x.com/getanimecaos"
 
 
 class _FlowLayout(QVBoxLayout):
@@ -258,6 +261,8 @@ class SearchView(QWidget):
     """Dedicated search results page with animated skeleton loading and card grid."""
 
     anime_clicked = Signal(object)
+    list_toggle_requested = Signal(object)
+    preview_requested = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -271,6 +276,10 @@ class SearchView(QWidget):
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        # Scrolling the page moves cards out from under any shown hover-preview
+        # panel (which is reparented onto the top-level window and doesn't
+        # move with them), so it must close rather than float in place.
+        self._scroll.verticalScrollBar().valueChanged.connect(lambda _: AnimeCard.suppress_previews())
 
         container = QWidget()
         container.setStyleSheet("background: transparent;")
@@ -377,7 +386,12 @@ class SearchView(QWidget):
         self._empty_state = EmptyState(
             icon_search_x(48, "rgba(255,255,255,0.12)"),
             "Nenhum resultado",
-            "Tente outro termo de busca",
+            "Não encontramos esse anime nas nossas fontes.\n"
+            "Solicite o anime desejado nas nossas redes sociais:",
+            social_links=[
+                (icon_instagram(16, "#E6E7EA"), "Instagram", INSTAGRAM_URL),
+                (icon_x_logo(16, "#E6E7EA"), "X", X_URL),
+            ],
         )
         self._empty_state.setVisible(False)
         self._empty_state.setMinimumHeight(300)
@@ -427,6 +441,8 @@ class SearchView(QWidget):
         for data in items:
             card = AnimeCard(data)
             card.clicked.connect(self.anime_clicked.emit)
+            card.list_toggle_clicked.connect(self.list_toggle_requested.emit)
+            card.preview_requested.connect(self.preview_requested.emit)
             self._cards.append(card)
             self._grid_layout.addWidget(card)
 
@@ -447,7 +463,23 @@ class SearchView(QWidget):
                 card.set_cover_from_path(cover_path)
                 break
 
+    def update_card_preview(
+        self, title: str, score: float | None = None, episodes: int | None = None,
+        description: str | None = None,
+    ) -> None:
+        for card in self._cards:
+            if card.data.get("title") == title:
+                card.set_preview_data(score=score, episodes=episodes, description=description)
+                break
+
+    def update_card_in_list(self, title: str, in_list: bool) -> None:
+        for card in self._cards:
+            if card.data.get("title") == title:
+                card.set_in_list(in_list)
+                break
+
     def _clear_cards(self) -> None:
+        AnimeCard.suppress_previews()
         for card in self._cards:
             card.setParent(None)
             card.deleteLater()

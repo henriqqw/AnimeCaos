@@ -63,15 +63,16 @@ class _DownloadRow(QFrame):
         play_btn.clicked.connect(lambda checked=False, e=entry: self.play_clicked.emit(e))
         row.addWidget(play_btn)
 
-        del_btn = QPushButton("\u2715")
+        del_btn = QPushButton()
+        del_btn.setIcon(QIcon(icon_trash(13, "#4B5563")))
         del_btn.setFixedSize(24, 24)
         del_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         del_btn.setToolTip("Remover")
         del_btn.setStyleSheet(
-            "QPushButton { color: #4B5563; background: transparent;"
-            " border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; font-size: 10px; }"
-            "QPushButton:hover { color: #E57373; border-color: rgba(229,115,115,0.35);"
-            " background: rgba(229,115,115,0.06); }"
+            "QPushButton { background: transparent;"
+            " border: 1px solid rgba(255,255,255,0.06); border-radius: 4px; }"
+            "QPushButton:hover { border-color: rgba(229,115,115,0.35);"
+            " background: rgba(229,115,115,0.10); }"
         )
         del_btn.clicked.connect(lambda checked=False, e=entry: self.delete_clicked.emit(e))
         row.addWidget(del_btn)

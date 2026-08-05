@@ -37,6 +37,7 @@ from animecaos.services.anilist_service import AniListService, AniListStatus
 from animecaos.services.anilist_auth_service import AniListAuthService
 from animecaos.services.config_service import ConfigService
 from animecaos.services.updater_service import UpdaterService
+from animecaos.services.watchlist_service import WatchlistService
 from animecaos.services.manga_service import MangaService
 from animecaos.services.manga_history_service import MangaHistoryEntry, MangaHistoryService
 from animecaos.services.manga_download_service import MangaDownloadService
@@ -44,7 +45,7 @@ from animecaos.services.manga_download_service import MangaDownloadService
 from animecaos.ui.gui.icons import icon_search, icon_terminal
 from animecaos.ui.gui.widgets import AnimatedStackedWidget, AnimatedButton, MiniPlayer, PlayOverlay, SidebarNav
 from animecaos.ui.gui.overlays import DownloadOverlay, UpdateDialog
-from animecaos.ui.gui.views import AccountView, AnimeDetailView, DownloadsView, HomeView, SearchView, MangaHomeView, MangaDetailView, MangaReaderView, LogView
+from animecaos.ui.gui.views import AccountView, AnimeDetailView, DownloadsView, HomeView, ListView, SearchView, MangaHomeView, MangaDetailView, MangaReaderView, LogView
 from animecaos.ui.gui.workers import FunctionWorker, DownloadWorker, MangaDownloadWorker, UpdaterCheckWorker
 
 
@@ -58,6 +59,7 @@ _VIEW_DOWNLOADS = 5
 _VIEW_MANGA_HOME = 6
 _VIEW_MANGA_DETAIL = 7
 _VIEW_MANGA_READER = 8
+_VIEW_LIST = 9
 
 
 class MainWindow(QMainWindow):
@@ -75,12 +77,14 @@ class MainWindow(QMainWindow):
         config_service: ConfigService | None = None,
         anilist_auth_service: AniListAuthService | None = None,
         preloaded_discover: dict | None = None,
+        watchlist_service: WatchlistService | None = None,
     ) -> None:
         super().__init__()
         self._anime_service = anime_service
         self._history_service = history_service
         self._anilist_service = anilist_service
         self._downloads_service = DownloadsService()
+        self._watchlist_service = watchlist_service or WatchlistService()
         self._config_service = config_service or ConfigService()
         self._anilist_auth_service = anilist_auth_service or AniListAuthService(self._config_service)
         self._thread_pool = QThreadPool.globalInstance()
@@ -100,6 +104,7 @@ class MainWindow(QMainWindow):
         self._current_episode_index = -1
         self._episode_titles: list[str] = []
         self._cover_cache: dict[str, str] = {}
+        self._metadata_fetch_started: set[str] = set()
         self._updater_service = UpdaterService()
         self._last_search_query: str = ""
         self._nav_history: list[int] = []
@@ -183,6 +188,7 @@ class MainWindow(QMainWindow):
         self._log_view = LogView()
         self._account_view = AccountView()
         self._downloads_view = DownloadsView()
+        self._list_view = ListView()
 
         self._manga_home_view = MangaHomeView()
         self._manga_detail_view = MangaDetailView()
@@ -197,6 +203,7 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._manga_home_view)    # 6
         self._stack.addWidget(self._manga_detail_view)  # 7
         self._stack.addWidget(self._manga_reader_view)  # 8
+        self._stack.addWidget(self._list_view)          # 9
 
         body.addWidget(self._stack, 1)
         root_layout.addLayout(body, 1)
@@ -312,14 +319,24 @@ class MainWindow(QMainWindow):
 
         # Home view
         self._home_view.history_clicked.connect(self._on_history_card_clicked)
+        self._home_view.list_toggle_requested.connect(self._on_card_list_toggle)
+        self._home_view.preview_requested.connect(self._on_card_preview_requested)
 
         # Search view
         self._search_view.anime_clicked.connect(self._on_anime_card_clicked)
+        self._search_view.list_toggle_requested.connect(self._on_card_list_toggle)
+        self._search_view.preview_requested.connect(self._on_card_preview_requested)
 
         # Detail view
         self._detail_view.back_clicked.connect(self._navigate_back)
         self._detail_view.play_clicked.connect(self._on_episode_play_clicked)
         self._detail_view.download_clicked.connect(self._on_episode_download_clicked)
+        self._detail_view.list_toggle_clicked.connect(self._on_detail_list_toggle_clicked)
+
+        # List view (watchlist)
+        self._list_view.anime_clicked.connect(self._on_anime_card_clicked)
+        self._list_view.remove_clicked.connect(self._on_list_remove_clicked)
+        self._list_view.preview_requested.connect(self._on_card_preview_requested)
 
         # Mini player
         self._mini_player.prev_clicked.connect(self._on_previous_clicked)
@@ -390,6 +407,7 @@ class MainWindow(QMainWindow):
         self._push_nav(_VIEW_DETAIL)
         self._prev_view = self._stack.currentIndex()
         self._detail_view.set_anime(anime_name)
+        self._detail_view.set_in_list(self._watchlist_service.is_favorited(anime_name))
         self._stack.slide_to(_VIEW_DETAIL)
         self._breadcrumb.setText(f"  >  {anime_name}")
         self._fetch_metadata(anime_name)
@@ -451,6 +469,9 @@ class MainWindow(QMainWindow):
         elif view_idx == _VIEW_DOWNLOADS:
             self._sidebar.set_active("downloads")
             self._breadcrumb.setText("  >  Downloads")
+        elif view_idx == _VIEW_LIST:
+            self._sidebar.set_active("list")
+            self._breadcrumb.setText("  >  Minha Lista")
         elif view_idx == _VIEW_MANGA_HOME:
             self._sidebar.set_active("manga")
             self._breadcrumb.setText("  >  Manga")
@@ -476,6 +497,8 @@ class MainWindow(QMainWindow):
         elif key == "search":
             self._navigate_to_search()
             self._focus_search()
+        elif key == "list":
+            self._navigate_to_list()
         elif key == "downloads":
             self._navigate_to_downloads()
         elif key == "manga":
@@ -531,7 +554,11 @@ class MainWindow(QMainWindow):
             self._search_view.set_results([], self._last_search_query)
             return
 
-        cards = [{"title": t, "cover_path": self._cover_cache.get(t)} for t in titles]
+        watchlist = set(self._watchlist_service.load_watchlist())
+        cards = [
+            {"title": t, "cover_path": self._cover_cache.get(t), "in_list": t in watchlist}
+            for t in titles
+        ]
         self._search_view.set_results(cards, self._last_search_query)
 
         self._set_status(f"{len(titles)} animes encontrados.")
@@ -558,6 +585,7 @@ class MainWindow(QMainWindow):
             # Navigate to detail WITHOUT auto-loading episodes
             # (resume_from_history loads them its own way)
             self._detail_view.set_anime(entry.anime)
+            self._detail_view.set_in_list(self._watchlist_service.is_favorited(entry.anime))
             self._push_nav(_VIEW_DETAIL)
             self._prev_view = self._stack.currentIndex()
             self._stack.slide_to(_VIEW_DETAIL)
@@ -1021,6 +1049,66 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
+    # ── WATCHLIST (Minha Lista) ──────────────────────────────────
+
+    def _navigate_to_list(self) -> None:
+        self._push_nav(_VIEW_LIST)
+        self._stack.slide_to(_VIEW_LIST)
+        self._sidebar.set_active("list")
+        self._breadcrumb.setText("  >  Minha Lista")
+        self._refresh_list_view()
+
+    def _refresh_list_view(self) -> None:
+        animes = self._watchlist_service.load_watchlist()
+        cards = [{"title": a, "cover_path": self._cover_cache.get(a)} for a in animes]
+        self._list_view.set_animes(cards)
+        for anime in animes:
+            self._fetch_card_metadata(anime)
+
+    def _on_detail_list_toggle_clicked(self) -> None:
+        anime = self._detail_view.anime_name
+        if not anime:
+            return
+        now_in_list = not self._detail_view.in_list
+        self._set_anime_in_list(anime, now_in_list)
+        self._detail_view.set_in_list(now_in_list)
+
+    def _on_list_remove_clicked(self, anime: str) -> None:
+        self._set_anime_in_list(anime, False)
+        self._refresh_list_view()
+        if self._detail_view.anime_name == anime:
+            self._detail_view.set_in_list(False)
+
+    def _on_card_list_toggle(self, data: dict) -> None:
+        anime = data.get("title", "")
+        if not anime:
+            return
+        now_in_list = not data.get("in_list", False)
+        self._set_anime_in_list(anime, now_in_list)
+        if self._detail_view.anime_name == anime:
+            self._detail_view.set_in_list(now_in_list)
+
+    def _on_card_preview_requested(self, data: dict) -> None:
+        """A card's hover panel needs its synopsis (score/episodes may
+        already be known) — fetched lazily, one card at a time as the user
+        actually hovers, rather than eagerly for everything on screen."""
+        anime = data.get("title", "")
+        if anime:
+            self._fetch_card_metadata(anime)
+
+    def _set_anime_in_list(self, anime: str, in_list: bool) -> None:
+        """Single source of truth for add/remove — persists to WatchlistService
+        and keeps every card showing this anime (home, search, list) in sync,
+        regardless of which one triggered the change."""
+        if in_list:
+            self._watchlist_service.add_anime(anime)
+            self._append_log(f"'{anime}' adicionado à lista.")
+        else:
+            self._watchlist_service.remove_anime(anime)
+            self._append_log(f"'{anime}' removido da lista.")
+        self._home_view.update_card_in_list(anime, in_list)
+        self._search_view.update_card_in_list(anime, in_list)
+
     # ── DISCOVERY SECTIONS ───────────────────────────────────────
 
     def _load_discover_sections(self) -> None:
@@ -1111,6 +1199,11 @@ class MainWindow(QMainWindow):
         trending = payload.get("trending") or []
         seasonal = payload.get("seasonal") or []
         spotlights = payload.get("spotlights") or []
+
+        watchlist = set(self._watchlist_service.load_watchlist())
+        for card in trending + seasonal:
+            card["in_list"] = card.get("title", "") in watchlist
+
         self._home_view.set_trending_cards(trending)
         self._home_view.set_seasonal_cards(seasonal)
         self._home_view.set_spotlights(spotlights)
@@ -1129,6 +1222,15 @@ class MainWindow(QMainWindow):
             cover_path = card.get("cover_path")
             if title and cover_path and os.path.exists(str(cover_path)):
                 self._cover_cache[title] = str(cover_path)
+
+        # Score/episodes already came with the discover payload. The
+        # synopsis is fetched lazily, one card at a time, only once the user
+        # actually hovers it (see AnimeCard.preview_requested /
+        # _on_card_preview_requested) — a discover screen alone can hold
+        # ~50 cards, and firing one AniList request per card up front was
+        # enough to trip AniList's per-IP rate limit (this app runs on each
+        # user's own machine, so a burst here is exactly as risky as it
+        # would be against a shared server).
 
         # Background availability filter — remove cards the scraper can't find.
         # Runs after display so UI appears immediately; unavailable cards vanish quietly.
@@ -1544,17 +1646,22 @@ class MainWindow(QMainWindow):
         if not isinstance(info, dict) or not isinstance(group_titles, list):
             return
         cover = info.get("cover_path")
-        if not cover or not os.path.exists(str(cover)):
-            return
+        has_cover = bool(cover) and os.path.exists(str(cover))
         for t in group_titles:
-            self._cover_cache[t] = str(cover)
-            self._home_view.update_card_cover(t, str(cover))
-            self._home_view.update_discover_cover(t, str(cover))
-            self._search_view.update_card_cover(t, str(cover))
+            if has_cover:
+                self._cover_cache[t] = str(cover)
+                self._home_view.update_card_cover(t, str(cover))
+                self._home_view.update_discover_cover(t, str(cover))
+                self._search_view.update_card_cover(t, str(cover))
+            self._search_view.update_card_preview(
+                t, score=info.get("score"), episodes=info.get("episodes"),
+                description=info.get("description"),
+            )
 
     def _fetch_card_metadata(self, anime: str) -> None:
-        if anime in self._cover_cache:
+        if anime in self._metadata_fetch_started:
             return
+        self._metadata_fetch_started.add(anime)
         worker = FunctionWorker(lambda a=anime: (a, self._anilist_service.fetch_anime_info(a)))
         self._metadata_workers.add(worker)
         worker.signals.succeeded.connect(self._on_card_metadata_fetched)
@@ -1574,6 +1681,20 @@ class MainWindow(QMainWindow):
             self._home_view.update_discover_cover(anime, str(cover))
             self._search_view.update_card_cover(anime, str(cover))
             self._downloads_view.update_cover(anime, str(cover))
+            self._list_view.update_cover(anime, str(cover))
+
+        self._home_view.update_card_preview(
+            anime, score=info.get("score"), episodes=info.get("episodes"),
+            description=info.get("description"),
+        )
+        self._search_view.update_card_preview(
+            anime, score=info.get("score"), episodes=info.get("episodes"),
+            description=info.get("description"),
+        )
+        self._list_view.update_card_preview(
+            anime, score=info.get("score"), episodes=info.get("episodes"),
+            description=info.get("description"),
+        )
 
     # ── MANGA ────────────────────────────────────────────────────
 

@@ -134,8 +134,12 @@ class Repository:
         episode_lists = [lst for lst in self.anime_episodes_titles.get(anime, []) if lst]
         if not episode_lists:
             return []
-        # Prefer shorter lists to reduce chance of OVA/special mismatch across sources.
-        return sorted(episode_lists, key=len)[0]
+        # Prefer the longest list. A source whose catalog for "the same"
+        # title is much shorter is far more likely to be an incomplete or
+        # season-split scrape (e.g. one season of a long-running show) than
+        # a source padding on a couple of bonus OVAs — picking the shortest
+        # one silently dropped hundreds of real episodes for long series.
+        return max(episode_lists, key=len)
 
     def is_playable(self, anime: str) -> bool:
         """Fast check (HTTP only, no Selenium): load episodes and test the first one."""

@@ -11,6 +11,7 @@ from threading import RLock
 import requests
 from bs4 import BeautifulSoup
 
+from animecaos.services import anilist_rate_limiter
 from animecaos.services.watchlist_service import _watchlist_dir
 
 log = logging.getLogger(__name__)
@@ -101,6 +102,8 @@ class AniListService:
             coverImage {
               large
             }
+            averageScore
+            episodes
           }
         }
         """
@@ -186,7 +189,7 @@ class AniListService:
     def fetch_anime_info(self, query: str) -> dict[str, str | None]:
         """Fetch cover + description for a title. Returns cached result if available."""
         if not query:
-            return {"description": None, "cover_path": None, "cover_url": None}
+            return {"description": None, "cover_path": None, "cover_url": None, "score": None, "episodes": None}
 
         clean_query = (
             query
@@ -211,6 +214,7 @@ class AniListService:
         media = None
         for search_q in queries_to_try:
             try:
+                anilist_rate_limiter.wait_for_slot()
                 response = requests.post(
                     self._url,
                     json={"query": self._query_template, "variables": {"search": search_q}},
@@ -224,7 +228,7 @@ class AniListService:
                 pass
 
         if not media:
-            return {"description": None, "cover_path": None, "cover_url": None}
+            return {"description": None, "cover_path": None, "cover_url": None, "score": None, "episodes": None}
 
         media_id = media.get("id")
         if isinstance(media_id, int):
@@ -250,6 +254,8 @@ class AniListService:
             "description": description,
             "cover_path": cover_path,
             "cover_url": cover_url if isinstance(cover_url, str) else None,
+            "score": media.get("averageScore"),
+            "episodes": media.get("episodes"),
         }
         with self._cache_lock:
             self._memory_cache[cache_key] = result
@@ -267,6 +273,7 @@ class AniListService:
         }
         """
         try:
+            anilist_rate_limiter.wait_for_slot()
             resp = requests.post(
                 self._url,
                 json={"query": gql, "variables": {"search": clean}},
@@ -313,6 +320,7 @@ class AniListService:
         }
         """
         try:
+            anilist_rate_limiter.wait_for_slot()
             resp = requests.post(
                 self._url,
                 json={"query": query, "variables": {"perPage": per_page}},
@@ -361,6 +369,7 @@ class AniListService:
         }
         """
         try:
+            anilist_rate_limiter.wait_for_slot()
             resp = requests.post(
                 self._url,
                 json={"query": query, "variables": {

@@ -28,6 +28,8 @@ class HorizontalCardScroll(QWidget):
 
     card_clicked = Signal(object)
     card_double_clicked = Signal(object)
+    list_toggle_requested = Signal(object)
+    preview_requested = Signal(object)
 
     def __init__(
         self,
@@ -97,6 +99,13 @@ class HorizontalCardScroll(QWidget):
 
         self._scroll.viewport().installEventFilter(self)
         self._container.installEventFilter(self)
+
+        # Any scroll (wheel, drag, kinetic momentum, arrow buttons) means the
+        # user is moving away from whatever card is currently hovered — its
+        # expanded preview panel is reparented onto the top-level window and
+        # won't move with the row, so it must close instead of floating in
+        # place over content it no longer corresponds to.
+        self._scroll.horizontalScrollBar().valueChanged.connect(lambda _: AnimeCard.suppress_previews())
 
         self._cards: list[AnimeCard] = []
         self._empty_state: EmptyState | None = None
@@ -210,6 +219,7 @@ class HorizontalCardScroll(QWidget):
 
 
     def set_cards(self, items: list[dict[str, Any]]) -> None:
+        AnimeCard.suppress_previews()
         for card in self._cards:
             card.setParent(None)
             card.deleteLater()
@@ -231,12 +241,15 @@ class HorizontalCardScroll(QWidget):
             card.installEventFilter(self)
             card.clicked.connect(self.card_clicked.emit)
             card.double_clicked.connect(self.card_double_clicked.emit)
+            card.list_toggle_clicked.connect(self.list_toggle_requested.emit)
+            card.preview_requested.connect(self.preview_requested.emit)
             self._cards.append(card)
             self._row_layout.addWidget(card)
 
         self._row_layout.addStretch()
 
     def set_empty(self, icon_pixmap: QPixmap | None, title: str, subtitle: str) -> None:
+        AnimeCard.suppress_previews()
         for card in self._cards:
             card.setParent(None)
             card.deleteLater()
@@ -283,4 +296,19 @@ class HorizontalCardScroll(QWidget):
         for card in self._cards:
             if card.data.get("title") == title:
                 card.set_cover_from_path(cover_path)
+                break
+
+    def update_card_preview(
+        self, title: str, score: float | None = None, episodes: int | None = None,
+        description: str | None = None,
+    ) -> None:
+        for card in self._cards:
+            if card.data.get("title") == title:
+                card.set_preview_data(score=score, episodes=episodes, description=description)
+                break
+
+    def update_card_in_list(self, title: str, in_list: bool) -> None:
+        for card in self._cards:
+            if card.data.get("title") == title:
+                card.set_in_list(in_list)
                 break

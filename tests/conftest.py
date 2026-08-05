@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import uuid
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -86,6 +87,7 @@ def main_window_factory(qapp_instance, monkeypatch, fake_anime_service, tmp_path
     from animecaos.services.anilist_service import AniListService
     from animecaos.services.anilist_auth_service import AniListAuthService
     from animecaos.services.config_service import ConfigService
+    from animecaos.services.watchlist_service import WatchlistService
     from animecaos.ui.gui import main_window as main_window_module
 
     monkeypatch.setattr(main_window_module.MainWindow, "_check_for_updates", lambda self: None)
@@ -103,6 +105,16 @@ def main_window_factory(qapp_instance, monkeypatch, fake_anime_service, tmp_path
             config_service=config_service,
             anilist_auth_service=AniListAuthService(config_service),
             preloaded_discover={},
+            # A uuid (not tmp_path.name) because WatchlistService persists to a
+            # real %APPDATA% folder outside pytest's tmp_path cleanup — using
+            # the deterministic tmp_path.name here left watchlist state leaking
+            # across separate test *runs* (same folder name every time).
+            # legacy_app_names=[] because otherwise, before this fresh test
+            # file exists, WatchlistService falls back to reading the real
+            # dev machine's actual "animecaos" watchlist.json.
+            watchlist_service=WatchlistService(
+                app_name=f"animecaos-test-{uuid.uuid4().hex}", legacy_app_names=[]
+            ),
         )
         created.append(window)
         window.show()

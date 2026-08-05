@@ -7,7 +7,7 @@ from PySide6.QtCore import QPoint, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QCursor, QFont, QIcon, QLinearGradient, QPainter, QPainterPath, QPixmap
 from PySide6.QtWidgets import QFrame, QGridLayout, QHBoxLayout, QLabel, QLayout, QPushButton, QScrollArea, QSizePolicy, QTextEdit, QVBoxLayout, QWidget
 
-from animecaos.ui.gui.icons import icon_arrow_left, icon_book, icon_clock, icon_folder, icon_loader, icon_monitor, icon_search, icon_trash, icon_user, icon_x
+from animecaos.ui.gui.icons import icon_arrow_left, icon_book, icon_bookmark, icon_clock, icon_folder, icon_loader, icon_monitor, icon_search, icon_trash, icon_user, icon_x
 from animecaos.ui.gui.widgets.animated_button import AnimatedButton
 from animecaos.ui.gui.widgets.episode_row import EpisodeRow
 from animecaos.ui.gui.widgets.anime_card import generate_dynamic_cover
@@ -64,6 +64,7 @@ class AnimeDetailView(QWidget):
     back_clicked = Signal()
     play_clicked = Signal(int)
     download_clicked = Signal(int)
+    list_toggle_clicked = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -71,6 +72,7 @@ class AnimeDetailView(QWidget):
         self._episode_count: int = 0
         self._current_episode_idx: int = -1
         self._loading_index: int = -1
+        self._in_list: bool = False
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -115,6 +117,17 @@ class AnimeDetailView(QWidget):
         self._title_label.setObjectName("ViewTitle")
         self._title_label.setWordWrap(True)
         info_layout.addWidget(self._title_label)
+
+        list_btn_row = QHBoxLayout()
+        self._list_btn = QPushButton()
+        self._list_btn.setObjectName("ListToggleButton")
+        self._list_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self._list_btn.setFixedHeight(30)
+        self._list_btn.clicked.connect(self.list_toggle_clicked.emit)
+        self._apply_list_button_style()
+        list_btn_row.addWidget(self._list_btn)
+        list_btn_row.addStretch()
+        info_layout.addLayout(list_btn_row)
 
         self._synopsis = QTextEdit()
         self._synopsis.setReadOnly(True)
@@ -192,6 +205,35 @@ class AnimeDetailView(QWidget):
         self._clear_episodes()
         self._loading_label.setVisible(True)
         self._episodes_empty.setVisible(False)
+        self.set_in_list(False)
+
+    def set_in_list(self, in_list: bool) -> None:
+        self._in_list = in_list
+        self._apply_list_button_style()
+
+    @property
+    def in_list(self) -> bool:
+        return self._in_list
+
+    def _apply_list_button_style(self) -> None:
+        if self._in_list:
+            self._list_btn.setText("  Na Lista")
+            self._list_btn.setIcon(QIcon(icon_bookmark(16, "#D44242", filled=True)))
+            self._list_btn.setStyleSheet(
+                "QPushButton#ListToggleButton { color: #D44242; background: rgba(212,66,66,0.10);"
+                " border: 1px solid rgba(212,66,66,0.35); border-radius: 6px;"
+                " font-size: 12px; font-weight: 600; padding: 0 14px; }"
+                "QPushButton#ListToggleButton:hover { background: rgba(212,66,66,0.18); }"
+            )
+        else:
+            self._list_btn.setText("  Adicionar à Lista")
+            self._list_btn.setIcon(QIcon(icon_bookmark(16, "#A7ACB5")))
+            self._list_btn.setStyleSheet(
+                "QPushButton#ListToggleButton { color: #A7ACB5; background: rgba(255,255,255,0.05);"
+                " border: 1px solid rgba(255,255,255,0.09); border-radius: 6px;"
+                " font-size: 12px; padding: 0 14px; }"
+                "QPushButton#ListToggleButton:hover { background: rgba(255,255,255,0.09); color: #F2F3F5; }"
+            )
 
     def set_metadata(self, description: str | None, cover_path: str | None) -> None:
         if description:

@@ -234,6 +234,25 @@ def icon_clock(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
     return pm
 
 
+# ── Icon: Bookmark (My List / watchlist, Crunchyroll-style ribbon) ─
+def icon_bookmark(size: int = 20, color: str = "#A7ACB5", filled: bool = False) -> QPixmap:
+    pm, p, s, c = _begin(size, color)
+    if filled:
+        p.setBrush(QColor(color))
+    path = QPainterPath()
+    path.moveTo(_s(19, s), _s(21, s))
+    path.lineTo(_s(12, s), _s(17, s))
+    path.lineTo(_s(5, s), _s(21, s))
+    path.lineTo(_s(5, s), _s(7, s))
+    path.quadTo(_s(5, s), _s(5, s), _s(7, s), _s(5, s))
+    path.lineTo(_s(17, s), _s(5, s))
+    path.quadTo(_s(19, s), _s(5, s), _s(19, s), _s(7, s))
+    path.closeSubpath()
+    p.drawPath(path)
+    p.end()
+    return pm
+
+
 # ── Icon: Star (bookmark/favorite) ───────────────────────────────
 def icon_star(size: int = 20, color: str = "#A7ACB5", filled: bool = False) -> QPixmap:
     pm, p, s, c = _begin(size, color)
@@ -389,6 +408,44 @@ def icon_trash(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
     # Inner lines: M10 11v6  M14 11v6
     p.drawLine(QPointF(_s(10, s), _s(11, s)), QPointF(_s(10, s), _s(17, s)))
     p.drawLine(QPointF(_s(14, s), _s(11, s)), QPointF(_s(14, s), _s(17, s)))
+    p.end()
+    return pm
+
+
+# ── Icon: Instagram (social link) ─────────────────────────────────
+def icon_instagram(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
+    pm, p, s, c = _begin(size, color)
+    p.drawRoundedRect(QRectF(_s(3, s), _s(3, s), _s(18, s), _s(18, s)), _s(5, s), _s(5, s))
+    p.drawEllipse(QRectF(_s(8, s), _s(8, s), _s(8, s), _s(8, s)))
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+    p.drawEllipse(QRectF(_s(16.5, s), _s(6.2, s), _s(1.6, s), _s(1.6, s)))
+    p.end()
+    return pm
+
+
+# ── Icon: X (brand mark, distinct from the generic "close" icon_x) ─
+def icon_x_logo(size: int = 20, color: str = "#A7ACB5") -> QPixmap:
+    """The X (formerly Twitter) logo — two crossing bars, not to be confused
+    with icon_x() above, which is a generic thin "close" cross."""
+    pm, p, s, c = _begin(size, color)
+    p.setPen(Qt.PenStyle.NoPen)
+    p.setBrush(c)
+
+    def _bar(x1: float, y1: float, x2: float, y2: float, width: float) -> None:
+        dx, dy = x2 - x1, y2 - y1
+        length = (dx ** 2 + dy ** 2) ** 0.5
+        nx, ny = -dy / length * width / 2, dx / length * width / 2
+        path = QPainterPath()
+        path.moveTo(_s(x1 + nx, s), _s(y1 + ny, s))
+        path.lineTo(_s(x2 + nx, s), _s(y2 + ny, s))
+        path.lineTo(_s(x2 - nx, s), _s(y2 - ny, s))
+        path.lineTo(_s(x1 - nx, s), _s(y1 - ny, s))
+        path.closeSubpath()
+        p.drawPath(path)
+
+    _bar(5, 5, 19, 19, 3.4)
+    _bar(19, 5, 5, 19, 3.4)
     p.end()
     return pm
 

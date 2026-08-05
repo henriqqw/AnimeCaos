@@ -8,6 +8,7 @@ from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
 from animecaos.ui.gui.icons import icon_clock, icon_loader
+from animecaos.ui.gui.widgets.anime_card import AnimeCard
 from animecaos.ui.gui.widgets.card_scroll import HorizontalCardScroll
 from animecaos.ui.gui.widgets.spotlight_banner import SpotlightBanner
 
@@ -128,6 +129,8 @@ class HomeView(QWidget):
     history_clicked = Signal(object)
     discover_clicked = Signal(object)
     anilist_page_requested = Signal(int)  # anilist_id
+    list_toggle_requested = Signal(object)
+    preview_requested = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -136,6 +139,10 @@ class HomeView(QWidget):
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+        # Scrolling the page moves cards out from under any shown hover-preview
+        # panel (which is reparented onto the top-level window and doesn't
+        # move with them), so it must close rather than float in place.
+        self._scroll.verticalScrollBar().valueChanged.connect(lambda _: AnimeCard.suppress_previews())
 
         # Root container — zero margins so spotlight fills edge to edge
         container = QWidget()
@@ -167,6 +174,8 @@ class HomeView(QWidget):
         # ── Em Alta ──
         self.trending_section = HorizontalCardScroll("Em Alta")
         self.trending_section.card_clicked.connect(self.discover_clicked.emit)
+        self.trending_section.list_toggle_requested.connect(self.list_toggle_requested.emit)
+        self.trending_section.preview_requested.connect(self.preview_requested.emit)
         self.trending_section.set_empty(
             icon_loader(36, "rgba(255,255,255,0.15)"),
             "Carregando...",
@@ -177,6 +186,8 @@ class HomeView(QWidget):
         # ── Continue Watching ──
         self.history_section = HorizontalCardScroll("Continue Assistindo")
         self.history_section.card_clicked.connect(self.history_clicked.emit)
+        self.history_section.list_toggle_requested.connect(self.list_toggle_requested.emit)
+        self.history_section.preview_requested.connect(self.preview_requested.emit)
         self.history_section.set_empty(
             icon_clock(36, "rgba(255,255,255,0.15)"),
             "Nenhum historico",
@@ -188,6 +199,8 @@ class HomeView(QWidget):
         self._seasonal_title = self._current_season_label()
         self.seasonal_section = HorizontalCardScroll(self._seasonal_title)
         self.seasonal_section.card_clicked.connect(self.discover_clicked.emit)
+        self.seasonal_section.list_toggle_requested.connect(self.list_toggle_requested.emit)
+        self.seasonal_section.preview_requested.connect(self.preview_requested.emit)
         self.seasonal_section.set_empty(
             icon_loader(36, "rgba(255,255,255,0.15)"),
             "Carregando...",
@@ -275,6 +288,19 @@ class HomeView(QWidget):
     def update_discover_cover(self, title: str, cover_path: str) -> None:
         self.trending_section.update_card_cover(title, cover_path)
         self.seasonal_section.update_card_cover(title, cover_path)
+
+    def update_card_preview(
+        self, title: str, score: float | None = None, episodes: int | None = None,
+        description: str | None = None,
+    ) -> None:
+        self.trending_section.update_card_preview(title, score, episodes, description)
+        self.seasonal_section.update_card_preview(title, score, episodes, description)
+        self.history_section.update_card_preview(title, score, episodes, description)
+
+    def update_card_in_list(self, title: str, in_list: bool) -> None:
+        self.trending_section.update_card_in_list(title, in_list)
+        self.seasonal_section.update_card_in_list(title, in_list)
+        self.history_section.update_card_in_list(title, in_list)
 
     def show_anilist_offline_banner(self, title: str, description: str) -> None:
         self._offline_banner.update_status(title, description)

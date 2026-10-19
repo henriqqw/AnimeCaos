@@ -11,7 +11,7 @@ import {
 } from "@testing-library/react";
 import App from "./App";
 import { api } from "./api";
-import type { Anime, Settings, SearchResult, History, Download, LocalFile } from "./types";
+import type { Anime, Settings, SearchResult, History, Download, LocalFile, Manga, Chapter, Account } from "./types";
 const events = vi.hoisted(() => new Map<string, (data: unknown) => void>());
 vi.mock("./api", () => ({
   api: {
@@ -27,9 +27,24 @@ vi.mock("./api", () => ({
     Preview: vi.fn(),
     Cancel: vi.fn(),
     Image: vi.fn(),
+    MangaSearch: vi.fn(),
+    Chapters: vi.fn(),
+    ChaptersLanguage: vi.fn(),
+    Pages: vi.fn(),
+    MangaHistory: vi.fn(),
+    SaveMangaProgress: vi.fn(),
+    DownloadManga: vi.fn(),
+    Accounts: vi.fn(),
+    MALClientSecretConfigured: vi.fn(),
+    SetMALClientSecret: vi.fn(),
+    Login: vi.fn(),
+    Logout: vi.fn(),
+    RefreshAccount: vi.fn(),
     History: vi.fn(),
     SaveHistoryCover: vi.fn(),
     Resume: vi.fn(),
+    SaveSettings: vi.fn(),
+    ClearCache: vi.fn(),
   },
   desktop: () => ({ OpenLink: vi.fn() }),
   op: () => crypto.randomUUID(),
@@ -71,6 +86,14 @@ beforeEach(() => {
   vi.mocked(api.History).mockResolvedValue([]);
   vi.mocked(api.Preview).mockResolvedValue({} as Anime);
   vi.mocked(api.Resume).mockResolvedValue();
+  vi.mocked(api.SaveSettings).mockResolvedValue();
+  vi.mocked(api.ClearCache).mockResolvedValue();
+  vi.mocked(api.Accounts).mockResolvedValue([]);
+  vi.mocked(api.MALClientSecretConfigured).mockResolvedValue(false);
+  vi.mocked(api.SetMALClientSecret).mockResolvedValue();
+  vi.mocked(api.Login).mockResolvedValue();
+  vi.mocked(api.Logout).mockResolvedValue();
+  vi.mocked(api.RefreshAccount).mockResolvedValue({ provider: "anilist", connected: true, id: 1, name: "Conta", avatar: "", animeCount: 0, episodes: 0, minutes: 0, error: "" });
   vi.mocked(api.OpenLocalFolder).mockResolvedValue();
   vi.mocked(api.PlayLocal).mockResolvedValue();
   vi.mocked(api.DeleteFile).mockResolvedValue();
@@ -81,6 +104,13 @@ beforeEach(() => {
   });
   vi.mocked(api.Cancel).mockResolvedValue();
   vi.mocked(api.Image).mockResolvedValue("");
+  vi.mocked(api.MangaSearch).mockResolvedValue([]);
+  vi.mocked(api.Chapters).mockResolvedValue([]);
+  vi.mocked(api.ChaptersLanguage).mockResolvedValue([]);
+  vi.mocked(api.Pages).mockResolvedValue([]);
+  vi.mocked(api.MangaHistory).mockResolvedValue([]);
+  vi.mocked(api.SaveMangaProgress).mockResolvedValue();
+  vi.mocked(api.DownloadManga).mockResolvedValue();
   globalThis.IntersectionObserver = class {
     observe() {}
     disconnect() {}
@@ -95,6 +125,49 @@ async function searchScreen() {
   return screen.getAllByRole("searchbox", { name: "Buscar animes" })[0];
 }
 describe("interface funcional", () => {
+  it("pesquisa, abre capítulos, lê páginas e salva o progresso do mangá", async () => {
+    const manga = { id: "manga-1", title: "One Piece", description: "A tripulação parte em uma aventura.", cover: "", status: "ongoing", languages: ["pt-br"] } as Manga;
+    const chapter = { id: "chapter-1", title: "Romance Dawn", number: "1", volume: "1", language: "pt-br", pages: 2 } as Chapter;
+    vi.mocked(api.MangaSearch).mockResolvedValue([manga]);
+    vi.mocked(api.Chapters).mockResolvedValue([chapter]);
+    vi.mocked(api.Pages).mockResolvedValue(["http://127.0.0.1/page-1", "http://127.0.0.1/page-2"]);
+    render(<App />);
+    const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
+    fireEvent.click(within(navigation).getByRole("button", { name: "Mangás" }));
+    expect(await screen.findByRole("heading", { name: "Leia mangás" })).toBeTruthy();
+    expect(api.MangaSearch).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByRole("searchbox", { name: "Título do mangá" }), { target: { value: "One Piece" } });
+    fireEvent.submit(screen.getByRole("searchbox", { name: "Título do mangá" }).closest("form")!);
+    const result = await screen.findByRole("button", { name: /One Piece/ });
+    expect(api.MangaSearch).toHaveBeenCalledWith(expect.any(String), "One Piece");
+    fireEvent.click(result);
+    expect(await screen.findByRole("heading", { name: "Capítulos" })).toBeTruthy();
+    expect(await screen.findByText(/Romance Dawn/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Ler capítulo" }));
+    expect(await screen.findByAltText("Página 1")).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Modo de leitura" })).toBeTruthy();
+    await waitFor(() => expect(api.SaveMangaProgress).toHaveBeenCalledWith(expect.objectContaining({ manga, chapter, page: 0 })));
+  });
+
+  it("mostra falha do capítulo e permite recarregar as páginas", async () => {
+    const manga = { id: "manga-retry", title: "Mangá de teste", cover: "", languages: ["pt-br"] } as Manga;
+    const chapter = { id: "chapter-retry", title: "Capítulo", number: "1", language: "pt-br", pages: 1 } as Chapter;
+    vi.mocked(api.MangaSearch).mockResolvedValue([manga]);
+    vi.mocked(api.Chapters).mockResolvedValue([chapter]);
+    vi.mocked(api.Pages).mockRejectedValueOnce(new Error("servidor de imagens indisponível")).mockResolvedValue(["http://127.0.0.1/recovered"]);
+    render(<App />);
+    const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
+    fireEvent.click(within(navigation).getByRole("button", { name: "Mangás" }));
+    fireEvent.change(screen.getByRole("searchbox", { name: "Título do mangá" }), { target: { value: "Mangá de teste" } });
+    fireEvent.submit(screen.getByRole("searchbox", { name: "Título do mangá" }).closest("form")!);
+    fireEvent.click(await screen.findByRole("button", { name: /Mangá de teste/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Ler capítulo" }));
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(await screen.findByAltText("Página 1")).toBeTruthy();
+    expect(api.Pages).toHaveBeenCalledTimes(2);
+  });
+
   it("continua pelo identificador salvo sem escolher episódio por posição", async () => {
     vi.mocked(api.History).mockResolvedValue([{anime:{id:"anime",provider:"animefire",title:"Continuar teste"},episode:{id:"episode",season:2,number:3},position:120,updated:1,needsResolve:false}] as History[]);
     render(<App />);
@@ -118,7 +191,7 @@ describe("interface funcional", () => {
     vi.mocked(api.History).mockResolvedValue([{anime:{id:"old-cover",provider:"legacy",title:"Bleach"},episode:{},position:0,updated:0,needsResolve:true}] as History[]);
     vi.mocked(api.Preview).mockResolvedValue({ cover: "https://images.example/bleach.jpg" } as Anime);
     const { container } = render(<App />);
-    await waitFor(() => expect(api.Preview).toHaveBeenCalledWith(expect.any(String), "Bleach"));
+    await waitFor(() => expect(api.Preview).toHaveBeenCalledWith(expect.any(String), "Bleach", 0));
     await waitFor(() => expect(container.querySelector(".continue-shelf .card img")).toBeTruthy());
     await waitFor(() => expect(api.SaveHistoryCover).toHaveBeenCalledWith("legacy:old-cover", "https://images.example/bleach.jpg"));
   });
@@ -132,7 +205,7 @@ describe("interface funcional", () => {
       disconnect() {}
     } as unknown as typeof IntersectionObserver;
     render(<App />);
-    await waitFor(() => expect(api.Preview).toHaveBeenCalledWith(expect.any(String), "Anime legado"));
+    await waitFor(() => expect(api.Preview).toHaveBeenCalledWith(expect.any(String), "Anime legado", 0));
     await waitFor(() => expect(api.SaveHistoryCover).toHaveBeenCalledWith("legacy:stale-cover", "https://images.example/recovered.jpg"));
   });
   it("mostra o histórico como uma estante de capas com ações compactas", async () => {
@@ -267,6 +340,8 @@ describe("interface funcional", () => {
       audio: "",
       status: "",
       score: 0,
+      year: 0,
+      format: "",
       episodeCount: 0,
       anilistId: 0,
       malId: 0,
@@ -314,7 +389,7 @@ describe("interface funcional", () => {
   });
   it("exibe o lote da busca de uma vez, após receber a qualidade confirmada", async () => {
     const result = {
-      id: "verified", provider: "animefire", title: "Verificado", titles: [], variants: [], url: "", cover: "", banner: "", description: "", audio: "", status: "", score: 0, episodeCount: 12, anilistId: 0, malId: 0, season: 0,
+      id: "verified", provider: "animefire", title: "Verificado", titles: [], variants: [], url: "", cover: "", banner: "", description: "", audio: "", status: "", score: 0, year: 2011, format: "TV", episodeCount: 148, anilistId: 11061, malId: 0, season: 0,
     } satisfies Anime;
     let finishSearch!: (result: SearchResult) => void;
     vi.mocked(api.Search).mockImplementation(() => new Promise((resolve) => { finishSearch = resolve; }));
@@ -328,7 +403,23 @@ describe("interface funcional", () => {
     await act(async () => finishSearch({ items: [{ ...result, availability: { maxHeight: 1080, quality: "Até 1080p", sourcesVerified: ["animefire", "onlinecc"], sampleEpisode: "E1" } }], page: 1, hasNext: false, warnings: [] }));
     expect(await screen.findByText("Verificado")).toBeTruthy();
     expect(screen.getByText("Até 1080p")).toBeTruthy();
+    expect(screen.getByText("2011 · 148 eps.")).toBeTruthy();
     expect(document.querySelector(".quality-badge")?.getAttribute("title")).toContain("2 fonte(s) validada(s)");
+  });
+  it("busca a prévia pelo ID canônico para manter os episódios da adaptação correta", async () => {
+    const anime = {
+      id: "hunter-2011", provider: "animesonlinecc", title: "Hunter x Hunter", titles: [], variants: [], url: "", cover: "", banner: "", description: "", audio: "", status: "", score: 8.9, year: 2011, format: "TV", episodeCount: 148, anilistId: 11061, malId: 0, season: 0,
+    } satisfies Anime;
+    vi.mocked(api.Search).mockResolvedValue({ items: [anime], page: 1, hasNext: false, warnings: [] });
+    vi.mocked(api.Preview).mockResolvedValue({ title: anime.title, score: 8.9, episodeCount: 148 } as Anime);
+    render(<App />);
+    const input = await searchScreen();
+    fireEvent.change(input, { target: { value: "hunter" } });
+    fireEvent.submit(input.closest("form")!);
+    const title = await screen.findByText("Hunter x Hunter", { selector: ".card-title" });
+    fireEvent.mouseEnter(title.closest("article")!);
+    await waitFor(() => expect(api.Preview).toHaveBeenCalledWith(expect.any(String), "Hunter x Hunter", 11061));
+    expect((await screen.findByRole("tooltip")).textContent).toContain("148 episódios");
   });
   it("mostra tema persistido e oferece escolha claro, escuro ou sistema", async () => {
     render(<App />);
@@ -336,9 +427,50 @@ describe("interface funcional", () => {
     const main = await screen.findByRole("main");
     expect(main.closest(".app")?.getAttribute("data-theme")).toBe("system");
     fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
-    expect(screen.getByLabelText("Aparência")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Aparência" })).toBeTruthy();
+    const theme = screen.getByLabelText("Tema");
+    expect(theme).toBeTruthy();
     expect(screen.getByRole("option", { name: "Claro" })).toBeTruthy();
     expect(screen.getByRole("option", { name: "Escuro" })).toBeTruthy();
+    const saveButton = screen.getByRole("button", { name: "Salvar alterações" }) as HTMLButtonElement;
+    expect(saveButton.disabled).toBe(true);
+    fireEvent.change(theme, { target: { value: "dark" } });
+    expect(screen.getByRole("status").textContent).toBe("Alterações pendentes");
+    fireEvent.click(saveButton);
+    await waitFor(() => expect(api.SaveSettings).toHaveBeenCalledWith({ ...settings, theme: "dark" }));
+    expect((await screen.findByRole("status")).textContent).toBe("Tudo salvo");
+  });
+  it("identifica AniList e MyAnimeList e conecta a conta pela tela de integrações", async () => {
+    const disconnected = [
+      { provider: "anilist", connected: false, id: 0, name: "", avatar: "", animeCount: 0, episodes: 0, minutes: 0, error: "" },
+      { provider: "mal", connected: false, id: 0, name: "", avatar: "", animeCount: 0, episodes: 0, minutes: 0, error: "" },
+    ] satisfies Account[];
+    const connected = [
+      { ...disconnected[0], connected: true, id: 42, name: "Perfil AniList", animeCount: 12, episodes: 76 },
+      disconnected[1],
+    ] satisfies Account[];
+    vi.mocked(api.Accounts).mockResolvedValueOnce(disconnected).mockResolvedValueOnce(connected);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
+
+    const anilistLogo = await screen.findByRole("img", { name: "AniList logo" });
+    expect(anilistLogo.getAttribute("src")).toBe("/anilist.ico");
+    expect(screen.getByRole("img", { name: "MyAnimeList logo" }).getAttribute("src")).toBe("/myanimelist.ico");
+    expect(screen.getByText(/pelo menos 80%/)).toBeTruthy();
+    const clientSecret = screen.getByLabelText("MyAnimeList Client Secret (opcional)");
+    expect(clientSecret.getAttribute("type")).toBe("password");
+    fireEvent.change(clientSecret, { target: { value: "test-client-secret" } });
+    fireEvent.click(screen.getByRole("button", { name: "Salvar segredo" }));
+    await screen.findByText("Client Secret salvo neste computador.");
+    expect(api.SetMALClientSecret).toHaveBeenCalledWith("test-client-secret");
+    expect((clientSecret as HTMLInputElement).value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Conectar AniList" }));
+
+    await screen.findByText("Perfil AniList");
+    expect(api.Login).toHaveBeenCalledWith("login", "anilist");
+    expect(screen.getByText(/76 episódios/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Conectar MyAnimeList" }));
+    await waitFor(() => expect(api.Login).toHaveBeenLastCalledWith("login", "mal"));
   });
   it("oculta domínios das fontes em mensagens comuns", async () => {
     vi.mocked(api.Search).mockRejectedValue(new Error("GET https://api.animefire.one/animes/pesquisar falhou"));

@@ -301,6 +301,33 @@ func TestSearchExpandedIgnoresAmbiguousAniListSynonym(t *testing.T) {
 	}
 }
 
+func TestSearchCardsReceiveOnlyTheirExactCanonicalDisplayMetadata(t *testing.T) {
+	old := domain.Anime{Title: "HUNTER×HUNTER", PrimaryTitles: []string{"HUNTER×HUNTER", "Hunter x Hunter"}, AniListID: 136, Year: 1999, Format: "TV", EpisodeCount: 62}
+	newer := domain.Anime{Title: "HUNTER×HUNTER (2011)", PrimaryTitles: []string{"HUNTER×HUNTER (2011)", "Hunter x Hunter 2011"}, AniListID: 11061, Year: 2011, Format: "TV", EpisodeCount: 148}
+	provider := &fixtureProvider{name: "animesonlinecc", items: map[string][]domain.Anime{
+		"hunter": {
+			{ID: "old", Provider: "animesonlinecc", Title: "Hunter x Hunter"},
+			{ID: "new", Provider: "animesonlinecc", Title: "Hunter x Hunter 2011"},
+		},
+	}}
+	result, err := (&Catalog{Providers: []domain.AnimeProvider{provider}}).SearchExpanded(context.Background(), "hunter", 1, []domain.Anime{old, newer})
+	if err != nil {
+		t.Fatal(err)
+	}
+	byID := make(map[int]domain.Anime, len(result.Items))
+	for _, item := range result.Items {
+		if item.AniListID > 0 {
+			byID[item.AniListID] = item
+		}
+	}
+	if got := byID[136]; got.Year != 1999 || got.EpisodeCount != 62 {
+		t.Errorf("1999 card lost or received incorrect metadata: %+v", got)
+	}
+	if got := byID[11061]; got.Year != 2011 || got.EpisodeCount != 148 {
+		t.Errorf("2011 card lost or received incorrect metadata: %+v", got)
+	}
+}
+
 func TestSearchExpandedSpreadsQueryBudgetAcrossAniListResults(t *testing.T) {
 	matches := []domain.Anime{
 		{Title: "Hunter"},

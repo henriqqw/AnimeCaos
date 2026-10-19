@@ -1,8 +1,31 @@
 # Revisão técnica — AnimeCaos
 
-Data: 18/10/2026. Escopo desta etapa: backend Go, interface React/TypeScript, busca com disponibilidade, scraping/MPV, fila de downloads e legado Python mantido como referência. `wails dev` foi executado para reiniciar o app após as mudanças; não houve build de distribuição nem empacotamento. A árvore antiga está preservada em `../Legacy/`.
+Data: 19/10/2026. Escopo desta etapa: janela desktop Windows, geometria persistida, bandeja do sistema, backend Go, interface React/TypeScript, integrações de conta, busca com disponibilidade, scraping/MPV, fila de downloads e legado Python mantido como referência. `wails dev` foi executado para abrir o app; não houve build de distribuição nem empacotamento. A árvore antiga está preservada em `../Legacy/`.
 
 ## Achados corrigidos nesta etapa
+
+### [P2] Encerramento curto podia marcar episódio como assistido na sincronização — corrigido
+
+- **Evidência:** `internal/player/player.go` definia `Watched` depois de 30 s de processo ativo, sem considerar duração ou posição do vídeo. `syncWatched` então gravava o número inteiro do episódio no AniList/MAL.
+- **Impacto:** fechar um episódio logo no início podia avançar a lista externa como se ele tivesse sido assistido.
+- **Correção:** só EOF natural ou posição de pelo menos 80% de duração conhecida produz estado `Watched`; sem duração, parar manualmente não sincroniza.
+- **Cobertura:** `TestEpisodeWatchedRequiresEOFOrEightyPercent`, `TestSyncUpdatesMALListAtWatchThreshold`, `TestSyncMarksAniListCompleteOnlyAtFinalEpisode` e teste DOM das ações AniList/MAL.
+- **Limite:** autenticação e escrita em conta externa real não foram feitas nesta execução.
+
+### [P1] Leitor de mangá podia ficar sem resposta quando a fonte de páginas falhava — corrigido
+
+- **Evidência:** a busca MangaDex vazia era disparada ao abrir a página; falha em `Pages` deixava o leitor sem um estado final visível, sem retry e sem navegação de capítulo. A interface não oferecia modo de página única, RTL/LTR ou indicação do grupo de tradução.
+- **Impacto:** a pesquisa podia aparecer vazia sem ação do usuário e um erro de atribuição MangaDex@Home parecia uma tela eternamente carregando, impedindo iniciar/retomar a leitura.
+- **Correção:** busca passou a ser sob demanda; o leitor mostra erro recuperável e pede nova atribuição ao repetir, valida listas `data`/`data-saver`, persiste progresso com debounce e oferece modos/controles de leitura e navegação de capítulo. O parser conserva crédito de grupos quando presente no feed.
+- **Cobertura:** fluxo DOM de busca → capítulo → página, erro/retry, fixture de grupo e página apenas `data-saver`; live MangaDex de One Piece leu/baixou 53 páginas para CBZ.
+- **Limite:** não houve inspeção gráfica da janela Wails nesta execução; a superfície de automação de tela não iniciou. Retomada de capítulo CBZ segue coberta apenas pelo contrato existente, não por jornada visual manual.
+
+### [P1] Janela iniciava fora da tela após minimizar — corrigido
+
+- **Evidência:** a janela Wails permanecia com processo responsivo e título `AnimeCaos`, mas seu retângulo era `-32000,-32000`, coordenada de janela minimizada no Windows. O `OnBeforeClose` persistia essa posição e o próximo início reaplicava como posição normal; por isso havia miniatura na barra, mas nenhuma janela visível.
+- **Impacto:** o usuário não conseguia reabrir o app clicando no ícone da barra de tarefas, apesar de o processo continuar ativo.
+- **Correção:** a restauração enumera as áreas úteis de todos os monitores e reaplica uma posição apenas quando uma parte utilizável da barra de título está visível. Caso contrário, centraliza. O fechamento pelo X oculta na bandeja; o menu oferece abrir, minimizar, ocultar e sair. O app não grava geometria enquanto minimizado ou fora dos monitores.
+- **Limite:** a bandeja está implementada nesta etapa apenas no Windows; Linux e macOS mantêm o ciclo de janela nativo.
 
 ### [P1] Alias genérico escondia adaptação reproduzível no catálogo — corrigido
 
@@ -137,6 +160,13 @@ Esse trecho registra o estado de código. Não é uma inspeção visual de um ex
 
 ## Achados pendentes
 
+### [P2] Client Secret e tokens OAuth ficam sem criptografia em repouso — confirmado
+
+- **Evidência:** `internal/store/store.go` serializa valores do bucket `auth` como JSON na base SQLite `state.db`. O Client Secret local do MAL e os tokens AniList/MAL não usam DPAPI/Keychain/libsecret nem criptografia de aplicação.
+- **Impacto:** alguém com acesso ao perfil/diretório de dados do usuário pode ler credenciais persistidas e reutilizar tokens ainda válidos.
+- **Mitigação atual:** o segredo MAL não é embutido no executável nem devolvido à interface; o usuário pode removê-lo em Configurações, e credenciais não devem aparecer em logs.
+- **Encaminhamento:** avaliar armazenamento protegido pelo sistema operacional por plataforma, incluindo migração de tokens já persistidos e fallback explícito. Não tratar as permissões do diretório como criptografia.
+
 ### [P2] Teste da home verifica navegação de busca, mas não o ciclo de resultados reais — parcialmente coberto
 
 - **Evidência:** o teste de interface cobre o ID canônico e o início automático da consulta; ainda não cobre card resultante, temporadas expostas em detalhe e retorno ao resultado após voltar.
@@ -187,6 +217,15 @@ As seguintes observações foram registradas numa rodada anterior e servem como 
 
 - As fontes responderam a consultas de Demon Slayer, Frieren, Solo Leveling, Jujutsu Kaisen e One Piece; contagens/agrupamentos variaram entre provedores.
 - O parser/resolvedor secundário retornou 404 para algumas páginas de episódio, e pesquisa por “Demon Slayer” chegou a apresentar Berserk sem referência canônica; a busca por alias expandido e filtro fraco foram adicionados em resposta.
-- Login MyAnimeList foi adiado pelo usuário após erro `invalid_client` na troca de token; não marcar autenticação como validada.
+- Login em conta real AniList/MyAnimeList ainda não foi executado. O fluxo MAL chegou à página de login, mas a troca do código falso retornou `invalid_client` sem Client Secret; a interface agora permite configurar o segredo sem expô-lo ao frontend. Consulte o registro de integrações de 19/10/2026 em `docs/TESTING.md`.
 
 Consulte `docs/TESTING.md` para os comandos opt-in. Atualize esta seção somente depois de rodar de novo e registrar o dia, ambiente e resultado real.
+
+### Integrações de conta — validação local em 19/10/2026
+
+- `go test ./... -count=1` — passou em todos os pacotes.
+- `cd frontend; npm exec -- tsc --noEmit` — passou.
+- `cd frontend; npm test -- --run` — primeira execução 26/27 por falha intermitente no teste de setas do destaque; repetição completa passou em 27/27 e o teste isolado de setas também passou.
+- `go env CGO_ENABLED` — retornou `0`; `go test -race ./...` não foi executado porque CGO está desabilitado.
+- `git diff --check` — passou; Git emitiu somente avisos de normalização LF/CRLF nos arquivos modificados.
+- As mutations do AniList e as operações MAL usam fixtures locais; nenhuma conta real foi autorizada ou alterada nesta rodada.

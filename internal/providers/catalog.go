@@ -145,6 +145,7 @@ func (c *Catalog) SearchExpanded(ctx context.Context, q string, page int, matche
 				continue
 			}
 			item.AniListID, item.MALID = exactCanonical(item, matches)
+			applyCanonicalDisplayMetadata(&item, matches)
 			if item.Titles == nil {
 				item.Titles = []string{}
 			}
@@ -188,6 +189,34 @@ func (c *Catalog) SearchExpanded(ctx context.Context, q string, page int, matche
 	out.Items = mergeSearchResults(out.Items)
 	sortSearchItems(out.Items)
 	return out, nil
+}
+
+// applyCanonicalDisplayMetadata only copies descriptive fields after the
+// provider title has an unambiguous canonical AniList identity. This keeps
+// search cards useful without making one metadata request per result or
+// assigning a remake's year/count to an ambiguous title.
+func applyCanonicalDisplayMetadata(item *domain.Anime, matches []domain.Anime) {
+	if item == nil || item.AniListID <= 0 {
+		return
+	}
+	for _, match := range matches {
+		if match.AniListID != item.AniListID {
+			continue
+		}
+		if match.Year > 0 {
+			item.Year = match.Year
+		}
+		if match.Format != "" {
+			item.Format = match.Format
+		}
+		if match.EpisodeCount > 0 {
+			item.EpisodeCount = match.EpisodeCount
+		}
+		if match.Score > 0 {
+			item.Score = match.Score
+		}
+		return
+	}
 }
 
 func (c *Catalog) searchProvider(ctx context.Context, provider domain.AnimeProvider, query string, page int) (domain.SearchResult, error) {

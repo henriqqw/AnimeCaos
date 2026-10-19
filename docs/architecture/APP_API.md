@@ -11,12 +11,12 @@ As assinaturas exatas de tipos estão em `frontend/src/api.ts`; os DTOs e tags J
 | Grupo | Métodos expostos |
 |---|---|
 | Inicialização e operação | `Initial() → {settings, version, accounts}`, `Settings() → Settings`, `SaveSettings(Settings)`, `Diagnose() → Diagnosis`, `Cancel(operationID)`, `ClearCache()` |
-| Catálogo | `Search(operationID, query, page, preferred?) → SearchResult`, `Discover(operationID) → Discovery`, `Details(operationID, Anime) → Detail`, `Preview(operationID, title) → Anime`, `Image(source) → data URL`, `SaveHistoryCover(key, cover)` |
+| Catálogo | `Search(operationID, query, page, preferred?) → SearchResult`, `Discover(operationID) → Discovery`, `Details(operationID, Anime) → Detail`, `Preview(operationID, title, preferredAniListID) → Anime`, `Image(source) → data URL`, `SaveHistoryCover(key, cover)` |
 | Biblioteca e histórico | `Library() → Anime[]`, `Favorite(Anime, enabled)`, `History() → History[]`, `RemoveHistory(key)`, `Resume(operationID, key)` |
 | Reprodução | `Play(operationID, Anime, Episode[], index, resume)`, `PlayerCommand(command, value)`, `Adjacent(delta)`, `PlayLocal(path)`, `OfflinePages(path) → string[]` |
 | Downloads e arquivos | `Enqueue(Anime, Episode[]) → Download[]`, `Downloads() → Download[]`, `CancelDownload(id)`, `LocalFiles() → LocalFile[]`, `DeleteFile(path)`, `OpenDownloads()`, `OpenLocalFolder(path)` (abre a pasta do arquivo após validar que ele está dentro da biblioteca) |
 | Mangá | `MangaSearch(operationID, query) → Manga[]`, `Chapters(operationID, mangaID) → Chapter[]`, `ChaptersLanguage(operationID, mangaID, language) → Chapter[]`, `Pages(operationID, chapterID) → string[]`, `MangaHistory() → MangaProgress[]`, `SaveMangaProgress(MangaProgress)`, `DownloadManga(operationID, Manga, Chapter[])` |
-| Contas | `Accounts() → Account[]`, `Login(operationID, provider)`, `Logout(provider)`, `RefreshAccount(operationID, provider) → Account` |
+| Contas | `Accounts() → Account[]`, `MALClientSecretConfigured() → bool`, `SetMALClientSecret(secret)`, `Login(operationID, provider)`, `Logout(provider)`, `RefreshAccount(operationID, provider) → Account` |
 | Atualização | `CheckUpdate(operationID) → Update`, `DownloadUpdate(operationID, Update) → path`, `InstallUpdate(path)` |
 
 Métodos que recebem `operationID` permitem ao frontend cancelar uma chamada ou substituir uma operação antiga. O serviço aplica timeouts próprios; consulte `internal/app/service.go` para valores e mudanças de implementação.

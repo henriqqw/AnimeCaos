@@ -20,6 +20,8 @@ wails dev
 
 `wails.json` configura o watcher e servidor frontend. Abrir a URL do Vite diretamente não fornece os bindings `window.go`; a página informa que deve ser aberta pelo aplicativo AnimeCaos.
 
+No Windows, o app mantém um ícone na área de notificação. Fechar pelo X oculta a janela; use o menu do ícone para abrir/minimizar/ocultar a janela ou escolher `Sair` para encerrar o processo. O ícone pode estar dentro do menu de ícones ocultos do Windows. Ao iniciar, uma posição salva fora dos monitores conectados é ignorada e a janela é centralizada.
+
 ## CLI
 
 O entry point é `cmd/animecaos`. O binário distribuído chama-se `animecaos-cli`. Comandos aceitos: `interactive`, `doctor`, `search`, `details`, `play`, `download`, `history`, `list`, `files`, `manga`, `chapters`, `accounts`, `login` e `update`.

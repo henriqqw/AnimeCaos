@@ -68,7 +68,7 @@ func (m *Metadata) Query(ctx context.Context, q string, vars any, token string, 
 	return json.Unmarshal(r.Data, out)
 }
 
-const mediaFields = `id idMal title { romaji english native } synonyms description coverImage { extraLarge large } bannerImage averageScore episodes format duration`
+const mediaFields = `id idMal title { romaji english native } synonyms description coverImage { extraLarge large } bannerImage averageScore episodes format duration startDate { year }`
 
 type aniMedia struct {
 	ID    int `json:"id"`
@@ -84,9 +84,13 @@ type aniMedia struct {
 		Extra string `json:"extraLarge"`
 		Large string `json:"large"`
 	} `json:"coverImage"`
-	Banner   string  `json:"bannerImage"`
-	Score    float64 `json:"averageScore"`
-	Episodes int     `json:"episodes"`
+	Banner    string  `json:"bannerImage"`
+	Score     float64 `json:"averageScore"`
+	Episodes  int     `json:"episodes"`
+	Format    string  `json:"format"`
+	StartDate struct {
+		Year int `json:"year"`
+	} `json:"startDate"`
 }
 
 var tags = regexp.MustCompile(`<[^>]*>`)
@@ -102,7 +106,7 @@ func (a aniMedia) model() domain.Anime {
 	}
 	primaryTitles := uniqueTitles(a.Title.Romaji, a.Title.English, a.Title.Native)
 	titles := uniqueTitles(append(append([]string{}, primaryTitles...), a.Synonyms...)...)
-	return domain.Anime{ID: strconv.Itoa(a.ID), Provider: "anilist", Title: title, Titles: titles, PrimaryTitles: primaryTitles, Cover: cover, Banner: a.Banner, Description: html.UnescapeString(tags.ReplaceAllString(a.Description, "")), Score: a.Score / 10, EpisodeCount: a.Episodes, AniListID: a.ID, MALID: a.MAL, URL: "https://anilist.co/anime/" + strconv.Itoa(a.ID)}
+	return domain.Anime{ID: strconv.Itoa(a.ID), Provider: "anilist", Title: title, Titles: titles, PrimaryTitles: primaryTitles, Cover: cover, Banner: a.Banner, Description: html.UnescapeString(tags.ReplaceAllString(a.Description, "")), Score: a.Score / 10, Year: a.StartDate.Year, Format: a.Format, EpisodeCount: a.Episodes, AniListID: a.ID, MALID: a.MAL, URL: "https://anilist.co/anime/" + strconv.Itoa(a.ID)}
 }
 
 func uniqueTitles(values ...string) []string {
@@ -231,7 +235,7 @@ func (m *Metadata) TitleMatchesBatch(ctx context.Context, queries []string) (map
 
 func titleMatchesCacheKey(query string) string {
 	hash := sha256.Sum256([]byte(strings.ToLower(strings.TrimSpace(query))))
-	return "title-matches:" + hex.EncodeToString(hash[:])
+	return "title-matches:v2:" + hex.EncodeToString(hash[:])
 }
 
 type Discovery struct {

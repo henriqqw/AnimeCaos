@@ -193,3 +193,46 @@ func TestTitleMatchesBatchUsesOneRequestAndCachesQueries(t *testing.T) {
 		t.Fatalf("cached lookup made another request: %d", requests.Load())
 	}
 }
+
+func TestAniMediaModelMapsYearFormatAndEpisodes(t *testing.T) {
+	var media aniMedia
+	if err := json.Unmarshal([]byte(`{"id":11061,"idMal":11061,"title":{"romaji":"HUNTER×HUNTER (2011)"},"averageScore":85,"episodes":148,"format":"TV","startDate":{"year":2011}}`), &media); err != nil {
+		t.Fatal(err)
+	}
+	anime := media.model()
+	if anime.Year != 2011 || anime.Format != "TV" || anime.EpisodeCount != 148 || anime.Score != 8.5 {
+		t.Fatalf("AniList display metadata was not mapped: %+v", anime)
+	}
+}
+
+func TestTitleMatchesPreferredIDKeepsAdaptationIdentity(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Query     string         `json:"query"`
+			Variables map[string]int `json:"variables"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Error(err)
+		}
+		if request.Variables["id"] != 11061 || !strings.Contains(request.Query, "Media(id:$id") {
+			t.Errorf("preferred ID was not used in the metadata query: %+v", request)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": map[string]any{"Media": map[string]any{
+			"id": 11061, "title": map[string]string{"romaji": "HUNTER×HUNTER (2011)"},
+			"episodes": 148, "format": "TV", "startDate": map[string]int{"year": 2011},
+		}}})
+	}))
+	defer server.Close()
+	m := NewMetadata(netx.New(), nil)
+	m.URL = server.URL
+	m.Gate.Interval = 0
+	defer m.Close()
+
+	matches, err := m.TitleMatches(context.Background(), "Hunter x Hunter", 11061)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(matches) != 1 || matches[0].AniListID != 11061 || matches[0].Year != 2011 || matches[0].EpisodeCount != 148 {
+		t.Fatalf("preferred adaptation metadata was not returned: %+v", matches)
+	}
+}

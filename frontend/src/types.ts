@@ -11,6 +11,8 @@ export type Anime = {
   audio: string;
   status: string;
   score: number;
+  year: number;
+  format: string;
   episodeCount: number;
   anilistId: number;
   malId: number;
@@ -111,6 +113,7 @@ export type Chapter = {
   volume: string;
   language: string;
   pages: number;
+  group?: string;
 };
 export type MangaProgress = {
   manga: Manga;

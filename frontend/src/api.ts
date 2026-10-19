@@ -29,7 +29,7 @@ export interface API {
     id: string,
   ): Promise<{ trending: Anime[]; seasonal: Anime[]; warning: string }>;
   Details(id: string, a: Anime): Promise<Detail>;
-  Preview(id: string, title: string): Promise<Anime>;
+  Preview(id: string, title: string, preferredAniListID: number): Promise<Anime>;
   Library(): Promise<Anime[]>;
   Favorite(a: Anime, enabled: boolean): Promise<void>;
   History(): Promise<History[]>;
@@ -61,6 +61,8 @@ export interface API {
   SaveMangaProgress(p: MangaProgress): Promise<void>;
   DownloadManga(id: string, m: Manga, ch: Chapter[]): Promise<void>;
   Accounts(): Promise<Account[]>;
+  MALClientSecretConfigured(): Promise<boolean>;
+  SetMALClientSecret(secret: string): Promise<void>;
   Login(id: string, provider: string): Promise<void>;
   Logout(provider: string): Promise<void>;
   RefreshAccount(id: string, provider: string): Promise<Account>;

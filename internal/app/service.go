@@ -391,9 +391,21 @@ func (s *Service) Details(id string, a domain.Anime) (domain.Detail, error) {
 	defer end()
 	return s.catalog.Details(ctx, a)
 }
-func (s *Service) Preview(id, title string) (domain.Anime, error) {
+func (s *Service) Preview(id, title string, preferredAniListID int) (domain.Anime, error) {
 	ctx, end := s.operation(id, 30*time.Second)
 	defer end()
+	if preferredAniListID > 0 {
+		matches, err := s.metadata.TitleMatches(ctx, title, preferredAniListID)
+		if err != nil {
+			return domain.Anime{}, err
+		}
+		if len(matches) == 0 {
+			return domain.Anime{}, fmt.Errorf("metadados do anime não encontrados")
+		}
+		anime := matches[0]
+		anime.Description = s.metadata.Translate(ctx, anime.Description)
+		return anime, nil
+	}
 	var lastErr error
 	var lastAnime domain.Anime
 	for _, query := range previewTitleCandidates(title) {
@@ -1146,6 +1158,10 @@ func (s *Service) DownloadManga(id string, m domain.Manga, chapters []domain.Cha
 	return nil
 }
 func (s *Service) Accounts() []integrations.Account { return s.accounts.Profiles() }
+func (s *Service) MALClientSecretConfigured() bool  { return s.accounts.MALClientSecretConfigured() }
+func (s *Service) SetMALClientSecret(secret string) error {
+	return s.accounts.SetMALClientSecret(secret)
+}
 func (s *Service) Login(id, provider string) error {
 	ctx, end := s.operation(id, 2*time.Minute)
 	defer end()

@@ -24,6 +24,7 @@ type Route = {
   anime?: Anime;
   manga?: Manga;
   chapter?: Chapter;
+  chapters?: Chapter[];
   pages?: string[];
   page?: number;
 };
@@ -58,6 +59,7 @@ const navPaths: Record<string, string> = {
   downloads: "M12 3v12m-5-5 5 5 5-5M4 19v2h16v-2",
   manga: "M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5v-13ZM4 16h16M8 6h8m-8 3h8",
   settings: "M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.7 2.9-.2-.1a1.7 1.7 0 0 0-1.9.2l-.2.1h-3.4l-.1-.2a1.7 1.7 0 0 0-1.7-1l-.2.1-2.9-1.7.1-.2a1.7 1.7 0 0 0-.2-1.9l-.1-.2v-3.4l.2-.1a1.7 1.7 0 0 0 1-1.7l-.1-.2 1.7-2.9.2.1a1.7 1.7 0 0 0 1.9-.2l.2-.1h3.4l.1.2a1.7 1.7 0 0 0 1.7 1l.2-.1 2.9 1.7-.1.2a1.7 1.7 0 0 0 .2 1.9l.1.2v3.4l-.2.1",
+  arrow: "M5 12h14m-7-7 7 7-7 7",
 };
 function NavIcon({ name }: { name: string }) {
   return <svg className="nav-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={navPaths[name] || navPaths.home} /></svg>;
@@ -214,8 +216,7 @@ export default function App() {
   if (!settings)
     return (
       <main className="boot" data-theme={localStorage.getItem("animecaos-theme") || "system"} aria-busy="true">
-        <img src="/animecaos-icon.png" alt="" className="boot-logo" />
-        <h1>AnimeCaos</h1>
+        <img src="/animecaos-wordmark.png" alt="AnimeCaos" className="boot-logo" />
         <small>v{version}</small>
         <p>{error || "Abrindo sua biblioteca…"}</p>
       </main>
@@ -230,7 +231,11 @@ export default function App() {
       }}
     >
       <aside>
-        <div className="brand"><img src="/animecaos-icon.png" alt="" /><h1>AnimeCaos</h1><SidebarToggle collapsed={sidebarCollapsed} onClick={toggleSidebar} /></div>
+        <div className="brand">
+          <img src="/animecaos-wordmark.png" alt="AnimeCaos" className="brand-wordmark" />
+          <img src="/animecaos-icon.png" alt="" className="brand-icon" />
+          <SidebarToggle collapsed={sidebarCollapsed} onClick={toggleSidebar} />
+        </div>
         <small>v{version}</small>
         <nav aria-label="Navegação principal">
           {Object.entries(names).filter(([id]) => id !== "accounts" && id !== "logs").map(([id, label]) => (
@@ -367,15 +372,24 @@ export default function App() {
           {route.name === "chapters" && route.manga && (
             <ChaptersView
               manga={route.manga}
-              open={(c) =>
-                navigate({ name: "reader", manga: route.manga, chapter: c })
+              open={(c, chapters) =>
+                navigate({ name: "reader", manga: route.manga, chapter: c, chapters })
               }
               report={report}
               showQueue={() => setPanel(true)}
             />
           )}
-          {route.name === "reader" && <Reader route={route} report={report} />}
-          {route.name === "accounts" && <AccountsView report={report} />}
+          {route.name === "reader" && (
+            <Reader
+              route={route}
+              report={report}
+              back={back}
+              changeChapter={(chapter, chapters) =>
+                setRoute({ name: "reader", manga: route.manga, chapter, chapters })
+              }
+            />
+          )}
+          {route.name === "accounts" && <AccountsView />}
           {route.name === "settings" && (
             <SettingsView
               settings={settings}
@@ -629,7 +643,7 @@ function Card({ a, open, subtitle, action, onImageFailure, showAvailability = fa
       const id = op();
       request.current = id;
       api
-        .Preview(id, a.title)
+        .Preview(id, a.title, a.anilistId || 0)
         .then((v) => {
           if (request.current === id) {
             positionPreview();
@@ -663,6 +677,10 @@ function Card({ a, open, subtitle, action, onImageFailure, showAvailability = fa
           </span>}
         </span>
         <strong className="card-title" title={a.title}>{a.title}</strong>
+        {showAvailability && (a.year > 0 || a.episodeCount > 0 || a.format === "MOVIE") && <small className="card-meta">{[
+          a.year > 0 ? a.year : "",
+          a.format === "MOVIE" ? "Filme" : a.episodeCount > 0 ? `${a.episodeCount} eps.` : "",
+        ].filter(Boolean).join(" · ")}</small>}
         {subtitle && <small className="card-subtitle">{subtitle}</small>}
       </button>
       {action && <div className="card-actions">{action}</div>}
@@ -1138,8 +1156,8 @@ function HistoryView({
   variant?: "list" | "shelf";
 }) {
   const [h, setH] = useState<History[]>(), [resuming, setResuming] = useState(""), [page, setPage] = useState(1), [recoveredCovers, setRecoveredCovers] = useState<Record<string, string>>({}), [failedCovers, setFailedCovers] = useState<Record<string, boolean>>({});
-  const recoverCover = (title: string, historyKey: string, request = op()) => {
-    api.Preview(request, title).then((metadata) => {
+  const recoverCover = (title: string, historyKey: string, request = op(), preferredAniListID = 0) => {
+    api.Preview(request, title, preferredAniListID).then((metadata) => {
       if (!metadata.cover) return;
       setRecoveredCovers((covers) => ({ ...covers, [historyKey]: metadata.cover }));
       setFailedCovers((current) => ({ ...current, [historyKey]: false }));
@@ -1163,7 +1181,7 @@ function HistoryView({
       .filter((x) => !x.anime.cover && x.anime.provider !== "local")
       .map((x) => {
         const id = op();
-        return recoverCover(x.anime.title, key(x.anime), id);
+        return recoverCover(x.anime.title, key(x.anime), id, x.anime.anilistId || 0);
       });
     return () => requests.forEach((id) => api.Cancel(id));
   }, [h, variant, limit, currentPage]);
@@ -1184,7 +1202,7 @@ function HistoryView({
               subtitle={x.needsResolve ? "Histórico antigo" : `T${x.episode.season} · Ep. ${x.episode.number} · ${time(x.position)}`}
               onImageFailure={() => {
                 setFailedCovers((current) => ({ ...current, [id]: true }));
-                if (x.anime.provider !== "local" && !recoveredCovers[id]) recoverCover(x.anime.title, id);
+                if (x.anime.provider !== "local" && !recoveredCovers[id]) recoverCover(x.anime.title, id, undefined, x.anime.anilistId || 0);
               }}
               action={!x.needsResolve ? <>
                 <button className="continue-action" disabled={resuming !== ""} onClick={async () => {
@@ -1226,7 +1244,7 @@ function HistoryView({
               <button className="history-poster" aria-label={`Abrir ${x.anime.title}`} onClick={() => x.needsResolve ? (search || open)(anime) : open(anime)}>
                 {anime.cover && !failedCovers[id] ? <Image src={anime.cover} alt="" loading="lazy" onLoadFailure={() => {
                   setFailedCovers((current) => ({ ...current, [id]: true }));
-                  if (x.anime.provider !== "local" && !recoveredCovers[id]) recoverCover(x.anime.title, id);
+                  if (x.anime.provider !== "local" && !recoveredCovers[id]) recoverCover(x.anime.title, id, undefined, x.anime.anilistId || 0);
                 }} /> : <span className="history-poster-placeholder">AC</span>}
               </button>
               <div className="history-card-copy">
@@ -1418,6 +1436,20 @@ function DownloadsView({
     </>
   );
 }
+function MangaCover({ manga, className = "" }: { manga: Manga; className?: string }) {
+  const [failed, setFailed] = useState(!manga.cover);
+  return failed ? (
+    <span className={`manga-cover-placeholder ${className}`} aria-hidden="true">
+      {manga.title.slice(0, 1).toLocaleUpperCase() || "漫"}
+    </span>
+  ) : (
+    <Image className={className} src={manga.cover} alt={`Capa de ${manga.title}`} loading="lazy" onLoadFailure={() => setFailed(true)} />
+  );
+}
+
+const mangaStatus = (status: string) =>
+  ({ ongoing: "Em publicação", completed: "Concluído", hiatus: "Em pausa", cancelled: "Cancelado" }[status] || status || "Status não informado");
+
 function MangaView({
   open,
   resume,
@@ -1430,70 +1462,85 @@ function MangaView({
   const [q, setQ] = useState(""),
     [items, setItems] = useState<Manga[]>([]),
     [history, setHistory] = useState<MangaProgress[]>([]),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [searched, setSearched] = useState(false),
+    [searchError, setSearchError] = useState("");
   const id = useRef("");
-  const search = async () => {
-    if (id.current) api.Cancel(id.current);
+  useEffect(() => {
+    let active = true;
+    api.MangaHistory().then((entries) => { if (active) setHistory(entries); }).catch(report);
+    return () => {
+      active = false;
+      if (id.current) void api.Cancel(id.current).catch(() => {});
+    };
+  }, []);
+  const search = async (value = q) => {
+    const query = value.trim();
+    if (id.current) void api.Cancel(id.current).catch(() => {});
+    if (!query) {
+      setItems([]);
+      setSearched(false);
+      setSearchError("Digite o título do mangá para pesquisar.");
+      return;
+    }
     id.current = op();
     const current = id.current;
     setBusy(true);
+    setSearched(true);
+    setSearchError("");
+    setItems([]);
     try {
-      const r = await api.MangaSearch(current, q);
-      if (current === id.current) setItems(r);
+      const result = await api.MangaSearch(current, query);
+      if (current === id.current) setItems(result);
     } catch (e) {
-      report(e);
+      if (current === id.current) setSearchError(message(e));
     } finally {
       if (current === id.current) setBusy(false);
     }
   };
-  useEffect(() => {
-    search();
-    api.MangaHistory().then(setHistory).catch(report);
-    return () => {
-      api.Cancel(id.current);
-    };
-  }, []);
   return (
-    <>
-      <form
-        className="search"
-        onSubmit={(e) => {
-          e.preventDefault();
-          search();
-        }}
-      >
-        <input
-          type="search"
-          aria-label="Título do mangá"
-          placeholder="Pesquisar no MangaDex"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <button>Pesquisar</button>
+    <section className="manga-library" aria-label="Biblioteca de mangás">
+      <div className="manga-library-intro"><h1>Leia mangás</h1><p>Encontre uma obra, escolha o idioma e continue de onde parou.</p></div>
+      <form className="search manga-search" role="search" onSubmit={(e) => { e.preventDefault(); void search(); }}>
+        <input type="search" aria-label="Título do mangá" placeholder="Buscar por título" value={q} onChange={(e) => setQ(e.target.value)} />
+        <button type="submit" disabled={busy || !q.trim()}>Pesquisar</button>
       </form>
       {history.length > 0 && (
-        <>
-          <h3>Continuar lendo</h3>
-          {history.map((p) => (
-            <button key={p.manga.id} onClick={() => resume(p)}>
-              {p.manga.title} · Cap. {p.chapter.number || p.chapter.title} ·
-              Pág. {p.page + 1}
-            </button>
-          ))}
-        </>
+        <section className="manga-history" aria-label="Continuar lendo">
+          <div className="manga-section-heading"><div><h2>Continue lendo</h2><small>Seu progresso fica salvo neste dispositivo</small></div></div>
+          <div className="manga-history-grid">
+            {history.slice().sort((a, b) => b.updated - a.updated).map((progress) => (
+              <article className="manga-history-card" key={progress.manga.id}>
+                <button type="button" className="manga-history-open" onClick={() => resume(progress)}>
+                  <MangaCover manga={progress.manga} />
+                  <span className="manga-history-copy"><strong>{progress.manga.title}</strong><small>Cap. {progress.chapter.number || progress.chapter.title || "—"}</small><small>Página {progress.page + 1}</small></span>
+                </button>
+                <button type="button" className="manga-resume-button" onClick={() => resume(progress)}>Continuar lendo</button>
+              </article>
+            ))}
+          </div>
+        </section>
       )}
-      {busy && <Busy cancel={() => api.Cancel(id.current)} />}
-      <div className="cards">
-        {items.map((m) => (
-          <button className="card" key={m.id} onClick={() => open(m)}>
-            <Image src={m.cover} alt="" loading="lazy" />
-            <strong>{m.title}</strong>
-            <small>{m.status}</small>
-          </button>
-        ))}
-      </div>
-      {!busy && !items.length && <Empty>Nenhum mangá encontrado.</Empty>}
-    </>
+      {busy && <div className="manga-status" role="status" aria-live="polite"><span className="search-loading-spinner" />Buscando no catálogo…</div>}
+      {searchError && <div className="manga-inline-error" role="alert"><span>{searchError}</span>{q.trim() && <button type="button" onClick={() => void search()}>Tentar novamente</button>}</div>}
+      {!busy && searched && !searchError && items.length === 0 && <Empty>Nenhum mangá encontrado. Tente buscar pelo título original.</Empty>}
+      {items.length > 0 && (
+        <section className="manga-results-section" aria-label="Resultados de mangá">
+          <div className="manga-section-heading"><div><h2>Resultados</h2><small>{items.length} {items.length === 1 ? "obra" : "obras"}</small></div></div>
+          <div className="manga-results">
+            {items.map((manga) => (
+              <button type="button" className="manga-result-card" key={manga.id} onClick={() => open(manga)}>
+                <MangaCover manga={manga} />
+                <span className="manga-result-copy"><strong>{manga.title}</strong><small>{mangaStatus(manga.status)}</small>{manga.languages?.length > 0 && <small>{manga.languages.slice(0, 3).join(" · ")}</small>}</span>
+                <span className="manga-card-action">Ver capítulos <NavIcon name="arrow" /></span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      {!searched && history.length === 0 && !busy && <div className="manga-welcome"><span className="manga-welcome-icon"><NavIcon name="manga" /></span><strong>Sua próxima leitura começa aqui</strong><p>Pesquise por uma obra para ver os capítulos disponíveis.</p></div>}
+      <footer className="manga-credit">Catálogo e leitura fornecidos pelo <button type="button" onClick={() => desktop().OpenLink("https://mangadex.org")}>MangaDex</button>.</footer>
+    </section>
   );
 }
 function ChaptersView({
@@ -1503,252 +1550,388 @@ function ChaptersView({
   showQueue,
 }: {
   manga: Manga;
-  open: (c: Chapter) => void;
+  open: (c: Chapter, chapters: Chapter[]) => void;
   report: (e: unknown) => void;
   showQueue: () => void;
 }) {
-  const [chapters, setChapters] = useState<Chapter[]>(),
+  const [chapters, setChapters] = useState<Chapter[] | null>(null),
     [language, setLanguage] = useState(""),
     [chapterError, setChapterError] = useState(""),
-    [selected, setSelected] = useState(new Set<string>());
+    [selected, setSelected] = useState(new Set<string>()),
+    [descending, setDescending] = useState(false),
+    [retry, setRetry] = useState(0),
+    [downloading, setDownloading] = useState(false);
   useEffect(() => {
     const id = op();
     let active = true;
-    setChapters(undefined);
+    setChapters(null);
     setChapterError("");
     setSelected(new Set());
     const request = language ? api.ChaptersLanguage(id, manga.id, language) : api.Chapters(id, manga.id);
     request.then((items) => { if (active) setChapters(items); }).catch((e) => {
-      if (active) { setChapterError(String(e)); setChapters([]); }
+      if (active) { setChapterError(message(e)); setChapters([]); }
     });
     return () => {
       active = false;
-      api.Cancel(id);
+      void api.Cancel(id).catch(() => {});
     };
-  }, [manga.id, language]);
-  const filtered = chapters || [];
-  const download = (list: Chapter[]) => {
-    showQueue();
-    api.DownloadManga(op(), manga, list).catch(report);
+  }, [manga.id, language, retry]);
+  const ordered = (chapters || []).slice();
+  if (descending) ordered.reverse();
+  const allSelected = ordered.length > 0 && ordered.every((chapter) => selected.has(chapter.id));
+  const download = async (list: Chapter[]) => {
+    setDownloading(true);
+    try {
+      await api.DownloadManga(op(), manga, list);
+      showQueue();
+    } catch (e) { report(e); }
+    finally { setDownloading(false); }
   };
   return (
-    <>
-      <p>{manga.description}</p>
-      <div className="toolbar">
-        <label>
-          Idioma{" "}
-          <select
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-          >
-            <option value="">Automático (preferir português)</option>
-            {[...new Set([...(manga.languages || []), "pt-br", "en", "es-la", "es"])].sort().map((l) => (
-              <option key={l}>{l}</option>
-            ))}
-          </select>
-        </label>
-        <button onClick={() => setSelected(new Set(filtered.map((c) => c.id)))}>
-          Selecionar todos
-        </button>
-        <button
-          disabled={!selected.size}
-          onClick={() => download(filtered.filter((c) => selected.has(c.id)))}
-        >
-          Baixar selecionados
-        </button>
-      </div>
-      {!chapters && <Busy />}
-      {chapterError && <Empty>{chapterError}</Empty>}
-      {chapters?.length === 0 && !chapterError && (
-        <Empty>Sem capítulos disponíveis neste idioma.</Empty>
-      )}
-      {filtered.map((c) => (
-        <div className="row" key={c.id}>
-          <input
-            type="checkbox"
-            aria-label={`Selecionar capítulo ${c.number}`}
-            checked={selected.has(c.id)}
-            onChange={(e) =>
-              setSelected((v) => {
-                const n = new Set(v);
-                e.target.checked ? n.add(c.id) : n.delete(c.id);
-                return n;
-              })
-            }
-          />
-          <span>
-            Vol. {c.volume || "—"} · Cap. {c.number} {c.title} · {c.language}
-          </span>
-          <button onClick={() => open(c)}>Ler</button>
-          <button onClick={() => download([c])}>Baixar CBZ</button>
+    <section className="manga-chapters" aria-label={`Capítulos de ${manga.title}`}>
+      <header className="manga-detail-head">
+        <MangaCover manga={manga} />
+        <div><span className="manga-eyebrow">MANGÁ</span><h1>{manga.title}</h1><p>{manga.description || "Sinopse não disponível."}</p><small>{mangaStatus(manga.status)}</small></div>
+      </header>
+      <section className="manga-chapter-panel" aria-label="Lista de capítulos">
+        <div className="manga-chapter-heading"><div><h2>Capítulos</h2><small>{chapters === null ? "Carregando catálogo…" : `${ordered.length} disponíveis`}</small></div></div>
+        <div className="manga-chapter-toolbar">
+          <label>Idioma
+            <select aria-label="Idioma dos capítulos" value={language} onChange={(e) => setLanguage(e.target.value)}>
+              <option value="">Automático · preferir português</option>
+              {[...new Set([...(manga.languages || []), "pt-br", "en", "es-la", "es"])].sort().map((code) => <option key={code} value={code}>{code.toLocaleUpperCase()}</option>)}
+            </select>
+          </label>
+          <button type="button" onClick={() => setDescending((value) => !value)}>{descending ? "Mais antigos primeiro" : "Mais recentes primeiro"}</button>
+          <button type="button" disabled={!ordered.length} onClick={() => setSelected(allSelected ? new Set() : new Set(ordered.map((chapter) => chapter.id)))}>{allSelected ? "Limpar seleção" : "Selecionar todos"}</button>
+          <button type="button" className="manga-download-selected" disabled={!selected.size || downloading} onClick={() => void download(ordered.filter((chapter) => selected.has(chapter.id)))}>{downloading ? "Enfileirando…" : `Baixar selecionados${selected.size ? ` (${selected.size})` : ""}`}</button>
         </div>
-      ))}
-    </>
+        {chapters === null && <Busy />}
+        {chapterError && <div className="manga-inline-error" role="alert"><span>Não foi possível carregar os capítulos: {chapterError}</span><button type="button" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</button></div>}
+        {chapters?.length === 0 && !chapterError && <Empty>Não há capítulos disponíveis neste idioma. Tente outra tradução.</Empty>}
+        {ordered.length > 0 && <div className="manga-chapter-list">
+          {ordered.map((chapter, index) => (
+            <article className="manga-chapter-row" key={chapter.id}>
+              <label className="manga-chapter-check"><input type="checkbox" aria-label={`Selecionar capítulo ${chapter.number || index + 1}`} checked={selected.has(chapter.id)} onChange={(e) => setSelected((current) => { const next = new Set(current); e.target.checked ? next.add(chapter.id) : next.delete(chapter.id); return next; })} /></label>
+              <div className="manga-chapter-copy"><strong>{chapter.number ? `Capítulo ${chapter.number}` : chapter.title || `Capítulo ${index + 1}`}</strong><small>{[chapter.volume && `Volume ${chapter.volume}`, chapter.title, chapter.language?.toUpperCase(), chapter.pages && `${chapter.pages} páginas`, chapter.group && `Grupo: ${chapter.group}`].filter(Boolean).join(" · ")}</small></div>
+              <div className="manga-chapter-actions"><button type="button" className="manga-read-button" onClick={() => open(chapter, ordered)}>Ler capítulo</button><button type="button" onClick={() => void download([chapter])}>Baixar CBZ</button></div>
+            </article>
+          ))}
+        </div>}
+      </section>
+    </section>
   );
 }
 function Reader({
   route,
   report,
+  back,
+  changeChapter,
 }: {
   route: Route;
   report: (e: unknown) => void;
+  back: () => void;
+  changeChapter: (chapter: Chapter, chapters: Chapter[]) => void;
 }) {
-  const [pages, setPages] = useState<string[]>(route.pages || []),
-    [page, setPage] = useState(route.page || 0);
-  const container = useRef<HTMLDivElement>(null);
+  const [pages, setPages] = useState<string[]>([]),
+    [page, setPage] = useState(Math.max(0, route.page || 0)),
+    [loading, setLoading] = useState(!!route.chapter),
+    [loadError, setLoadError] = useState(""),
+    [retry, setRetry] = useState(0),
+    [failedPages, setFailedPages] = useState(new Set<number>()),
+    [chapterOptions, setChapterOptions] = useState(route.chapters || []),
+    [mode, setMode] = useState<"vertical" | "paged">(() => localStorage.getItem("animecaos-manga-reader-mode") === "paged" ? "paged" : "vertical"),
+    [direction, setDirection] = useState<"rtl" | "ltr">(() => localStorage.getItem("animecaos-manga-reader-direction") === "ltr" ? "ltr" : "rtl");
+  const container = useRef<HTMLDivElement>(null),
+    progressRef = useRef<MangaProgress | null>(null),
+    chapterID = route.chapter?.id || "";
+  const scrollToPage = (index: number, behavior: ScrollBehavior = "auto") => {
+    const element = container.current?.querySelector(`[data-page="${index}"]`) as HTMLElement | null;
+    if (element && typeof element.scrollIntoView === "function") element.scrollIntoView({ behavior, block: "start" });
+  };
   useEffect(() => {
-    if (!route.chapter) return;
+    let active = true;
+    if (!chapterID) {
+      setPages(route.pages || []);
+      setLoading(false);
+      setLoadError("");
+      setPage(Math.min(route.page || 0, Math.max(0, (route.pages || []).length - 1)));
+      return () => { active = false; };
+    }
     const id = op();
-    api.Pages(id, route.chapter.id).then(setPages).catch(report);
+    setLoading(true);
+    setLoadError("");
+    setPages([]);
+    setFailedPages(new Set());
+    setPage(Math.max(0, route.page || 0));
+    api.Pages(id, chapterID).then((result) => {
+      if (!active) return;
+      if (!result.length) throw new Error("O capítulo não retornou páginas.");
+      setPages(result);
+      setPage(Math.min(route.page || 0, result.length - 1));
+      setLoading(false);
+    }).catch((e) => {
+      if (active) { setLoadError(message(e)); setPages([]); setLoading(false); }
+    });
     return () => {
-      api.Cancel(id);
+      active = false;
+      void api.Cancel(id).catch(() => {});
     };
-  }, []);
+  }, [chapterID, retry]);
   useEffect(() => {
-    if (!pages.length) return;
-    const el = container.current?.querySelector(
-      `[data-page="${route.page || 0}"]`,
-    );
-    el?.scrollIntoView();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting)
-            setPage(Number((e.target as HTMLElement).dataset.page));
-        }
-      },
-      { threshold: 0.25 },
-    );
-    container.current
-      ?.querySelectorAll("[data-page]")
-      .forEach((e) => observer.observe(e));
+    if (!route.manga || !route.chapter || route.chapters?.length) {
+      setChapterOptions(route.chapters || []);
+      return;
+    }
+    const id = op();
+    let active = true;
+    const request = route.chapter.language ? api.ChaptersLanguage(id, route.manga.id, route.chapter.language) : api.Chapters(id, route.manga.id);
+    request.then((result) => { if (active) setChapterOptions(result); }).catch(() => {});
+    return () => { active = false; void api.Cancel(id).catch(() => {}); };
+  }, [route.manga?.id, route.chapter?.language, route.chapters]);
+  useEffect(() => {
+    if (!pages.length || mode === "paged") return;
+    const target = Math.min(page, pages.length - 1);
+    scrollToPage(target);
+  }, [pages, mode]);
+  useEffect(() => {
+    if (!pages.length || mode !== "vertical") return;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting).sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (visible) setPage(Number((visible.target as HTMLElement).dataset.page));
+    }, { threshold: [0.25, 0.55, 0.8] });
+    container.current?.querySelectorAll("[data-page]").forEach((element) => observer.observe(element));
     return () => observer.disconnect();
-  }, [pages]);
+  }, [pages, mode]);
+  const currentProgress: MangaProgress | null = route.manga && route.chapter && pages.length ? { manga: route.manga, chapter: route.chapter, page, updated: 0 } : null;
   useEffect(() => {
-    if (!route.manga || !route.chapter) return;
-    const t = setTimeout(
-      () =>
-        api
-          .SaveMangaProgress({
-            manga: route.manga!,
-            chapter: route.chapter!,
-            page,
-            updated: 0,
-          })
-          .catch(report),
-      500,
-    );
-    return () => clearTimeout(t);
-  }, [page]);
+    progressRef.current = currentProgress;
+    if (!currentProgress) return;
+    const timer = window.setTimeout(() => api.SaveMangaProgress(currentProgress).catch(report), 350);
+    return () => window.clearTimeout(timer);
+  }, [route.manga?.id, chapterID, page, pages.length]);
+  useEffect(() => () => {
+    if (progressRef.current) void api.SaveMangaProgress(progressRef.current).catch(() => {});
+  }, []);
+  const movePage = (delta: number) => {
+    const next = Math.max(0, Math.min(pages.length - 1, page + delta));
+    if (next === page) return;
+    setPage(next);
+    if (mode === "vertical") scrollToPage(next, "smooth");
+  };
+  useEffect(() => {
+    if (mode !== "paged") return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && ["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(target.tagName)) return;
+      if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        event.preventDefault();
+        const forward = direction === "rtl" ? event.key === "ArrowLeft" : event.key === "ArrowRight";
+        movePage(forward ? 1 : -1);
+      } else if (event.key === "PageDown" || event.key === " ") {
+        event.preventDefault(); movePage(1);
+      } else if (event.key === "PageUp") {
+        event.preventDefault(); movePage(-1);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mode, direction, page, pages.length]);
+  const currentChapterIndex = route.chapter ? chapterOptions.findIndex((chapter) => chapter.id === route.chapter?.id) : -1;
+  const previousChapter = currentChapterIndex > 0 ? chapterOptions[currentChapterIndex - 1] : undefined;
+  const nextChapter = currentChapterIndex >= 0 ? chapterOptions[currentChapterIndex + 1] : undefined;
+  const visiblePages = mode === "paged" ? pages.slice(page, page + 1) : pages;
+  const reloadChapter = () => { setLoadError(""); setFailedPages(new Set()); setRetry((value) => value + 1); };
   return (
-    <div className="reader" ref={container}>
-      <div className="reader-tools">
-        Página {page + 1} / {pages.length || "…"}{" "}
-        <select
-          aria-label="Ir à página"
-          value={page}
-          onChange={(e) =>
-            container.current
-              ?.querySelector(`[data-page="${e.target.value}"]`)
-              ?.scrollIntoView()
-          }
-        >
-          {pages.map((_, i) => (
-            <option key={i} value={i}>
-              {i + 1}
-            </option>
-          ))}
-        </select>
+    <section className="manga-reader" aria-label="Leitor de mangá">
+      <div className="reader-topbar">
+        <button type="button" className="reader-back" onClick={back}>← <span>Capítulos</span></button>
+        <div className="reader-title"><strong>{route.manga?.title || "Leitura offline"}</strong><small>{route.chapter ? `Cap. ${route.chapter.number || route.chapter.title || "—"}${route.chapter.language ? ` · ${route.chapter.language.toUpperCase()}` : ""}` : "Arquivo local"}</small></div>
+        <div className="reader-chapter-nav"><button type="button" aria-label="Capítulo anterior" title="Capítulo anterior" disabled={!previousChapter} onClick={() => previousChapter && changeChapter(previousChapter, chapterOptions)}>‹</button><button type="button" aria-label="Próximo capítulo" title="Próximo capítulo" disabled={!nextChapter} onClick={() => nextChapter && changeChapter(nextChapter, chapterOptions)}>›</button></div>
       </div>
-      {!pages.length && <Busy />}
-      {pages.map((url, i) => (
-        <div key={url} data-page={i} className="manga-page">
-          <img
-            src={url}
-            alt={`Página ${i + 1}`}
-            loading={
-              i < 2 || Math.abs(i - (route.page || 0)) < 2 ? "eager" : "lazy"
-            }
-            onError={(e) => {
-              e.currentTarget.alt = `Página ${i + 1} indisponível. Reabra o capítulo para atualizar as URLs.`;
-            }}
-          />
-        </div>
-      ))}
-    </div>
+      <div className="reader-tools">
+        <button type="button" aria-label="Página anterior" title="Página anterior" disabled={!pages.length || page <= 0} onClick={() => movePage(-1)}>‹</button>
+        <label className="reader-page-select">Página <select aria-label="Ir para página" disabled={!pages.length} value={pages.length ? Math.min(page, pages.length - 1) : 0} onChange={(event) => { const next = Number(event.target.value); setPage(next); scrollToPage(next, "smooth"); }}>{pages.map((_, index) => <option key={index} value={index}>{index + 1}</option>)}</select><span>de {pages.length || "—"}</span></label>
+        <button type="button" aria-label="Próxima página" title="Próxima página" disabled={!pages.length || page >= pages.length - 1} onClick={() => movePage(1)}>›</button>
+        <label className="reader-mode-select">Leitura <select aria-label="Modo de leitura" value={mode} onChange={(event) => { const value = event.target.value as "vertical" | "paged"; setMode(value); localStorage.setItem("animecaos-manga-reader-mode", value); }}><option value="vertical">Rolagem contínua</option><option value="paged">Uma página por vez</option></select></label>
+        {mode === "paged" && <label className="reader-direction-select">Ordem <select aria-label="Direção de leitura" value={direction} onChange={(event) => { const value = event.target.value as "rtl" | "ltr"; setDirection(value); localStorage.setItem("animecaos-manga-reader-direction", value); }}><option value="rtl">Direita para esquerda</option><option value="ltr">Esquerda para direita</option></select></label>}
+      </div>
+      {loading && <div className="reader-state" role="status"><Busy /><span>Carregando páginas do capítulo…</span></div>}
+      {!loading && loadError && <div className="reader-state reader-error" role="alert"><strong>Não foi possível abrir este capítulo.</strong><span>{loadError}</span><button type="button" onClick={reloadChapter}>Tentar novamente</button></div>}
+      {!loading && !loadError && pages.length === 0 && <Empty>Este arquivo não contém páginas para exibir.</Empty>}
+      {!!pages.length && <div className={`reader-pages reader-${mode}`} ref={container}>
+        {visiblePages.map((url, visibleIndex) => {
+          const index = mode === "paged" ? page : visibleIndex;
+          return <article key={`${chapterID}:${url}`} id={`manga-page-${index + 1}`} data-page={index} className="manga-page">
+            {failedPages.has(index) ? <div className="reader-page-error" role="alert"><strong>Página {index + 1} indisponível</strong><span>O servidor de imagens não respondeu. Recarregue o capítulo para buscar uma nova rota.</span><button type="button" onClick={reloadChapter}>Recarregar capítulo</button></div> : <img src={url} alt={`Página ${index + 1}`} loading={mode === "paged" || index < 2 || Math.abs(index - page) < 2 ? "eager" : "lazy"} decoding="async" onError={() => setFailedPages((current) => new Set(current).add(index))} onLoad={() => setFailedPages((current) => { if (!current.has(index)) return current; const next = new Set(current); next.delete(index); return next; })} />}
+          </article>;
+        })}
+      </div>}
+      {!!pages.length && <div className="reader-bottom-nav"><button type="button" disabled={!previousChapter} onClick={() => previousChapter && changeChapter(previousChapter, chapterOptions)}>← Capítulo anterior</button><span>{page + 1} / {pages.length}</span><button type="button" disabled={!nextChapter} onClick={() => nextChapter && changeChapter(nextChapter, chapterOptions)}>Próximo capítulo →</button></div>}
+    </section>
   );
 }
-function AccountsView({ report }: { report: (e: unknown) => void }) {
+function AccountsPanel({ compact = false }: { compact?: boolean }) {
   const [accounts, setAccounts] = useState<Account[]>([]),
-    [busy, setBusy] = useState("");
-  const load = () => api.Accounts().then(setAccounts).catch(report);
-  useEffect(() => {
-    load();
-    const t = setInterval(() => {
-      api
-        .Accounts()
-        .then((xs) =>
-          xs
-            .filter((x) => x.connected)
-            .forEach((x) =>
-              api.RefreshAccount(op(), x.provider).then(load).catch(report),
-            ),
-        );
-    }, 300000);
-    return () => clearInterval(t);
-  }, []);
-  const login = async (p: string) => {
-    setBusy(p);
+    [busy, setBusy] = useState(""),
+    [loginInProgress, setLoginInProgress] = useState(false),
+    [accountsLoaded, setAccountsLoaded] = useState(false),
+    [error, setError] = useState("");
+  const load = async () => {
     try {
-      await api.Login("login", p);
+      setAccounts(await api.Accounts());
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAccountsLoaded(true);
+    }
+  };
+  useEffect(() => { void load(); }, []);
+  const connect = async (provider: string) => {
+    setBusy(provider);
+    setLoginInProgress(true);
+    setError("");
+    try {
+      await api.Login("login", provider);
       await load();
     } catch (e) {
-      report(e);
+      setError(e instanceof Error ? e.message : String(e));
+      try { setAccounts(await api.Accounts()); } catch { /* keep the login error visible */ }
+    } finally {
+      setBusy("");
+      setLoginInProgress(false);
+    }
+  };
+  const refresh = async (provider: string) => {
+    setBusy(provider);
+    setError("");
+    try {
+      const updated = await api.RefreshAccount(op(), provider);
+      setAccounts((current) => current.map((account) => account.provider === provider ? updated : account));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setBusy("");
     }
   };
+  const disconnect = async (provider: string) => {
+    setBusy(provider);
+    setError("");
+    try {
+      await api.Logout(provider);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  };
+  const providers = [
+    { id: "anilist", name: "AniList", icon: "/anilist.ico", description: "Sincronize seu progresso com o AniList." },
+    { id: "mal", name: "MyAnimeList", icon: "/myanimelist.ico", description: "Sincronize seu progresso com o MyAnimeList." },
+  ];
   return (
-    <>
-      {accounts.map((a) => (
-        <article className="account" key={a.provider}>
-          <h3>{a.provider === "mal" ? "MyAnimeList" : "AniList"}</h3>
-          {a.avatar && <Image src={a.avatar} alt="" />}
-          {a.connected ? (
-            <>
-              <h4>{a.name || "Conta conectada"}</h4>
-              <p>
-                {a.animeCount} animes · {a.episodes} episódios ·{" "}
-                {Math.round(a.minutes / 60)} horas
-              </p>
-              <button
-                onClick={() =>
-                  api.RefreshAccount(op(), a.provider).then(load).catch(report)
-                }
-              >
-                Atualizar perfil
-              </button>
-              <button
-                onClick={() => api.Logout(a.provider).then(load).catch(report)}
-              >
-                Sair da conta
-              </button>
-            </>
-          ) : (
-            <button disabled={!!busy} onClick={() => login(a.provider)}>
-              Entrar pelo navegador
-            </button>
-          )}
-        </article>
-      ))}
-      {busy && <Busy cancel={() => api.Cancel("login")} />}
-      <p>
-        O login abre o navegador do sistema. Autorize o AnimeCaos e aguarde o
-        retorno ao aplicativo.
-      </p>
-    </>
+    <div className={`account-connections${compact ? " account-connections-compact" : ""}`}>
+      <div className="account-provider-grid">
+        {providers.map((provider) => {
+          const account = accounts.find((item) => item.provider === provider.id);
+          const connected = !!account?.connected;
+          return (
+            <article className="account-provider" key={provider.id} aria-busy={busy === provider.id}>
+              <header className="account-provider-heading">
+                <img className="account-provider-icon" src={provider.icon} alt={`${provider.name} logo`} />
+                <div className="account-provider-brand">
+                  <h3>{provider.name}</h3>
+                  <p>{connected ? account?.name || "Conta conectada" : provider.description}</p>
+                </div>
+                <span className={`account-provider-status${connected ? " is-connected" : ""}`}>
+                  {!accountsLoaded ? "Verificando…" : connected ? "Conectada" : "Desconectada"}
+                </span>
+              </header>
+              {connected ? (
+                <>
+                  <p className="account-provider-stats">
+                    {account?.animeCount ?? 0} animes · {account?.episodes ?? 0} episódios · {Math.round((account?.minutes ?? 0) / 60)} h
+                  </p>
+                  <div className="account-provider-actions">
+                    <button type="button" className="settings-secondary" disabled={!!busy} onClick={() => void refresh(provider.id)}>
+                      {busy === provider.id ? "Atualizando…" : "Atualizar perfil"}
+                    </button>
+                    <button type="button" className="settings-secondary" disabled={!!busy} onClick={() => void disconnect(provider.id)}>Desconectar</button>
+                  </div>
+                </>
+              ) : (
+                <button type="button" className="settings-secondary account-connect-button" disabled={!!busy || !accountsLoaded} onClick={() => void connect(provider.id)}>
+                  {busy === provider.id ? "Aguardando autorização…" : `Conectar ${provider.name}`}
+                </button>
+              )}
+            </article>
+          );
+        })}
+      </div>
+      {error && <p className="account-connection-error" role="alert">{error}</p>}
+      {loginInProgress && <button type="button" className="account-cancel-login" onClick={() => api.Cancel("login").catch((e) => setError(String(e)))}>Cancelar login</button>}
+      <p className="account-sync-note">O AnimeCaos atualiza as contas conectadas quando o episódio termina ou quando você assiste pelo menos 80% dele. O título precisa ter correspondência identificada no serviço.</p>
+    </div>
   );
 }
+
+function AccountsView() {
+  return <section className="accounts-view"><header><h3>Contas conectadas</h3><p>Conecte suas contas para acompanhar automaticamente os episódios assistidos.</p></header><AccountsPanel /></section>;
+}
+
+function MALClientSecretField() {
+  const [secret, setSecret] = useState(""),
+    [configured, setConfigured] = useState(false),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState("");
+  useEffect(() => {
+    api.MALClientSecretConfigured().then(setConfigured).catch((e) => setMessage(e instanceof Error ? e.message : String(e)));
+  }, []);
+  const save = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      await api.SetMALClientSecret(secret);
+      setConfigured(true);
+      setSecret("");
+      setMessage("Client Secret salvo neste computador.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      await api.SetMALClientSecret("");
+      setConfigured(false);
+      setMessage("Client Secret removido.");
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mal-secret-field">
+      <div className="settings-field">
+        <label className="settings-field-label" htmlFor="settings-mal-secret">MyAnimeList Client Secret (opcional)</label>
+        <input id="settings-mal-secret" type="password" autoComplete="new-password" spellCheck={false} value={secret} onChange={(e) => setSecret(e.target.value)} placeholder={configured ? "Segredo salvo; digite para substituir" : "Deixe vazio para cliente sem segredo"} />
+        <small>O valor não volta para a interface depois de salvo. Se o seu aplicativo MAL for público, deixe vazio.</small>
+      </div>
+      <div className="mal-secret-actions">
+        {!!secret && <button type="button" className="settings-secondary" disabled={busy} onClick={() => void save()}>{busy ? "Salvando…" : "Salvar segredo"}</button>}
+        {configured && !secret && <button type="button" className="settings-secondary" disabled={busy} onClick={() => void remove()}>{busy ? "Removendo…" : "Remover segredo"}</button>}
+      </div>
+      {message && <small className="mal-secret-status" role="status">{message}</small>}
+    </div>
+  );
+}
+
 function SettingsView({
   settings,
   save,
@@ -1761,211 +1944,182 @@ function SettingsView({
   navigate: (name: string) => void;
 }) {
   const [v, setV] = useState(settings),
-    [saved, setSaved] = useState(false),
+    [saveState, setSaveState] = useState<"idle" | "dirty" | "saving" | "saved">("idle"),
     [update, setUpdate] = useState<Update>(),
-    [packagePath, setPackage] = useState("");
+    [packagePath, setPackage] = useState(""),
+    [toolStatus, setToolStatus] = useState(""),
+    [checkingUpdate, setCheckingUpdate] = useState(false);
+  const editVersion = useRef(0);
   const patch = (x: Partial<Settings>) => {
+    editVersion.current += 1;
     setV({ ...v, ...x });
-    setSaved(false);
+    setSaveState("dirty");
   };
   return (
     <form
-      className="settings"
-      onSubmit={(e) => {
+      className="settings-page"
+      onSubmit={async (e) => {
         e.preventDefault();
-        save(v)
-          .then(() => setSaved(true))
-          .catch(report);
+        if (saveState === "idle" || saveState === "saved" || saveState === "saving") return;
+        const submittedVersion = editVersion.current;
+        setSaveState("saving");
+        try {
+          await save(v);
+          setSaveState(editVersion.current === submittedVersion ? "saved" : "dirty");
+        } catch (error) {
+          setSaveState("dirty");
+          report(error);
+        }
       }}
     >
-      <label>
-        Aparência
-        <select value={v.theme || "system"} onChange={(e) => patch({ theme: e.target.value as Settings["theme"] })}>
-          <option value="system">Usar preferência do sistema</option>
-          <option value="light">Claro</option>
-          <option value="dark">Escuro</option>
-        </select>
-      </label>
-      <label>
-        Escala da interface{" "}
-        <input
-          type="range"
-          min="1"
-          max="1.5"
-          step="0.05"
-          value={v.uiScale}
-          onChange={(e) => patch({ uiScale: +e.target.value })}
-        />{" "}
-        {Math.round(v.uiScale * 100)}%
-      </label>
-      <label>
-        Player
-        <select
-          value={v.playerMode}
-          onChange={(e) => patch({ playerMode: e.target.value })}
-        >
-          <option value="mpv">MPV integrado</option>
-          <option value="system">Player padrão do sistema</option>
-          <option value="custom">Player personalizado</option>
-        </select>
-      </label>
-      {v.playerMode === "custom" && (
-        <label>
-          Executável{" "}
-          <input
-            value={v.playerPath}
-            onChange={(e) => patch({ playerPath: e.target.value })}
-          />
-          <button
-            type="button"
-            onClick={() =>
-              desktop()
-                .ChoosePlayer()
-                .then((p) => p && patch({ playerPath: p }))
-                .catch(report)
-            }
-          >
-            Escolher
-          </button>
-        </label>
-      )}
-      {v.playerMode !== "mpv" && (
-        <p>Controles no app e autoplay requerem MPV.</p>
-      )}
-      <label>
-        Pasta de downloads
-        <input
-          value={v.downloadsDir}
-          onChange={(e) => patch({ downloadsDir: e.target.value })}
-        />
-        <button
-          type="button"
-          onClick={() =>
-            desktop()
-              .ChooseDirectory()
-              .then((p) => p && patch({ downloadsDir: p }))
-              .catch(report)
-          }
-        >
-          Escolher pasta
-        </button>
-      </label>
-      <label>
-        Downloads simultâneos
-        <input
-          type="number"
-          min="1"
-          max="5"
-          value={v.concurrent}
-          onChange={(e) => patch({ concurrent: +e.target.value })}
-        />
-      </label>
-      <label>
-        Áudio preferido
-        <select
-          value={v.audio}
-          onChange={(e) => patch({ audio: e.target.value })}
-        >
-          <option value="legendado">Legendado</option>
-          <option value="dublado">Dublado</option>
-        </select>
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={v.autoplay}
-          onChange={(e) => patch({ autoplay: e.target.checked })}
-        />
-        Reproduzir próximo episódio automaticamente
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={v.discord}
-          onChange={(e) => patch({ discord: e.target.checked })}
-        />
-        Discord Rich Presence
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          checked={v.autoClose}
-          onChange={(e) => patch({ autoClose: e.target.checked })}
-        />
-        Fechar painel ao terminar os downloads
-      </label>
-      <label>
-        Espera para fechar (ms)
-        <input
-          type="number"
-          min="0"
-          max="60000"
-          value={v.autoCloseMs}
-          onChange={(e) => patch({ autoCloseMs: +e.target.value })}
-        />
-      </label>
-      <label>
-        MyAnimeList Client ID
-        <input
-          value={v.malClientId}
-          onChange={(e) => patch({ malClientId: e.target.value })}
-        />
-      </label>
-      <button type="submit">Salvar configurações</button>
-      {saved && <p role="status">Configurações salvas.</p>}
-      <div className="settings-links"><span>Mais opções</span><button type="button" onClick={() => navigate("accounts")}>Contas conectadas</button><button type="button" onClick={() => navigate("logs")}>Diagnóstico</button></div>
-      <hr />
-      <button
-        type="button"
-        onClick={() =>
-          api
-            .ClearCache()
-            .then(() => setSaved(true))
-            .catch(report)
-        }
-      >
-        Limpar cache de metadados
-      </button>
-      <button
-        type="button"
-        onClick={() => api.CheckUpdate(op()).then(setUpdate).catch(report)}
-      >
-        Verificar atualização
-      </button>
-      {update && (
+      <div className="settings-intro">
         <div>
-          <p>
-            {update.managed
-              ? "Atualize pelo Flatpak."
-              : update.available
-                ? `Versão ${update.version} disponível.`
-                : "Você está na versão mais recente disponível para esta plataforma."}
-          </p>
-          <pre>{update.notes}</pre>
-          {update.available && !update.managed && (
-            <button
-              type="button"
-              onClick={() =>
-                api.DownloadUpdate(op(), update).then(setPackage).catch(report)
-              }
-            >
-              Baixar e verificar pacote
-            </button>
-          )}
-          {packagePath && (
-            <div>
-              <p>Pacote verificado: {packagePath}</p>
-              <button
-                type="button"
-                onClick={() => api.InstallUpdate(packagePath).catch(report)}
-              >
-                Instalar e reiniciar
-              </button>
+          <h3>Personalize o AnimeCaos</h3>
+          <p>Ajuste reprodução, downloads e aparência em um só lugar.</p>
+        </div>
+        {saveState !== "idle" && (
+          <span className={`settings-save-state is-${saveState}`} role="status">
+            {saveState === "dirty" ? "Alterações pendentes" : saveState === "saving" ? "Salvando…" : "Tudo salvo"}
+          </span>
+        )}
+      </div>
+
+      <div className="settings-grid">
+        <SettingsSection icon="settings" title="Aparência" description="Deixe a interface do seu jeito.">
+          <div className="settings-fields">
+            <div className="settings-field">
+              <label className="settings-field-label" htmlFor="settings-theme">Tema</label>
+              <select id="settings-theme" value={v.theme || "system"} onChange={(e) => patch({ theme: e.target.value as Settings["theme"] })}>
+                <option value="system">Sistema</option>
+                <option value="light">Claro</option>
+                <option value="dark">Escuro</option>
+              </select>
+            </div>
+            <div className="settings-field">
+              <label className="settings-field-label" htmlFor="settings-scale">Escala da interface</label>
+              <div className="settings-range">
+                <input id="settings-scale" type="range" min="1" max="1.5" step="0.05" value={v.uiScale} onChange={(e) => patch({ uiScale: +e.target.value })} />
+                <span className="settings-range-value" aria-hidden="true">{Math.round(v.uiScale * 100)}%</span>
+              </div>
+            </div>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection icon="play" title="Reprodução" description="Escolha como o anime deve tocar.">
+          <div className="settings-fields">
+            <div className="settings-field">
+              <label className="settings-field-label" htmlFor="settings-player">Player</label>
+              <select id="settings-player" value={v.playerMode} onChange={(e) => patch({ playerMode: e.target.value })}>
+                <option value="mpv">MPV integrado</option>
+                <option value="system">Player padrão do sistema</option>
+                <option value="custom">Player personalizado</option>
+              </select>
+            </div>
+            {v.playerMode === "custom" && (
+              <div className="settings-field">
+                <label className="settings-field-label" htmlFor="settings-player-path">Executável</label>
+                <div className="settings-input-action">
+                  <input id="settings-player-path" value={v.playerPath} onChange={(e) => patch({ playerPath: e.target.value })} />
+                  <button type="button" className="settings-secondary" onClick={() => desktop().ChoosePlayer().then((p) => p && patch({ playerPath: p })).catch(report)}>Escolher</button>
+                </div>
+              </div>
+            )}
+            <div className="settings-field">
+              <label className="settings-field-label" htmlFor="settings-audio">Áudio preferido</label>
+              <select id="settings-audio" value={v.audio} onChange={(e) => patch({ audio: e.target.value })}>
+                <option value="legendado">Legendado</option>
+                <option value="dublado">Dublado</option>
+              </select>
+            </div>
+            <label className="settings-toggle">
+              <input type="checkbox" checked={v.autoplay} onChange={(e) => patch({ autoplay: e.target.checked })} />
+              <span><strong>Próximo episódio automático</strong><small>Continuar quando o episódio terminar.</small></span>
+            </label>
+            {v.playerMode !== "mpv" && <p className="settings-note">Os controles no app e a reprodução automática requerem o MPV.</p>}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection icon="downloads" title="Downloads" description="Organize onde e como os arquivos são baixados." className="settings-section-wide">
+          <div className="settings-fields settings-fields-columns">
+            <div className="settings-field settings-field-wide">
+              <label className="settings-field-label" htmlFor="settings-downloads-dir">Pasta de downloads</label>
+              <div className="settings-input-action">
+                <input id="settings-downloads-dir" value={v.downloadsDir} onChange={(e) => patch({ downloadsDir: e.target.value })} />
+                <button type="button" className="settings-secondary" onClick={() => desktop().ChooseDirectory().then((p) => p && patch({ downloadsDir: p })).catch(report)}>Escolher pasta</button>
+              </div>
+            </div>
+            <div className="settings-field">
+              <label className="settings-field-label" htmlFor="settings-concurrent">Downloads simultâneos</label>
+              <input id="settings-concurrent" type="number" min="1" max="5" value={v.concurrent} onChange={(e) => patch({ concurrent: +e.target.value })} />
+              <small>Entre 1 e 5 tarefas.</small>
+            </div>
+            <label className="settings-toggle settings-toggle-inline">
+              <input type="checkbox" checked={v.autoClose} onChange={(e) => patch({ autoClose: e.target.checked })} />
+              <span><strong>Fechar painel ao concluir</strong><small>Ocultar downloads quando a fila terminar.</small></span>
+            </label>
+            {v.autoClose && (
+              <div className="settings-field">
+                <label className="settings-field-label" htmlFor="settings-close-delay">Aguardar antes de fechar</label>
+                <div className="settings-number-suffix"><input id="settings-close-delay" type="number" min="0" max="60000" step="500" value={v.autoCloseMs} onChange={(e) => patch({ autoCloseMs: +e.target.value })} /><span>ms</span></div>
+              </div>
+            )}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection icon="list" title="Integrações" description="Discord, AniList e MyAnimeList; acompanhe automaticamente os episódios assistidos.">
+          <div className="settings-fields">
+            <label className="settings-toggle">
+              <input type="checkbox" checked={v.discord} onChange={(e) => patch({ discord: e.target.checked })} />
+              <span><strong>Discord Rich Presence</strong><small>Mostrar o que você está assistindo.</small></span>
+            </label>
+            <div className="settings-field">
+              <label className="settings-field-label" htmlFor="settings-mal-client">MyAnimeList Client ID</label>
+              <input id="settings-mal-client" value={v.malClientId} onChange={(e) => patch({ malClientId: e.target.value })} />
+              <small>Salve as alterações antes de conectar se você editar este ID.</small>
+            </div>
+            <MALClientSecretField />
+            <AccountsPanel compact />
+            <button type="button" className="settings-secondary settings-link-button" onClick={() => navigate("accounts")}>Contas conectadas <NavIcon name="arrow" /></button>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection icon="history" title="Manutenção" description="Ferramentas para manter o app atualizado.">
+          <div className="settings-tools">
+            <button type="button" className="settings-secondary" onClick={() => api.ClearCache().then(() => setToolStatus("Cache de metadados limpo.")).catch(report)}>Limpar cache de metadados</button>
+            <button type="button" className="settings-secondary" disabled={checkingUpdate} onClick={() => { setToolStatus(""); setUpdate(undefined); setCheckingUpdate(true); api.CheckUpdate(op()).then(setUpdate).catch(report).finally(() => setCheckingUpdate(false)); }}>{checkingUpdate ? "Verificando…" : "Verificar atualização"}</button>
+            <button type="button" className="settings-secondary settings-link-button" onClick={() => navigate("logs")}>Abrir diagnóstico <NavIcon name="arrow" /></button>
+          </div>
+          {toolStatus && <p className="settings-tool-status" role="status">{toolStatus}</p>}
+          {update && (
+            <div className="settings-update" role="status">
+              <strong>{update.managed ? "Atualize pelo Flatpak." : update.available ? `Versão ${update.version} disponível.` : "Você está na versão mais recente."}</strong>
+              {update.notes && <pre>{update.notes}</pre>}
+              {update.available && !update.managed && <button type="button" className="settings-secondary" onClick={() => api.DownloadUpdate(op(), update).then(setPackage).catch(report)}>Baixar e verificar</button>}
+              {packagePath && <div className="settings-input-action"><small className="settings-package-path">Pacote verificado: {packagePath}</small><button type="button" className="settings-secondary" onClick={() => api.InstallUpdate(packagePath).catch(report)}>Instalar e reiniciar</button></div>}
             </div>
           )}
-        </div>
-      )}
+        </SettingsSection>
+      </div>
+
+      <footer className="settings-actions">
+        <span className="settings-save-hint">As alterações só entram em vigor depois de salvar.</span>
+        <button type="submit" disabled={saveState !== "dirty"}>
+          {saveState === "saving" ? "Salvando…" : saveState === "saved" ? "Salvo" : "Salvar alterações"}
+        </button>
+      </footer>
     </form>
+  );
+}
+
+function SettingsSection({ icon, title, description, className = "", children }: { icon: string; title: string; description: string; className?: string; children: ReactNode }) {
+  return (
+    <section className={`settings-section ${className}`} aria-labelledby={`settings-heading-${title.toLowerCase().replace(/\s+/g, "-")}`}>
+      <header className="settings-section-heading">
+        <span className="settings-section-icon"><NavIcon name={icon} /></span>
+        <div><h4 id={`settings-heading-${title.toLowerCase().replace(/\s+/g, "-")}`}>{title}</h4><p>{description}</p></div>
+      </header>
+      {children}
+    </section>
   );
 }
 function Diagnostics({

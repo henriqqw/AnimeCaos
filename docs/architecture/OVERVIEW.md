@@ -1,6 +1,6 @@
 # Visão geral da arquitetura
 
-**Estado:** implementação presente na árvore, conferida em 18/10/2026. O produto é um aplicativo desktop. A tela React não é um site autônomo: os métodos de aplicação são expostos pelo Wails e não existe servidor HTTP próprio para a interface.
+**Estado:** implementação presente na árvore, conferida em 19/10/2026. O produto é um aplicativo desktop. A tela React não é um site autônomo: os métodos de aplicação são expostos pelo Wails e não existe servidor HTTP próprio para a interface.
 
 ## Stack observada
 
@@ -42,7 +42,7 @@ flowchart LR
 
 ## Entradas do aplicativo
 
-- `main.go`: inicializa o store, configura o serviço, incorpora `frontend/dist` no executável e cria a janela Wails. Também roteia a execução do helper de atualização com `--apply-update`.
+- `main.go`: inicializa o store, configura o serviço, incorpora `frontend/dist` no executável e cria a janela Wails. Valida a posição persistida antes de restaurá-la, integra o ciclo de abrir/ocultar/sair da bandeja do Windows e roteia a execução do helper de atualização com `--apply-update`.
 - `cmd/animecaos/main.go`: CLI para os mesmos serviços; não mantém uma segunda implementação do domínio.
 - `cmd/package/main.go`: prepara um stage de distribuição, compila o frontend salvo que não seja passado `-skip-ui`, compila GUI e CLI, copia dependências e gera manifestos de hash.
 - `deploy/go/`: script de AppImage, desktop entry e definição Inno Setup.
@@ -51,6 +51,7 @@ flowchart LR
 
 - `frontend/src/App.tsx` ainda reúne muitas telas e comportamentos num arquivo único. O [mapa do código](../CODE_MAP.md) documenta o estado presente; separar componentes é trabalho futuro, não uma estrutura já existente.
 - Os métodos Wails não são endpoints REST. Os endpoints HTTP documentados são integrações externas consumidas pelo backend.
+- No Windows, fechar pelo botão X oculta a janela na bandeja; o menu do ícone permite abrir, minimizar, ocultar e sair. Posições salvas só são reaplicadas quando a barra de título continua visível em algum monitor conectado.
 - AnimeFire, AnimesOnlineCC, SushiAnimes e Otakulogia são os quatro provedores registrados em `Service.New`. AniList fornece metadados e descoberta, não é um provedor de streams. A disponibilidade dos sites muda; consulte [a validação por fonte](../TESTING.md#reprodução-real-das-fontes-restantes--18102026).
 - A busca textual aproximada serve para classificação e filtragem de resultados fracos quando há metadados canônicos. A identidade é associada por aliases coincidentes e sem ambiguidade; semelhança, sozinha, não une animes.
 - MelhorAnime não está registrado no catálogo Go. O código Python antigo permanece em `Legacy/` e não participa da execução Go.

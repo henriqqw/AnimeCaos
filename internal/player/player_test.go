@@ -3,14 +3,16 @@ package player
 import (
 	"context"
 	"fmt"
-	"github.com/henriqqw/animecaos/internal/platform"
 	"io"
+	"math"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/henriqqw/animecaos/internal/platform"
 )
 
 func TestMPVIntegration(t *testing.T) {
@@ -102,6 +104,31 @@ func TestIPCSignalsNaturalEOFOnly(t *testing.T) {
 		})
 	}
 }
+
+func TestEpisodeWatchedRequiresEOFOrEightyPercent(t *testing.T) {
+	tests := []struct {
+		name     string
+		eof      bool
+		position float64
+		duration float64
+		want     bool
+	}{
+		{name: "natural EOF", eof: true, position: 12, duration: 300, want: true},
+		{name: "eighty percent", position: 240, duration: 300, want: true},
+		{name: "almost eighty percent", position: 239.9, duration: 300},
+		{name: "closed early", position: 31, duration: 1400},
+		{name: "unknown duration", position: 1400},
+		{name: "invalid position", position: math.NaN(), duration: 1400},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := episodeWatched(tt.eof, tt.position, tt.duration); got != tt.want {
+				t.Fatalf("episodeWatched(%v, %v, %v) = %v, want %v", tt.eof, tt.position, tt.duration, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestOldPlayerSessionIgnored(t *testing.T) {
 	c := New(func(State) {})
 	c.state = State{Session: "new"}

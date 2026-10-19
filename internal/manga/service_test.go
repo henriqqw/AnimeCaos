@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -96,6 +97,94 @@ func TestFailedChapterNeverPublished(t *testing.T) {
 		return nil
 	})
 }
+
+func TestChaptersExposeScanlationGroupForAttribution(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasSuffix(r.URL.Path, "/feed") {
+			http.NotFound(w, r)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"total": 1,
+			"data": []any{map[string]any{
+				"id":            "chapter-1",
+				"attributes":    map[string]any{"title": "Romance Dawn", "chapter": "1", "volume": "1", "pages": 18},
+				"relationships": []any{map[string]any{"type": "scanlation_group", "attributes": map[string]any{"name": "Grupo de tradução"}}},
+			}},
+		})
+	}))
+	defer server.Close()
+	s := New(netx.New())
+	s.Base = server.URL
+	s.Gate.Interval = 0
+	chapters, err := s.ChaptersLanguage(context.Background(), "manga-id", "pt-br")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(chapters) != 1 || chapters[0].Group != "Grupo de tradução" {
+		t.Fatalf("chapter group attribution not preserved: %#v", chapters)
+	}
+}
+
+func TestPageSourcesFallsBackToSaverWhenOriginalPageIsMissing(t *testing.T) {
+	var base string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/at-home/server/chapter" {
+			http.NotFound(w, r)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"baseUrl": base,
+			"chapter": map[string]any{
+				"hash":      "chapter-hash",
+				"data":      []string{"", "original.jpg"},
+				"dataSaver": []string{"saved.jpg", ""},
+			},
+		})
+	}))
+	defer server.Close()
+	base = server.URL + "/token/"
+
+	s := New(netx.New())
+	s.Base = server.URL
+	s.Gate.Interval = 0
+	pages, err := s.PageSources(context.Background(), "chapter")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pages) != 2 {
+		t.Fatalf("expected two pages, got %d", len(pages))
+	}
+	if want := base + "data-saver/chapter-hash/saved.jpg"; pages[0].URL != want {
+		t.Fatalf("saver-only page URL = %q, want %q", pages[0].URL, want)
+	}
+	if want := base + "data/chapter-hash/original.jpg"; pages[1].URL != want {
+		t.Fatalf("original page URL = %q, want %q", pages[1].URL, want)
+	}
+}
+
+func TestPageSourcesRejectsInvalidServerAndEmptyChapter(t *testing.T) {
+	var base string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(map[string]any{
+			"baseUrl": base,
+			"chapter": map[string]any{"hash": "hash", "data": []string{"1.jpg"}},
+		})
+	}))
+	defer server.Close()
+	s := New(netx.New())
+	s.Base = server.URL
+	s.Gate.Interval = 0
+
+	if _, err := s.PageSources(context.Background(), " "); err == nil {
+		t.Fatal("empty chapter id should be rejected")
+	}
+	base = "javascript:alert(1)"
+	if _, err := s.PageSources(context.Background(), "chapter"); err == nil {
+		t.Fatal("non-HTTP page server should be rejected")
+	}
+}
+
 func TestLiveMangaDex(t *testing.T) {
 	if os.Getenv("ANIMECAOS_LIVE") != "1" {
 		t.Skip("set ANIMECAOS_LIVE=1")

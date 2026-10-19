@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -114,6 +115,12 @@ func (s *Service) ChaptersLanguage(ctx context.Context, id, language string) ([]
 						Pages    int     `json:"pages"`
 						External *string `json:"externalUrl"`
 					} `json:"attributes"`
+					Relationships []struct {
+						Type       string `json:"type"`
+						Attributes struct {
+							Name string `json:"name"`
+						} `json:"attributes"`
+					} `json:"relationships"`
 				} `json:"data"`
 			}
 			if e := s.get(ctx, "/manga/"+url.PathEscape(id)+"/feed?"+params.Encode(), &r); e != nil {
@@ -129,7 +136,13 @@ func (s *Service) ChaptersLanguage(ctx context.Context, id, language string) ([]
 					continue
 				}
 				seen[key] = true
-				out = append(out, domain.Chapter{ID: ch.ID, Title: a.Title, Number: a.Chapter, Volume: a.Volume, Language: lang, Pages: a.Pages})
+				groups := []string{}
+				for _, relationship := range ch.Relationships {
+					if relationship.Type == "scanlation_group" && relationship.Attributes.Name != "" {
+						groups = append(groups, relationship.Attributes.Name)
+					}
+				}
+				out = append(out, domain.Chapter{ID: ch.ID, Title: a.Title, Number: a.Chapter, Volume: a.Volume, Language: lang, Pages: a.Pages, Group: strings.Join(groups, ", ")})
 			}
 			if offset+len(r.Data) >= r.Total || len(r.Data) == 0 {
 				break
@@ -148,6 +161,9 @@ type Page struct {
 }
 
 func (s *Service) PageSources(ctx context.Context, id string) ([]Page, error) {
+	if strings.TrimSpace(id) == "" {
+		return nil, fmt.Errorf("capítulo sem identificador")
+	}
 	var r struct {
 		Base    string `json:"baseUrl"`
 		Chapter struct {
@@ -159,13 +175,31 @@ func (s *Service) PageSources(ctx context.Context, id string) ([]Page, error) {
 	if e := s.get(ctx, "/at-home/server/"+url.PathEscape(id), &r); e != nil {
 		return nil, e
 	}
+	base, err := url.Parse(r.Base)
+	if err != nil || base.Host == "" || (base.Scheme != "http" && base.Scheme != "https") {
+		return nil, fmt.Errorf("servidor de páginas retornou uma URL inválida")
+	}
+	if r.Chapter.Hash == "" {
+		return nil, fmt.Errorf("servidor de páginas não retornou o hash do capítulo")
+	}
 	out := []Page{}
-	for i, p := range r.Chapter.Data {
-		page := Page{URL: r.Base + "/data/" + r.Chapter.Hash + "/" + p}
-		if i < len(r.Chapter.Saver) {
-			page.Alternatives = []string{r.Base + "/data-saver/" + r.Chapter.Hash + "/" + r.Chapter.Saver[i]}
+	count := max(len(r.Chapter.Data), len(r.Chapter.Saver))
+	for i := 0; i < count; i++ {
+		page := Page{}
+		if i < len(r.Chapter.Data) && r.Chapter.Data[i] != "" {
+			page.URL = strings.TrimRight(r.Base, "/") + "/data/" + url.PathEscape(r.Chapter.Hash) + "/" + url.PathEscape(r.Chapter.Data[i])
 		}
-		out = append(out, page)
+		if i < len(r.Chapter.Saver) && r.Chapter.Saver[i] != "" {
+			saverURL := strings.TrimRight(r.Base, "/") + "/data-saver/" + url.PathEscape(r.Chapter.Hash) + "/" + url.PathEscape(r.Chapter.Saver[i])
+			if page.URL == "" {
+				page.URL = saverURL
+			} else {
+				page.Alternatives = []string{saverURL}
+			}
+		}
+		if page.URL != "" {
+			out = append(out, page)
+		}
 	}
 	if len(out) == 0 {
 		return nil, fmt.Errorf("capítulo sem páginas hospedadas")

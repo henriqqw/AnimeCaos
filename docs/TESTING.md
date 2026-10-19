@@ -1,5 +1,23 @@
 # Testes e validação
 
+## AniList e MyAnimeList — conta e sincronização automática — 19/10/2026
+
+Configurações e a tela Contas compartilham cards com os favicons locais, estado da conexão, login pelo navegador, atualizar perfil, desconectar e erro de OAuth. O Client Secret MAL é opcional, pode ser salvo/removido localmente e nunca volta ao frontend. O jogador só marca o episódio como assistido no EOF natural ou quando encerra com pelo menos 80% da duração conhecida; a sincronização consulta a lista antes de escrever, não regride o progresso e mantém obras concluídas. As gravações de lista foram verificadas contra fixtures HTTP, sem utilizar uma conta real.
+
+| Comando/validação | Resultado |
+|---|---|
+| `go test ./... -count=1` (reexecução em 19/10/2026) | Passou em todos os pacotes. A tentativa anterior descrita abaixo recebeu `net::ERR_UNSAFE_PORT` em fixture Chromium e passou na repetição. |
+| `cd frontend; npm exec -- tsc --noEmit` (19/10/2026) | Passou sem diagnósticos. |
+| `cd frontend; npm test -- --run` (19/10/2026) | A primeira execução teve 26/27: falhou o teste de navegação das setas do destaque. A repetição completa passou com 27/27; o teste isolado também passou. O teste novo de integrações confere logos, Client Secret, conexão AniList e perfil. |
+| `TestSyncUpdatesMALListAtWatchThreshold`, `TestSyncMarksAniListCompleteOnlyAtFinalEpisode`, `TestSyncDoesNotMoveMALProgressBackwards`, `TestMALTokenExchangeUsesBasicClientAuthentication` e `TestMALRefreshUsesBasicAuthenticationAndPreservesRefreshToken` | Passaram dentro do pacote `internal/integrations`; verificam leitura prévia, headers, HTTP Basic com segredo, renovação, progresso, status, proteção contra regressão e mutations contra `httptest`. |
+| `TestEpisodeWatchedRequiresEOFOrEightyPercent` | Passou dentro do pacote `internal/player`; fechar aos 31 s ou sem duração não marca como assistido. |
+| Download de `https://anilist.co/favicon.ico` e `https://myanimelist.net/favicon.ico` | Ambos responderam HTTP 200; os favicons foram guardados em `frontend/public/`. |
+| OAuth com uma conta real e confirmação das listas externas | Não executado: exige autorização da conta do usuário e altera dados nas listas. A atualização HTTP está coberta por fixtures locais. |
+
+`go env CGO_ENABLED` retornou `0`; `go test -race ./...` não foi executado neste ambiente. `git diff --check` passou com avisos de normalização LF/CRLF nos arquivos modificados.
+
+O endpoint OAuth do MAL redirecionou o Client ID configurado para a página de login (HTTP 303). A troca do código falso no endpoint de token com autenticação Basic e senha vazia ainda retornou `invalid_client`; o painel agora permite salvar o Client Secret correspondente se esse cliente exigir segredo. Não foi usado código real nem conta autenticada.
+
 ## Comandos locais
 
 Na raiz:
@@ -20,11 +38,58 @@ npm test -- --run
 
 `npm run build`, `wails build` e `go run ./cmd/package` compilam partes do produto. Os comandos de teste acima não geram instalador. Execute builds somente quando a etapa permitir.
 
+## Catálogo e leitor de mangá — 19/10/2026
+
+O catálogo não consulta títulos vazios ao abrir. A pesquisa tem estado local de erro/retry e cancela a operação anterior. O leitor busca novamente as URLs ao abrir/retomar um capítulo, salva a página atual e oferece rolagem contínua, página única, direção RTL/LTR, atalhos, controles de página e capítulo; falhas de rede e de imagem exibem retry. Capítulos exibem o grupo de tradução quando a API retorna esse relacionamento. URLs temporárias não entram no histórico.
+
+| Comando/validação | Resultado |
+|---|---|
+| `ANIMECAOS_LIVE=1 go test ./internal/manga -run '^TestLiveMangaDex$' -count=1 -v` | Passou em 6,34 s: MangaDex retornou One Piece, 61 capítulos em português; páginas foram consultadas, a primeira página `data-saver` respondeu e um CBZ legível com 53 páginas foi criado. Foi executado em Windows via PowerShell com `$env:ANIMECAOS_LIVE='1'`. |
+| `go test ./...` | Passou em todos os pacotes após redirecionar `TEMP`, `TMP`, `GOTMPDIR` e `GOCACHE` para `D:\AnimeCaos\.task-cache`, pois o temporário padrão no C: não tinha espaço livre. |
+| `cd frontend; npm exec -- tsc --noEmit` | Passou após implementar o fluxo de leitor. |
+| `cd frontend; npm test -- --run` | Passou: 26 testes, incluindo pesquisa → capítulos → páginas, progresso salvo e retry de erro de páginas. |
+| Inspeção visual da janela Wails | Não executada nesta sessão: a inicialização de automação de tela falhou antes de disponibilizar a janela. A inspeção manual permanece pendente. |
+
+O teste Go inicial falhou ao tentar criar o temporário em `C:\Users\caosdev\AppData\Local\Temp` (C: sem espaço). Usar temporários/cache no D: permitiu executar o live. O acesso HTTPS direto pelo `Invoke-WebRequest`/Schannel também falhou com `ProtocolVersion`, mas o cliente Go do aplicativo consultou MangaDex com sucesso. O usuário não precisa mudar DNS por causa desse resultado local.
+
+## Restauração da janela e menu da bandeja Windows — 19/10/2026
+
+A janela `AnimeCaos` estava fora da tela nas coordenadas `-32000,-32000` enquanto o processo permanecia responsivo. No Windows, a posição salva agora é comparada às áreas úteis de todos os monitores; uma barra de título sem área visível faz o app centralizar a janela. Fechar pelo X oculta a janela na bandeja, cujo menu oferece abrir, minimizar, ocultar e sair.
+
+| Comando/ação | Resultado |
+|---|---|
+| `gofmt -w main.go internal/platform/window_position.go internal/platform/window_position_windows.go internal/platform/window_position_other.go internal/platform/window_position_test.go internal/platform/tray_windows.go internal/platform/tray_other.go` | Passou |
+| `go mod tidy` | Passou; incluiu `github.com/getlantern/systray` para o adaptador Windows |
+| `go test ./internal/platform -count=1` | Passou, incluindo casos dentro do monitor, monitor lateral, barra parcialmente visível, coordenadas minimizadas e título abaixo da área útil |
+| `go test ./...` | Passou em todos os pacotes |
+| `cd frontend; npm exec -- tsc --noEmit` | Passou |
+| `cd frontend; npm test -- --run` | Passou: 24 testes |
+| `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado |
+| `git diff --check` | Passou sem erros de whitespace; Git emitiu avisos de normalização LF/CRLF em arquivos alterados |
+| Sessão `wails dev` no Windows | Processo `AnimeCaos-dev` permaneceu responsivo; a janela foi iniciada em coordenadas visíveis após rejeitar a posição antiga |
+| Fechar via `WM_CLOSE` e abrir pelo menu da bandeja | Fechamento ocultou a janela sem encerrar o processo. O menu nativo foi exibido com as quatro ações; selecionar `Abrir AnimeCaos` restaurou a janela visível em `350,130`, tamanho `900×600` |
+
+A bandeja foi verificada na sessão local Windows de desenvolvimento; não houve build de distribuição. Linux e macOS ainda não têm adaptador de bandeja nesta etapa.
+
 ## Remoção de integrações de catálogo — 18/10/2026
 
 - `gofmt -w internal/app/service.go internal/providers/browser.go internal/providers/catalog_test.go internal/providers/live_ad_audit_test.go internal/providers/player_candidates.go internal/providers/player_candidates_test.go internal/providers/browser_test.go internal/providers/selenium.go internal/providers/selenium_test.go` — passou.
 - `go test ./... -count=1` — passou em todos os pacotes Go.
 - A busca textual final pela árvore ativa não encontrou referências aos adaptadores removidos nem aos seus seletores específicos.
+
+## Identificação de adaptações nos cards de busca — 18/10/2026
+
+Uma consulta live `hunter` confirmou que as duas adaptações continuavam no resultado apesar do aviso de prazo: AniList 136 (1999), aprovada pela SushiAnimes, e AniList 11061 (2011), aprovada pela Otakulogia. O título sozinho deixava os cards visualmente ambíguos. A UI passou a mostrar ano e número de episódios a partir da identidade canônica. Não há consulta adicional por card para esses campos; `startDate.year`, `format` e `episodes` vêm na mesma resposta GraphQL em lote. A prévia em hover usa o AniList ID quando confirmado, evitando consultar o remake de 1999 apenas porque ambas as obras aparecem como “Hunter x Hunter”.
+
+| Comando | Resultado |
+|---|---|
+| `$env:ANIMECAOS_LIVE='1'; $env:ANIMECAOS_LIVE_TITLE='hunter'; go test ./internal/app -run '^TestLiveSearchAvailabilityTenAnimeSamples$' -count=1 -v` | Passou em 16,152 s: 8 cards reproduzíveis; Hunter x Hunter 1999 (AniList 136) validado pela SushiAnimes e 2011 (AniList 11061) pela Otakulogia. Aviso de prazo permaneceu para outros candidatos. |
+| `gofmt -w internal/domain/models.go internal/integrations/anilist.go internal/integrations/anilist_test.go internal/providers/catalog.go internal/providers/catalog_test.go internal/providers/otakulogia.go internal/app/service.go internal/app/service_test.go` | Passou. |
+| `go test ./...` | Primeira execução encontrou falha no teste novo por falta de alias no fixture; após completar o título canônico, reexecução passou em todos os pacotes. |
+| `npm exec -- tsc --noEmit` | Primeira execução apontou matcher DOM indisponível no teste; após trocar para a asserção nativa de `textContent`, passou. |
+| `npm test -- --run` | Primeira execução: 23/24 passaram; a única falha usava o mesmo matcher DOM ausente. Após ajuste, 24/24 passaram. |
+| `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado porque CGO está desativado. |
+| `git diff --check` | Passou sem erros de whitespace; Git avisou que normalizará LF para CRLF nos arquivos editados. |
 
 ## Testes com rede e mídia reais
 
@@ -329,6 +394,14 @@ Fixtures de batching/cache `TestTitleMatchesBatchUsesOneRequestAndCachesQueries`
 
 ## Cobertura de frontend
 
+### Refatoração de Configurações — 18/10/2026
+
+- `cd frontend; npm exec -- tsc --noEmit` — passou.
+- `cd frontend; npm test -- --run` — passou: 24 testes.
+- `git diff --check` — passou; Git emitiu avisos de normalização LF/CRLF nos arquivos modificados, sem erros de whitespace.
+
+Os testes automatizados incluem o acesso semântico ao tema na tela de Configurações. A checagem confirma tipos e regressões existentes; inspeção visual em diferentes tamanhos de janela desktop não foi realizada nesta rodada.
+
 ### Consolidação do histórico de reprodução baixada — 18/10/2026
 
 - `gofmt -w internal/app/service.go internal/app/history_offline_test.go` — passou.
@@ -451,3 +524,14 @@ Validação final desta rodada:
 - Testes live não devem conter credenciais nem tornar a suite padrão dependente de internet.
 - Use `t.TempDir()` ou `ANIMECAOS_DATA_DIR` para não alterar dados reais.
 - Descreva exatamente comandos e resultados; não apresente testes anteriores como se fossem desta revisão.
+
+## Responsividade em janela compacta — 19/10/2026
+
+A janela de desenvolvimento foi inspecionada em 900×600 px na tela Configurações. A correção removeu a largura de 145 px da sidebar e compactou o espaçamento entre ícone e rótulo até 1050 px; a captura confirmou que “Configurações” e os demais itens aparecem completos. Abaixo de 760 px permanece a navegação inferior. Não houve alteração de componentes nem de cobertura automatizada.
+
+| Verificação | Resultado |
+|---|---|
+| Inspeção visual da janela `AnimeCaos-dev` em 900×600 | Rótulos da sidebar completos; painel de Configurações continuou rolável e os cartões de integração permaneceram lado a lado |
+| `cd frontend; npm exec -- tsc --noEmit` | Passou sem diagnósticos TypeScript |
+| `git diff --check` | Passou; Git avisou apenas que normalizará LF para CRLF nos arquivos alterados |
+| Testes automatizados | Não executados nesta alteração de CSS |

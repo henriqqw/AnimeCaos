@@ -2,6 +2,15 @@
 
 Estas regras descrevem o comportamento implementado. Para a hierarquia visual e estados por tela, consulte [Frontend](architecture/FRONTEND.md) e [System design](SYSTEM_DESIGN.md).
 
+## Janela e bandeja do Windows
+
+- Ao iniciar, o app restaura a posição salva somente se a barra de título continuar visível em pelo menos um monitor conectado. Posições inválidas ou gravadas pelo Windows ao minimizar (`-32000,-32000`) são descartadas e a janela é centralizada.
+- O botão X oculta a janela e mantém o processo ativo na bandeja. A ação `Sair` do menu encerra o processo e remove o ícone.
+- Se o Windows não conseguir inicializar o ícone da bandeja, o botão X encerra o app para evitar deixá-lo invisível.
+- O menu da bandeja oferece `Abrir AnimeCaos`, `Minimizar`, `Ocultar para bandeja` e `Sair`. Ao abrir, a janela é mostrada e desminimizada. Abrir uma segunda instância também mostra a janela já existente.
+- Minimizar pelo controle nativo da janela continua minimizando para a barra de tarefas; a ação do menu da bandeja tem o mesmo comportamento. `Ocultar para bandeja` remove a janela da barra de tarefas sem encerrar o app.
+- O menu de bandeja está implementado para Windows. Em Linux e macOS o app mantém o comportamento nativo de fechamento até existir um adaptador de bandeja específico para essas plataformas.
+
 ## Descobrir, pesquisar e abrir um anime
 
 1. A home combina descoberta do AniList com histórico local. Cards de catálogo consultam resumo detalhado sob demanda.
@@ -50,15 +59,20 @@ Estas regras descrevem o comportamento implementado. Para a hierarquia visual e 
 
 - Minha Lista usa a chave `provider:id`; ligar/desligar é persistido no bucket `watchlist`.
 - AniList/MAL são opcionais. A reprodução continua mesmo quando a sincronização falha; erro de integração é relatado separadamente.
-- Ao assistir, o backend sincroniza o progresso com a conta conectada se o título tiver ID reconhecido pelo tracker. Sem ID correspondente, sincronização não é válida.
+- Em Configurações ou em Contas, o usuário conecta/desconecta AniList e MyAnimeList pelo navegador do sistema; as contas aparecem com ícones, status e estatísticas do perfil. O Client ID do MAL deve estar salvo antes do login; alguns clientes também exigem um Client Secret, que pode ser salvo/removido localmente em Configurações e não é devolvido à interface.
+- Após o MPV encerrar um episódio, a sincronização avança a lista se houve EOF natural ou se o vídeo chegou a pelo menos 80% da duração conhecida. Fechar antes disso não marca o episódio como assistido. A integração consulta primeiro o progresso remoto, não diminui a contagem nem reabre uma obra concluída. Apenas IDs AniList/MAL canônicos e correspondentes são aceitos; sem ID, o serviço externo não é alterado.
+- A sincronização usa `SaveMediaListEntry` no AniList e `PATCH /anime/{id}/my_list_status` no MyAnimeList. A reprodução não espera a resposta dessas chamadas; erros aparecem como erro de integração.
 - Tokens são locais e a interface recebe estado de perfil, não o segredo/token.
 
 ## Mangás
 
+- A tela de catálogo não dispara uma busca vazia ao abrir. O usuário pesquisa por título; a busca mostra estado de carregamento, falha com nova tentativa, resultados com placeholder de capa e a estante “Continue lendo” ordenada pelo progresso mais recente.
+- Ao abrir uma obra, a tela apresenta capa, sinopse, status, idioma e capítulos, incluindo crédito do grupo de tradução quando fornecido pela API. É possível alternar idioma, ordenar capítulos, selecionar um conjunto para baixar e abrir um capítulo individual.
+- O leitor abre páginas em sequência contínua por padrão e também oferece modo de página única, seletor de página, atalhos por teclado, direção RTL/LTR e botões de página/capítulo anterior e seguinte. O modo e a direção ficam salvos localmente.
+- O progresso é salvo por obra, capítulo e página. Retomar uma leitura busca novamente as páginas no MangaDex; URLs temporárias não são persistidas.
+- Falha ao buscar páginas sai do estado de carregamento, explica o problema e oferece nova tentativa para obter uma atribuição MangaDex@Home atualizada. Falha de uma imagem também mostra ação de recuperação.
 - Catálogo MangaDex escolhe texto em pt-BR quando disponível e tem fallback por idiomas em `manga.Service`.
-- A tela pede capítulos por idioma, exibe o progresso salvo e reabre na página persistida.
-- Download individual/em lote é registrado na mesma fila de atividade. Página remota tenta URL original e alternativa data-saver.
-- Leitura offline usa o caminho do CBZ e não exige pedir lista de páginas à API.
+- Download individual/em lote é registrado na mesma fila de atividade. Cada imagem tenta qualidade original e alternativa data-saver; capítulos incompletos não são publicados. Leitura offline usa páginas do CBZ sem pedir lista de páginas à API.
 
 ## Interface e acessibilidade observadas
 
@@ -67,4 +81,5 @@ Estas regras descrevem o comportamento implementado. Para a hierarquia visual e 
 - Prévia de anime é montada fora do carrossel para não ser cortada por overflow; no layout compacto fica oculta, pois depende de hover.
 - Capas podem falhar sem bloquear cards; mantém-se placeholder.
 - Tema aceita `system`, `light`, `dark`; escala de UI é validada entre 1 e 1,5.
+- Configurações ficam agrupadas por assunto em uma grade responsiva. Alterações são explícitas: a UI informa o estado pendente/salvando/salvo e só confirma após `SaveSettings`; ações de cache e atualização têm feedback próprio.
 - O botão da hero continua iniciando a pesquisa pelo anime destacado; texto/ícone apresentados são “Assistir” com play.

@@ -91,7 +91,7 @@ func (p *Otakulogia) Search(ctx context.Context, query string, page int) (domain
 		if strings.TrimSpace(item.NameEN) != "" && normalized(item.NameEN) != normalized(item.Name) {
 			titles = append(titles, item.NameEN)
 		}
-		anime := domain.Anime{ID: strconv.Itoa(item.UpstreamCID), Provider: p.Name(), Title: strings.TrimSpace(item.Name), Titles: titles, URL: strings.TrimRight(p.Base, "/") + "/" + strings.TrimLeft(item.Slug, "/"), Cover: item.PosterURL, Description: item.Synopsis, Status: item.Status, Audio: item.AudioMix, Season: 0}
+		anime := domain.Anime{ID: strconv.Itoa(item.UpstreamCID), Provider: p.Name(), Title: strings.TrimSpace(item.Name), Titles: titles, URL: strings.TrimRight(p.Base, "/") + "/" + strings.TrimLeft(item.Slug, "/"), Cover: item.PosterURL, Description: item.Synopsis, Status: item.Status, Audio: item.AudioMix, Year: item.Year, Season: 0}
 		if item.Year > 0 {
 			anime.Description = strings.TrimSpace(anime.Description)
 		}

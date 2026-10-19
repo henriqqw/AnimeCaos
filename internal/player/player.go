@@ -5,13 +5,27 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/henriqqw/animecaos/internal/media"
-	"github.com/henriqqw/animecaos/internal/platform"
+	"math"
 	"net"
 	"os/exec"
 	"sync"
 	"time"
+
+	"github.com/henriqqw/animecaos/internal/media"
+	"github.com/henriqqw/animecaos/internal/platform"
 )
+
+const watchedEpisodeRatio = 0.8
+
+func episodeWatched(eof bool, position, duration float64) bool {
+	if eof {
+		return true
+	}
+	if duration <= 0 || position < 0 || math.IsNaN(position) || math.IsInf(position, 0) || math.IsNaN(duration) || math.IsInf(duration, 0) {
+		return false
+	}
+	return position >= duration*watchedEpisodeRatio
+}
 
 type State struct {
 	Playing    bool    `json:"playing"`
@@ -185,7 +199,7 @@ func (c *Controller) Start(parent context.Context, url, mode, path string, start
 		if ctx.Err() != nil {
 			c.state.EOF = false
 		}
-		c.state.Watched = c.state.EOF || time.Since(started) >= 30*time.Second
+		c.state.Watched = episodeWatched(c.state.EOF, c.state.Position, c.state.Duration)
 		if err != nil && ctx.Err() == nil {
 			c.state.Error = "Player encerrou com erro: " + err.Error()
 		}

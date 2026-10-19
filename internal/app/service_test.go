@@ -590,7 +590,7 @@ func TestLiveLegacyHistoryCovers(t *testing.T) {
 	}
 	missing := []string{}
 	for _, title := range titles {
-		anime, err := s.Preview("live-legacy-cover", title)
+		anime, err := s.Preview("live-legacy-cover", title, 0)
 		if err != nil || anime.Cover == "" {
 			missing = append(missing, title)
 		}

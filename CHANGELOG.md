@@ -1,7 +1,19 @@
 # Changelog
 
-## Em desenvolvimento — revisão de interface e documentação
+## Em desenvolvimento — interface, janela e documentação
 
+- Integrações AniList e MyAnimeList agora aparecem com os favicons oficiais e ações de conectar/desconectar dentro de Configurações e da tela Contas; falhas de OAuth ficam visíveis junto ao serviço.
+- O Client Secret opcional do MAL pode ser salvo/removido em campo de senha local sem ser devolvido ao frontend; a troca de token envia autenticação HTTP Basic conforme a documentação oficial.
+- Sincronização automática só marca progresso depois do EOF natural ou de 80% da duração conhecida, evitando enviar como assistido quando o usuário fecha o episódio cedo. Antes de gravar, consulta a lista remota para não regredir progresso nem reabrir obra concluída; testes com servidores locais validam as duas APIs.
+- A área de Mangás agora funciona como fluxo completo de catálogo, capítulos e leitor: busca sob demanda, retomada visual do progresso, filtro de idioma, ordenação/seleção/download, navegação entre capítulos, modos contínuo/paginado, direção RTL/LTR, retry quando o MangaDex@Home falha e crédito do grupo de tradução quando disponível. URLs temporárias continuam fora do histórico salvo.
+- O resolvedor de páginas do MangaDex aceita capítulos em que só a qualidade `data-saver` esteja listada e valida base HTTP(S), hash e páginas antes de criar a sessão do leitor.
+- Corrigida a restauração de janelas posicionadas fora da tela, incluindo o sentinel `-32000,-32000` gravado ao minimizar no Windows. No Windows, fechar pelo X oculta o app na bandeja, cujo menu permite abrir, minimizar, ocultar e sair.
+
+- A marca enviada substituiu os ícones anteriores. O lettering foi recortado com transparência e agora aparece na sidebar expandida e no carregamento; os ícones PNG/ICO de janela e pacote usam a versão quadrada.
+- Configurações foram reorganizadas por assunto em cartões compactos e responsivos; o estado de alterações pendentes/salvas ficou explícito, com ações de manutenção separadas do salvamento das preferências.
+- Em janelas de 761 a 1050 px, a sidebar mantém 188 px e compacta o espaçamento dos itens para preservar rótulos como “Configurações”; antes, a regra de 145 px cortava os nomes das telas.
+- Cards de busca agora identificam adaptações com ano e contagem de episódios (por exemplo, Hunter x Hunter 1999/62 e 2011/148). Os valores vêm dos metadados canônicos já consultados em lote e só são associados após uma correspondência de identidade sem ambiguidade.
+- O painel de prévia usa o AniList ID da obra quando confirmado, evitando exibir a contagem de episódios de outra adaptação com título parecido.
 - A resolução da SushiAnimes aceita os atributos `data-id` e `data-embed` e usa o extrator de player filtrado quando a opção AJAX não está disponível. O fallback Blogger da AnimesOnlineCC tenta Selenium quando o RPC não publica renditions; o navegador também pode iniciar silenciadamente um vídeo HTML5 dentro do player.
 - Consultas que terminam em ano, como `Hunter x Hunter 2011`, pesquisam também o título base, mas só mantêm resultados que correspondam ao ano consultado; isso recupera o título na Otakulogia sem misturar a versão de 1999.
 - Testes live recentes confirmaram busca → resolução → gateway → MPV para SushiAnimes, AnimesOnlineCC e Otakulogia. AnimesOnlineCC Hunter E1 recebeu `payload=null` do RPC Blogger e continua sem mídia extraível; Hunter E2 e Naruto E1 tocaram. No app, Hunter 2011 E1 passou pelo fallback Otakulogia. Detalhes e limites em `docs/TESTING.md`.

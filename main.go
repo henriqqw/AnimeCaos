@@ -5,6 +5,10 @@ import (
 	"embed"
 	"flag"
 	"fmt"
+	"os"
+	"path/filepath"
+	"sync/atomic"
+
 	"github.com/henriqqw/animecaos/internal/app"
 	"github.com/henriqqw/animecaos/internal/platform"
 	"github.com/henriqqw/animecaos/internal/update"
@@ -12,14 +16,37 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	wr "github.com/wailsapp/wails/v2/pkg/runtime"
-	"os"
-	"path/filepath"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed assets/icons/icon.ico
+var trayIcon []byte
+
 type Desktop struct{ ctx context.Context }
+
+var quitRequested atomic.Bool
+
+func showMainWindow(ctx context.Context) {
+	wr.WindowShow(ctx)
+	wr.WindowUnminimise(ctx)
+}
+
+func saveWindowGeometry(ctx context.Context, service *app.Service) {
+	if wr.WindowIsMinimised(ctx) {
+		return
+	}
+	width, height := wr.WindowGetSize(ctx)
+	x, y := wr.WindowGetPosition(ctx)
+	if width < 800 || height < 560 || !platform.WindowPositionVisible(x, y, width, height) {
+		return
+	}
+	settings := service.Settings()
+	settings.Width, settings.Height = width, height
+	settings.X, settings.Y = x, y
+	_ = service.SaveSettings(settings)
+}
 
 func (d *Desktop) ChooseDirectory() (string, error) {
 	return wr.OpenDirectoryDialog(d.ctx, wr.OpenDialogOptions{Title: "Pasta de downloads"})
@@ -47,6 +74,8 @@ func main() {
 	service, e := app.New(context.Background(), platform.DataDir(), func(name string, data any) {
 		if desktop.ctx != nil {
 			if name == "quit" {
+				quitRequested.Store(true)
+				platform.QuitTray()
 				wr.Quit(desktop.ctx)
 				return
 			}
@@ -62,20 +91,33 @@ func main() {
 	e = wails.Run(&options.App{Title: "AnimeCaos", Width: max(900, settings.Width), Height: max(600, settings.Height), MinWidth: 800, MinHeight: 560, BackgroundColour: options.NewRGB(18, 20, 28), AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{service, &desktop},
 		OnStartup: func(ctx context.Context) {
 			desktop.ctx = ctx
-			if settings.X != 0 || settings.Y != 0 {
+			width, height := max(900, settings.Width), max(600, settings.Height)
+			if (settings.X != 0 || settings.Y != 0) && platform.WindowPositionVisible(settings.X, settings.Y, width, height) {
 				wr.WindowSetPosition(ctx, settings.X, settings.Y)
+			} else {
+				wr.WindowCenter(ctx)
 			}
+			platform.RunTray(trayIcon, func() { showMainWindow(ctx) }, func() { wr.WindowMinimise(ctx) }, func() { wr.WindowHide(ctx) }, func() {
+				quitRequested.Store(true)
+				platform.QuitTray()
+				wr.Quit(ctx)
+			})
 		},
 		OnBeforeClose: func(ctx context.Context) bool {
-			v := service.Settings()
-			v.Width, v.Height = wr.WindowGetSize(ctx)
-			v.X, v.Y = wr.WindowGetPosition(ctx)
-			service.SaveSettings(v)
-			return false
+			saveWindowGeometry(ctx, service)
+			if quitRequested.Load() {
+				return false
+			}
+			if !platform.TrayAvailable() {
+				return false
+			}
+			wr.WindowHide(ctx)
+			return true
 		},
+		OnShutdown: func(context.Context) { platform.QuitTray() },
 		SingleInstanceLock: &options.SingleInstanceLock{UniqueId: "com.animecaos.App", OnSecondInstanceLaunch: func(options.SecondInstanceData) {
 			if desktop.ctx != nil {
-				wr.WindowShow(desktop.ctx)
+				showMainWindow(desktop.ctx)
 			}
 		}},
 	})

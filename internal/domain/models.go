@@ -16,6 +16,8 @@ type Anime struct {
 	Audio         string                `json:"audio"`
 	Status        string                `json:"status"`
 	Score         float64               `json:"score"`
+	Year          int                   `json:"year"`
+	Format        string                `json:"format"`
 	MatchScore    float64               `json:"-"`
 	SearchGroupID int                   `json:"-"`
 	EpisodeCount  int                   `json:"episodeCount"`
@@ -117,6 +119,7 @@ type Chapter struct {
 	Volume   string `json:"volume"`
 	Language string `json:"language"`
 	Pages    int    `json:"pages"`
+	Group    string `json:"group,omitempty"`
 }
 type MangaProgress struct {
 	Manga   Manga   `json:"manga"`

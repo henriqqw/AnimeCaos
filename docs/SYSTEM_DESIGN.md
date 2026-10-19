@@ -9,7 +9,7 @@ Status: a especificação orienta o visual e vários padrões já estão present
 - Os carrosséis têm setas laterais quando há conteúdo fora da área visível e também respondem às setas do teclado quando o foco está no trilho.
 - O destaque usa ação “Assistir” com ícone de play, mas mantém o fluxo de pesquisa pelo título selecionado; ele não começa reprodução direta sem seleção de uma opção disponível.
 - Descoberta usa descrição traduzida para pt-BR pelo serviço de metadados. Falha ou indisponibilidade da tradução deve permanecer tolerável.
-- Os arquivos fonte de ícone Wails (`build/appicon.png` e `build/windows/icon.ico`) foram substituídos pela marca. O executável atual não foi recompilado; portanto, a mudança no ícone da janela/taskbar ainda não foi confirmada em binário.
+- Os arquivos de ícone e o lettering da interface foram atualizados com a marca enviada. A sidebar expandida e a tela de carregamento usam o lettering recortado; a versão quadrada permanece nos ícones do aplicativo. Aplicações abertas precisam ser reiniciadas para atualizar o ícone da janela/taskbar; o pacote distribuído não foi recompilado.
 
 ## Objetivos de experiência
 
@@ -21,9 +21,9 @@ Status: a especificação orienta o visual e vários padrões já estão present
 
 ## Identidade visual
 
-Usar exclusivamente a marca AnimeCaos em `assets/icons/icon.png` (640 × 640 px): emblema prateado com detalhe vermelho sobre fundo escuro. Os antigos `public/zinnes_logo.webp` e `assets/zinnes_logo.webp` foram arquivados em `Legacy/` porque pertencem à Zinnes e não são a identidade do aplicativo.
+Usar a marca AnimeCaos em `assets/icons/icon.png` e `assets/icons/wordmark.png`. O ícone quadrado preserva a arte enviada; o lettering é creme sobre transparência e aparece na sidebar expandida e na tela de carregamento. A cópia web fica em `frontend/public/`. Os antigos `public/zinnes_logo.webp` e `assets/zinnes_logo.webp` foram arquivados em `Legacy/` porque pertencem à Zinnes e não são a identidade do aplicativo.
 
-Preservar o desenho e a proporção do emblema. É permitido recortar margens, redimensionar e preparar variantes raster para tamanhos diferentes. Para o tema claro, pode-se criar uma versão recortada com fundo transparente se isso mantiver o contraste e o acabamento do símbolo; não redesenhar nem trocar o vermelho da marca. O brilho que já faz parte da imagem original pode permanecer, mas não adicionar glow, neon, halo ou sombra decorativa. Como o arquivo não contém wordmark, combiná-lo com o nome “AnimeCaos” em texto na tela inicial e no splash. Usar o mesmo símbolo no ícone do aplicativo.
+Preservar o desenho e a proporção das letras. A versão da interface remove o fundo vermelho e mantém os vazios internos das letras transparentes; no tema claro, o lettering é invertido para manter contraste. O ícone quadrado usa o arquivo original como fundo da janela/taskbar. Não deformar o lettering nem acrescentar efeitos.
 
 ### Tokens
 
@@ -59,7 +59,7 @@ Usar uma família vetorial única, com traço consistente e alinhamento óptico.
 
 - Preferência persistida no SQLite: `Sistema`, `Claro` ou `Escuro`. `Sistema` é o padrão inicial e acompanha a preferência atual do sistema operacional; a última escolha também é aplicada ao splash pelo armazenamento local para reduzir flash visual.
 - O tema fica no elemento raiz e é aplicado antes de mostrar o conteúdo principal.
-- Splash: logo, nome AnimeCaos, versão e indicador discreto. Fechar quando inicialização essencial terminar; se ela exceder o tempo esperado, mostrar texto de progresso acessível e ação de tentar novamente quando possível.
+- Splash: lettering AnimeCaos transparente, versão e indicador discreto. A sidebar expandida usa o mesmo lettering; a sidebar recolhida usa o ícone quadrado. Fechar quando inicialização essencial terminar; se ela exceder o tempo esperado, mostrar texto de progresso acessível e ação de tentar novamente quando possível.
 - Skeletons usam superfícies neutras próximas à tela final, com brilho animado muito sutil ou sem animação. Reservar o espaço final para evitar layout shift; aplicar movimento apenas se não houver preferência de movimento reduzido.
 - Carregamento de busca oferece cancelar. Operações antigas canceladas não podem substituir resultados novos.
 
@@ -82,7 +82,7 @@ Navegação principal: Início, Pesquisar, Minha Lista, Histórico, Downloads, M
 | Mangás | Pesquisa, itens salvos e progresso recente | Idioma e capítulos visíveis; estados vazios; erro com tentar novamente |
 | Leitor de mangá | Página ocupa a maior área; barra mínima com capítulo, página e navegação | Carregamento por página, falha individual, offline, alteração de orientação e retomada do progresso |
 | Contas | Estado de sessão, perfil e ações de conectar/atualizar/desconectar | Navegador aberto, retorno OAuth, erro de autorização, sem sessão, sessão expirada e sincronização |
-| Configurações | Grupos com nomes claros e descrição curta; temas, escala, player, downloads, janela, autoplay e integrações | Alteração salva/pendente, validação junto ao campo e restaurar padrão |
+| Configurações | Grupos compactos com descrição curta; grade em duas colunas que empilha em telas estreitas; temas, escala, player, downloads, autoplay e integrações | Estado pendente/salvando/salvo, botão de gravação desabilitado sem alterações e controles nativos de diálogo claramente agrupados |
 | Diagnóstico | Dependências, logs técnicos e exportação controlada | Nomes/IDs de fontes e erros brutos podem aparecer aqui; ocultar tokens, cookies, URLs assinadas e dados pessoais |
 
 ## Componentes e regras
@@ -100,12 +100,13 @@ Navegação principal: Início, Pesquisar, Minha Lista, Histórico, Downloads, M
 - **Continuar:** no Histórico e no carrossel “Continuar assistindo”, exibir o ícone de play da família visual da sidebar à esquerda do rótulo; o botão mantém seu nome acessível e a mesma ação de retomada.
 - **Ações de arquivos offline:** usar botões de ícone compactos para reproduzir/ler, abrir a pasta do arquivo e excluir. Cada controle mantém nome acessível e tooltip; exclusão conserva confirmação.
 - **Filtro de temporada:** usar menu próprio no estilo das superfícies do app, com opção atual identificada, foco visível e navegação por teclado; evitar menus nativos do sistema.
+- **Configurações:** agrupar opções relacionadas em cartões compactos; manter alinhamento consistente entre rótulos, descrições e controles; permitir duas colunas apenas quando houver largura suficiente. O salvamento manual apresenta estados explícitos e ações secundárias não devem alterar o estado de salvamento das preferências.
 - **Preview dos cards:** painel compacto ancorado ao card, com lado escolhido pelo espaço disponível, título de até duas linhas e sinopse de até três linhas. Não deve cobrir desnecessariamente o carrossel nem criar rolagem interna; movimento respeita `prefers-reduced-motion`.
 
 ## Responsividade
 
 - **Amplo (>1050 px):** sidebar expandida com opção de recolher para uma coluna de ícones; conteúdo e carrosséis adaptam ao espaço restante.
-- **Médio (951–1050 px):** sidebar passa a 188 px. De 761–950 px, a regra de layout estreito usa 145 px; grade e banner reduzem espaçamento.
+- **Médio (761–1050 px):** sidebar mantém 188 px e reduz o espaçamento interno dos botões para preservar rótulos longos; conteúdo, cartões e banner reduzem espaçamento. Abaixo de 760 px, a navegação muda para a barra inferior.
 - **Compacto (≤760 px):** navegação inferior; o botão da sidebar fica no cabeçalho; recolher reduz a barra e esconde rótulos. Em telas estreitas, a grade usa duas colunas; player e fila reservam espaço para a navegação.
 - **Janela estreita/altura baixa:** telas sem largura suficiente devem empilhar imagem e texto, evitar larguras mínimas fixas, oferecer rolagem vertical e manter controles essenciais visíveis.
 - Testar redimensionamento contínuo, zoom/escala, orientação e conteúdo com títulos muito longos. Nenhum texto, controle ou ação deve depender de hover.

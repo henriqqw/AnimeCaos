@@ -1,0 +1,100 @@
+name: Release
+
+# Builds and publishes the Linux AppImage whenever a version tag is pushed.
+# The Windows build (installer + auto-update zip) stays a local/manual step
+# via deploy/build_release.py — this workflow only covers what that script
+# can't do from Windows: produce and sign a Linux artifact.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  linux-appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Fetch the Linux yt-dlp binary
+        run: |
+          mkdir -p bin
+          curl -fL -o bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp
+          chmod +x bin/yt-dlp
+
+      - name: Build with PyInstaller
+        run: pyinstaller AnimeCaos-linux.spec --noconfirm
+
+      - name: Assemble the AppDir
+        run: |
+          set -eu
+          APPDIR="$PWD/AppDir"
+          mkdir -p \
+            "$APPDIR/usr/bin" \
+            "$APPDIR/usr/share/applications" \
+            "$APPDIR/usr/share/icons/hicolor/256x256/apps" \
+            "$APPDIR/usr/share/metainfo"
+
+          cp -r dist/AnimeCaos/* "$APPDIR/usr/bin/"
+          cp bin/yt-dlp "$APPDIR/usr/bin/yt-dlp"
+          chmod +x "$APPDIR/usr/bin/yt-dlp" "$APPDIR/usr/bin/AnimeCaos"
+
+          cp deploy/appimage/com.animecaos.App.desktop "$APPDIR/usr/share/applications/"
+          cp deploy/appimage/com.animecaos.App.desktop "$APPDIR/"
+          cp deploy/com.animecaos.App.metainfo.xml "$APPDIR/usr/share/metainfo/"
+
+          # .DirIcon + a copy at the AppDir root are what make the icon show
+          # up in file managers and the AppImage's own extraction UI — the
+          # hicolor path is what makes it show up once installed/integrated.
+          cp public/icon.png "$APPDIR/usr/share/icons/hicolor/256x256/apps/com.animecaos.App.png"
+          cp public/icon.png "$APPDIR/com.animecaos.App.png"
+          cp public/icon.png "$APPDIR/.DirIcon"
+
+          cp deploy/appimage/AppRun "$APPDIR/AppRun"
+          chmod +x "$APPDIR/AppRun"
+
+      - name: Download linuxdeploy
+        run: |
+          curl -fL -o linuxdeploy-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/latest/download/linuxdeploy-x86_64.AppImage
+          curl -fL -o linuxdeploy-plugin-appimage-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/latest/download/linuxdeploy-plugin-appimage-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage linuxdeploy-plugin-appimage-x86_64.AppImage
+
+      - name: Build the AppImage
+        env:
+          ARCH: x86_64
+          # Embeds zsync update metadata pointing at this repo's releases —
+          # this is what lets AppImageUpdate (and UpdaterService's own
+          # Linux path, see updater_service.py) fetch a delta update instead
+          # of the whole file.
+          UPDATE_INFORMATION: "gh-releases-zsync|henriqqw|animecaos|latest|AnimeCaos-*x86_64.AppImage.zsync"
+        run: |
+          ./linuxdeploy-x86_64.AppImage --appimage-extract-and-run \
+            --appdir AppDir --output appimage
+
+          VERSION="${GITHUB_REF_NAME#v}"
+          mkdir -p installer
+          mv AnimeCaos-*x86_64.AppImage "installer/AnimeCaos-${VERSION}-x86_64.AppImage"
+          if [ -f AnimeCaos-*x86_64.AppImage.zsync ]; then
+            mv AnimeCaos-*x86_64.AppImage.zsync "installer/AnimeCaos-${VERSION}-x86_64.AppImage.zsync"
+          fi
+
+      - name: Upload to the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            installer/AnimeCaos-*x86_64.AppImage
+            installer/AnimeCaos-*x86_64.AppImage.zsync

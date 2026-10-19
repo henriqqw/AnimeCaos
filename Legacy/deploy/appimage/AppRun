@@ -1,0 +1,8 @@
+#!/bin/sh
+# Entry point linuxdeploy wires up as the AppImage's launcher. Resolves
+# paths relative to its own location (not the cwd) so the AppImage works
+# regardless of where the user double-clicked it from — the same reasoning
+# as core/paths.get_base_path() not using os.path.abspath(".").
+HERE="$(dirname "$(readlink -f "${0}")")"
+export PATH="${HERE}/usr/bin:${PATH}"
+exec "${HERE}/usr/bin/AnimeCaos" "$@"

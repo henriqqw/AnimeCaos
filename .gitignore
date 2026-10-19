@@ -1,7 +1,7 @@
 # -------------------------------
 # Scripts locais
 # -------------------------------
-downloads.py
+Legacy/downloads.py
 
 # -------------------------------
 # Security / Secrets
@@ -21,7 +21,7 @@ id_ed25519
 id_ed25519.pub
 secrets/
 credentials/
-animecaos/services/_discord_app_id.py
+Legacy/animecaos/services/_discord_app_id.py
 
 # -------------------------------
 # Logs
@@ -61,6 +61,7 @@ temp_build/
 installer/
 bin/
 *.spec
+!Legacy/*.spec
 *.tmp
 *.temp
 
@@ -96,6 +97,15 @@ landing/out/
 /package.json
 /package-lock.json
 
+# Go/Wails frontend and packages
+frontend/node_modules/
+frontend/dist/
+frontend/wailsjs/
+frontend/package.json.md5
+release/
+*.test
+coverage.out
+
 # -------------------------------
 # IDE / OS
 # -------------------------------
@@ -117,3 +127,11 @@ mobile/android/app/build/
 mobile/android/.kotlin/
 mobile/android/local.properties
 mobile/.idea/
+
+# Wails source icons are inputs, not generated build artifacts.
+!/build/
+/build/*
+!/build/appicon.png
+!/build/windows/
+/build/windows/*
+!/build/windows/icon.ico

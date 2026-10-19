@@ -1,0 +1,421 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+  waitFor,
+} from "@testing-library/react";
+import App from "./App";
+import { api } from "./api";
+import type { Anime, Settings, SearchResult, History, Download, LocalFile } from "./types";
+const events = vi.hoisted(() => new Map<string, (data: unknown) => void>());
+vi.mock("./api", () => ({
+  api: {
+    Initial: vi.fn(),
+    Library: vi.fn(),
+    Downloads: vi.fn(),
+    LocalFiles: vi.fn(),
+    OpenLocalFolder: vi.fn(),
+    PlayLocal: vi.fn(),
+    DeleteFile: vi.fn(),
+    Discover: vi.fn(),
+    Search: vi.fn(),
+    Preview: vi.fn(),
+    Cancel: vi.fn(),
+    Image: vi.fn(),
+    History: vi.fn(),
+    SaveHistoryCover: vi.fn(),
+    Resume: vi.fn(),
+  },
+  desktop: () => ({ OpenLink: vi.fn() }),
+  op: () => crypto.randomUUID(),
+  on: (name: string, cb: (data: unknown) => void) => {
+    events.set(name, cb);
+    return () => events.delete(name);
+  },
+}));
+const settings: Settings = {
+  uiScale: 1,
+  theme: "system",
+  playerMode: "mpv",
+  playerPath: "",
+  downloadsDir: "D:\\Downloads",
+  concurrent: 2,
+  autoClose: false,
+  autoCloseMs: 3000,
+  autoplay: true,
+  audio: "legendado",
+  discord: false,
+  malClientId: "public-id",
+  width: 1280,
+  height: 820,
+  x: 0,
+  y: 0,
+};
+beforeEach(() => {
+  vi.resetAllMocks();
+  events.clear();
+  localStorage.removeItem("animecaos-sidebar-collapsed");
+  vi.mocked(api.Initial).mockResolvedValue({
+    settings,
+    version: "test",
+    accounts: [],
+  });
+  vi.mocked(api.Library).mockResolvedValue([]);
+  vi.mocked(api.Downloads).mockResolvedValue([]);
+  vi.mocked(api.LocalFiles).mockResolvedValue([]);
+  vi.mocked(api.History).mockResolvedValue([]);
+  vi.mocked(api.Preview).mockResolvedValue({} as Anime);
+  vi.mocked(api.Resume).mockResolvedValue();
+  vi.mocked(api.OpenLocalFolder).mockResolvedValue();
+  vi.mocked(api.PlayLocal).mockResolvedValue();
+  vi.mocked(api.DeleteFile).mockResolvedValue();
+  vi.mocked(api.Discover).mockResolvedValue({
+    trending: [],
+    seasonal: [],
+    warning: "",
+  });
+  vi.mocked(api.Cancel).mockResolvedValue();
+  vi.mocked(api.Image).mockResolvedValue("");
+  globalThis.IntersectionObserver = class {
+    observe() {}
+    disconnect() {}
+    unobserve() {}
+  } as unknown as typeof IntersectionObserver;
+});
+afterEach(cleanup);
+async function searchScreen() {
+  render(<App />);
+  const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
+  fireEvent.click(within(navigation).getByRole("button", { name: "Pesquisar" }));
+  return screen.getAllByRole("searchbox", { name: "Buscar animes" })[0];
+}
+describe("interface funcional", () => {
+  it("continua pelo identificador salvo sem escolher episódio por posição", async () => {
+    vi.mocked(api.History).mockResolvedValue([{anime:{id:"anime",provider:"animefire",title:"Continuar teste"},episode:{id:"episode",season:2,number:3},position:120,updated:1,needsResolve:false}] as History[]);
+    render(<App />);
+    const shelfButton = await screen.findByRole("button",{name:"Continuar"});
+    expect(shelfButton.querySelector("svg.nav-icon path")?.getAttribute("d")).toBe("m8 5 11 7-11 7V5Z");
+    fireEvent.click(await screen.findByRole("button",{name:"Histórico"}));
+    const continueButton = await screen.findByRole("button",{name:"Continuar"});
+    expect(continueButton.querySelector("svg.nav-icon path")?.getAttribute("d")).toBe("m8 5 11 7-11 7V5Z");
+    fireEvent.click(continueButton);
+    await waitFor(()=>expect(api.Resume).toHaveBeenCalledWith(expect.any(String),"animefire:anime"));
+  });
+  it("exige escolher o episódio quando o histórico antigo não tem identidade segura", async () => {
+    vi.mocked(api.History).mockResolvedValue([{anime:{id:"old",provider:"legacy",title:"Legado"},episode:{},position:0,updated:0,needsResolve:true}] as History[]);
+    render(<App />);
+    await screen.findByText("Histórico antigo");
+    expect(screen.queryByRole("button",{name:"Escolher episódio"})).toBeNull();
+    expect(screen.queryByRole("button",{name:"Continuar"})).toBeNull();
+    expect(api.Resume).not.toHaveBeenCalled();
+  });
+  it("recupera a capa dos itens antigos do histórico", async () => {
+    vi.mocked(api.History).mockResolvedValue([{anime:{id:"old-cover",provider:"legacy",title:"Bleach"},episode:{},position:0,updated:0,needsResolve:true}] as History[]);
+    vi.mocked(api.Preview).mockResolvedValue({ cover: "https://images.example/bleach.jpg" } as Anime);
+    const { container } = render(<App />);
+    await waitFor(() => expect(api.Preview).toHaveBeenCalledWith(expect.any(String), "Bleach"));
+    await waitFor(() => expect(container.querySelector(".continue-shelf .card img")).toBeTruthy());
+    await waitFor(() => expect(api.SaveHistoryCover).toHaveBeenCalledWith("legacy:old-cover", "https://images.example/bleach.jpg"));
+  });
+  it("substitui e salva uma capa antiga cujo endereço falhou", async () => {
+    vi.mocked(api.History).mockResolvedValue([{anime:{id:"stale-cover",provider:"legacy",title:"Anime legado",cover:"https://images.example/broken.jpg"},episode:{},position:0,updated:0,needsResolve:true}] as History[]);
+    vi.mocked(api.Preview).mockResolvedValue({ cover: "https://images.example/recovered.jpg" } as Anime);
+    vi.mocked(api.Image).mockRejectedValue(new Error("imagem antiga indisponível"));
+    globalThis.IntersectionObserver = class {
+      constructor(private callback: IntersectionObserverCallback) {}
+      observe(target: Element) { this.callback([{ isIntersecting: true, target } as IntersectionObserverEntry], this as unknown as IntersectionObserver); }
+      disconnect() {}
+    } as unknown as typeof IntersectionObserver;
+    render(<App />);
+    await waitFor(() => expect(api.Preview).toHaveBeenCalledWith(expect.any(String), "Anime legado"));
+    await waitFor(() => expect(api.SaveHistoryCover).toHaveBeenCalledWith("legacy:stale-cover", "https://images.example/recovered.jpg"));
+  });
+  it("mostra o histórico como uma estante de capas com ações compactas", async () => {
+    vi.mocked(api.History).mockResolvedValue([{anime:{id:"old-history",provider:"legacy",title:"Bleach: Temporada longa"},episode:{},position:0,updated:10,needsResolve:true}] as History[]);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Histórico" }));
+    expect(await screen.findByRole("region", { name: "Histórico de animes" })).toBeTruthy();
+    expect(screen.getByText("Assistidos recentemente")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Encontrar episódios" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Escolher episódio" })).toBeNull();
+    expect(document.querySelector(".history-grid .history-poster")).toBeTruthy();
+    expect(document.querySelector(".history-page .row")).toBeNull();
+  });
+  it("pagina o histórico em blocos de 24 e mantém a ordem mais recente", async () => {
+    const history = Array.from({ length: 25 }, (_, index) => ({
+      anime: { id: `history-${index}`, provider: "animefire", title: `Anime ${index + 1}`, cover: "cover" },
+      episode: { season: 1, number: index + 1 },
+      position: 0,
+      updated: index,
+      needsResolve: true,
+    })) as History[];
+    vi.mocked(api.History).mockResolvedValue(history);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Histórico" }));
+    const cards = await screen.findAllByRole("button", { name: /^Abrir Anime/ });
+    expect(cards).toHaveLength(24);
+    expect(screen.getAllByText("Mostrando 1–24 de 25")).toHaveLength(2);
+    fireEvent.click(screen.getAllByRole("button", { name: "Próxima página" })[0]);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Abrir Anime 1" })).toBeTruthy());
+    expect(screen.getAllByRole("button", { name: /^Abrir Anime/ })).toHaveLength(1);
+    expect(screen.getAllByText("Mostrando 25–25 de 25")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "Página anterior" }).every((button) => !button.hasAttribute("disabled"))).toBe(true);
+  });
+  it("recolhe a sidebar e mantém acessível a ação para expandi-la", async () => {
+    const { container } = render(<App />);
+    await screen.findAllByRole("button", { name: "Recolher menu" });
+    const toggle = container.querySelector(".brand .sidebar-toggle") as HTMLButtonElement;
+    fireEvent.click(toggle);
+    expect(container.querySelector(".app")?.classList.contains("sidebar-collapsed")).toBe(true);
+    expect(container.querySelector('.brand .sidebar-toggle[aria-label="Expandir menu"]')).toBeTruthy();
+    expect(localStorage.getItem("animecaos-sidebar-collapsed")).toBe("true");
+  });
+  it("leva a pesquisa da navegação e do atalho ao campo único da home", async () => {
+    render(<App />);
+    const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
+    fireEvent.click(within(navigation).getByRole("button", { name: "Pesquisar" }));
+    expect(screen.getByRole("heading", { name: "Início" })).toBeTruthy();
+    expect(screen.getAllByRole("searchbox")).toHaveLength(1);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Buscar animes" })));
+    fireEvent.keyDown(window, { key: "f", ctrlKey: true });
+    expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Buscar animes" }));
+  });
+  it("envia a busca pelo campo compacto do cabeçalho", async () => {
+    vi.mocked(api.Search).mockResolvedValue({ items: [], page: 1, hasNext: false, warnings: [] });
+  vi.mocked(api.Preview).mockResolvedValue({} as Anime);
+    render(<App />);
+    const input = await screen.findByRole("searchbox", { name: "Buscar animes" });
+    fireEvent.change(input, { target: { value: "Frieren" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() => expect(api.Search).toHaveBeenCalledWith(expect.any(String), "Frieren", 1, undefined));
+  });
+  it("ao selecionar um destaque da home, pesquisa pelo título canônico", async () => {
+    const featured = { id: "anilist:101", provider: "anilist", title: "Demon Slayer", anilistId: 101, titles: ["Kimetsu no Yaiba"] } as Anime;
+    vi.mocked(api.Discover).mockResolvedValue({ trending: [featured], seasonal: [], warning: "" });
+    vi.mocked(api.Search).mockResolvedValue({ items: [], page: 1, hasNext: false, warnings: [] });
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Assistir" }));
+    await waitFor(() => expect(api.Search).toHaveBeenCalledWith(expect.any(String), "Demon Slayer", 1, featured));
+  });
+  it("navega os destaques com as setas do teclado", async () => {
+    const first = { id: "a", provider: "anilist", title: "Anime A" } as Anime;
+    const second = { id: "b", provider: "anilist", title: "Anime B" } as Anime;
+    vi.mocked(api.Discover).mockResolvedValue({ trending: [first, second], seasonal: [], warning: "" });
+    render(<App />);
+    const hero = await screen.findByRole("button", { name: "Assistir" });
+    fireEvent.keyDown(hero, { key: "ArrowRight" });
+    expect(screen.getByRole("button", { name: "Destaque 2: Anime B" }).getAttribute("aria-pressed")).toBe("true");
+  });
+  it("renderiza a prévia acima dos carrosséis em uma camada de viewport", async () => {
+    const featured = { id: "anime-1", provider: "anilist", title: "Frieren" } as Anime;
+    vi.mocked(api.Discover).mockResolvedValue({ trending: [featured], seasonal: [], warning: "" });
+    vi.mocked(api.Preview).mockResolvedValue({ title: "Frieren", description: "Resumo" } as Anime);
+    render(<App />);
+    await screen.findByText("Frieren", { selector: ".card-title" });
+    const card = document.querySelector(".card > button") as HTMLButtonElement;
+    fireEvent.mouseEnter(card.closest("article")!);
+    const preview = await screen.findByRole("tooltip");
+    expect(preview.parentElement).toBe(document.body);
+    expect((preview as HTMLElement).style.position).toBe("fixed");
+    expect(preview.textContent).toContain("Resumo");
+  });
+  it("abre os downloads em cards com progresso e ação para o anime", async () => {
+    vi.mocked(api.Downloads).mockResolvedValue([{
+      id: "job-1",
+      anime: { id: "anime-1", provider: "animefire", title: "Frieren", cover: "" },
+      episode: { id: "ep-1", season: 2, number: 4, title: "A jornada", audio: "Dublado" },
+      status: "downloading", percent: 42, speed: "2 MB/s", eta: "00:30", error: "", path: "", kind: "anime",
+    }] as Download[]);
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Downloads, 1 ativos" }));
+    expect(await screen.findByText("Frieren")).toBeTruthy();
+    expect(screen.getByText("Temporada 2 · Episódio 4 · Dublado")).toBeTruthy();
+    expect(screen.getByText("42%")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Abrir anime" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Fechar downloads" })).toBeTruthy();
+  });
+  it("mostra ações de ícone acessíveis para arquivos offline e abre a pasta do arquivo", async () => {
+    const file = { path: "D:\\Downloads\\Frieren\\Frieren - S01E1-JP.mkv", title: "Frieren", episode: 1, size: 1024, cover: "", kind: "anime" } as LocalFile;
+    vi.mocked(api.LocalFiles).mockResolvedValue([file]);
+    render(<App />);
+    const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
+    fireEvent.click(within(navigation).getByRole("button", { name: "Downloads" }));
+    expect(await screen.findByRole("heading", { name: "Disponíveis offline" })).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: "Abrir pasta de Frieren" }));
+    await waitFor(() => expect(api.OpenLocalFolder).toHaveBeenCalledWith(file.path));
+    expect(screen.getByRole("button", { name: "Reproduzir Frieren" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Excluir Frieren" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Reproduzir" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Excluir" })).toBeNull();
+  });
+  it("não exibe identificação das fontes na navegação nem nos cards", async () => {
+    const result = {
+      id: "1",
+      provider: "animefire",
+      title: "Resultado",
+      titles: [],
+      variants: [],
+      url: "",
+      cover: "",
+      banner: "",
+      description: "",
+      audio: "",
+      status: "",
+      score: 0,
+      episodeCount: 0,
+      anilistId: 0,
+      malId: 0,
+      season: 0,
+    } satisfies Anime;
+    vi.mocked(api.Search).mockResolvedValue({ items: [result], page: 1, hasNext: false, warnings: [] });
+    render(<App />);
+    const input = await searchScreen();
+    fireEvent.change(input, { target: { value: "Resultado" } });
+    fireEvent.submit(input.closest("form")!);
+    await screen.findByText("Resultado");
+    expect(document.body.textContent).not.toMatch(/AnimeFire|AnimesOnlineCC|BetterAnime/);
+  });
+  it("mostra skeletons discretos e permite cancelar a busca", async () => {
+    let finishSearch!: (result: SearchResult) => void;
+    vi.mocked(api.Search).mockImplementation(() => new Promise((resolve) => { finishSearch = resolve; }));
+    const input = await searchScreen();
+    fireEvent.change(input, { target: { value: "Naruto" } });
+    fireEvent.submit(input.closest("form")!);
+    expect(await screen.findByRole("status", { name: "Buscando animes" })).toBeTruthy();
+    expect(document.querySelectorAll(".search-skeleton-grid .skeleton-card")).toHaveLength(10);
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar pesquisa" }));
+    expect(api.Cancel).toHaveBeenCalledWith(expect.any(String));
+    expect(screen.queryByRole("status", { name: "Buscando animes" })).toBeNull();
+    await act(async () => finishSearch({ items: [], page: 1, hasNext: false, warnings: [] }));
+    expect(screen.queryByRole("status", { name: "Buscando animes" })).toBeNull();
+  });
+  it("preserva resultados enquanto carrega a próxima página da busca", async () => {
+    const first = { id: "first", provider: "animefire", title: "Primeiro resultado" } as Anime;
+    const second = { id: "second", provider: "animefire", title: "Segundo resultado" } as Anime;
+    let finishMore!: (result: SearchResult) => void;
+    vi.mocked(api.Search)
+      .mockResolvedValueOnce({ items: [first], page: 1, hasNext: true, warnings: [] })
+      .mockImplementationOnce(() => new Promise((resolve) => { finishMore = resolve; }));
+    const input = await searchScreen();
+    fireEvent.change(input, { target: { value: "Anime" } });
+    fireEvent.submit(input.closest("form")!);
+    expect(await screen.findByText("Primeiro resultado")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Carregar mais" }));
+    expect(screen.getByRole("status", { name: "Carregando mais resultados" })).toBeTruthy();
+    expect(screen.getByText("Primeiro resultado")).toBeTruthy();
+    expect(document.querySelector(".search-skeleton-grid")).toBeNull();
+    await act(async () => finishMore({ items: [second], page: 2, hasNext: false, warnings: [] }));
+    expect(await screen.findByText("Segundo resultado")).toBeTruthy();
+  });
+  it("exibe o lote da busca de uma vez, após receber a qualidade confirmada", async () => {
+    const result = {
+      id: "verified", provider: "animefire", title: "Verificado", titles: [], variants: [], url: "", cover: "", banner: "", description: "", audio: "", status: "", score: 0, episodeCount: 12, anilistId: 0, malId: 0, season: 0,
+    } satisfies Anime;
+    let finishSearch!: (result: SearchResult) => void;
+    vi.mocked(api.Search).mockImplementation(() => new Promise((resolve) => { finishSearch = resolve; }));
+    render(<App />);
+    const input = await searchScreen();
+    fireEvent.change(input, { target: { value: "Verificado" } });
+    fireEvent.submit(input.closest("form")!);
+    await waitFor(() => expect(api.Search).toHaveBeenCalled());
+    expect(screen.queryByText("Verificado")).toBeNull();
+    expect(events.get("search-item")).toBeUndefined();
+    await act(async () => finishSearch({ items: [{ ...result, availability: { maxHeight: 1080, quality: "Até 1080p", sourcesVerified: ["animefire", "onlinecc"], sampleEpisode: "E1" } }], page: 1, hasNext: false, warnings: [] }));
+    expect(await screen.findByText("Verificado")).toBeTruthy();
+    expect(screen.getByText("Até 1080p")).toBeTruthy();
+    expect(document.querySelector(".quality-badge")?.getAttribute("title")).toContain("2 fonte(s) validada(s)");
+  });
+  it("mostra tema persistido e oferece escolha claro, escuro ou sistema", async () => {
+    render(<App />);
+    await screen.findByRole("navigation", { name: "Navegação principal" });
+    const main = await screen.findByRole("main");
+    expect(main.closest(".app")?.getAttribute("data-theme")).toBe("system");
+    fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
+    expect(screen.getByLabelText("Aparência")).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Claro" })).toBeTruthy();
+    expect(screen.getByRole("option", { name: "Escuro" })).toBeTruthy();
+  });
+  it("oculta domínios das fontes em mensagens comuns", async () => {
+    vi.mocked(api.Search).mockRejectedValue(new Error("GET https://api.animefire.one/animes/pesquisar falhou"));
+    const input = await searchScreen();
+    fireEvent.change(input, { target: { value: "naruto" } });
+    fireEvent.submit(input.closest("form")!);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).not.toMatch(/animefire|animesonlinecc|https?:\/\//i);
+    expect(alert.textContent).toContain("serviço externo");
+  });
+  it("encerra o carregamento quando a pesquisa falha", async () => {
+    vi.mocked(api.Search).mockRejectedValue(
+      new Error("Fonte temporariamente indisponível"),
+    );
+    const input = await searchScreen();
+    fireEvent.change(input, { target: { value: "naruto" } });
+    fireEvent.submit(input.closest("form")!);
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByRole("alert").textContent).toContain(
+      "Fonte temporariamente indisponível",
+    );
+  });
+  it("descarta uma resposta antiga após uma nova busca", async () => {
+    let resolveOld!: (r: SearchResult) => void;
+    vi.mocked(api.Search)
+      .mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            resolveOld = r;
+          }),
+      )
+      .mockResolvedValueOnce({
+        items: [],
+        page: 1,
+        hasNext: false,
+        warnings: [],
+      });
+    const input = await searchScreen();
+    fireEvent.change(input, { target: { value: "antigo" } });
+    fireEvent.submit(input.closest("form")!);
+    fireEvent.change(input, { target: { value: "atual" } });
+    fireEvent.submit(input.closest("form")!);
+    await screen.findByText(/Nenhum anime encontrado/);
+    await act(async () =>
+      resolveOld({
+        items: [],
+        page: 1,
+        hasNext: true,
+        warnings: ["RESPOSTA ANTIGA"],
+      }),
+    );
+    expect(screen.queryByText("RESPOSTA ANTIGA")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Carregar mais" })).toBeNull();
+    expect(api.Cancel).toHaveBeenCalled();
+  });
+  it("mantém o painel fechado enquanto o download avança", async () => {
+    const { container } = render(<App />);
+    await screen.findByTitle("Downloads");
+    const toggle = container.querySelector<HTMLButtonElement>(".download-toggle")!;
+    fireEvent.click(toggle);
+    fireEvent.click(screen.getByRole("button", { name: "Fechar downloads" }));
+    act(() =>
+      events.get("download")?.({
+        id: "d1",
+        anime: { title: "Teste" },
+        episode: { number: 1 },
+        status: "downloading",
+        percent: 42,
+        kind: "anime",
+      }),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Downloads, 1 ativos" })).toBeTruthy(),
+    );
+    expect(
+      screen.queryByRole("region", { name: "Downloads" }),
+    ).toBeNull();
+  });
+});

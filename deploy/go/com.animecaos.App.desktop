@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=AnimeCaos
+Comment=Animes e mangás
+Exec=AnimeCaos
+Icon=com.animecaos.App
+Terminal=false
+Categories=AudioVideo;Video;Player;
+StartupWMClass=AnimeCaos

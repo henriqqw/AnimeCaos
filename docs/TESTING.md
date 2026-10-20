@@ -1,14 +1,120 @@
 # Testes e validação
 
+## Preparação para publicação — 19/10/2026
+
+Esta seção registra a rodada de release sem confundir arquivos de automação com
+execuções concluídas. O workflow `.github/workflows/ci.yml` executa testes Go,
+race no Ubuntu 24.04, TypeScript e Vitest em runners Windows e Linux. O workflow
+`.github/workflows/release.yml` constrói pacotes somente em tags `v*`, valida
+assinatura/checksums e roda smoke tests. Os resultados da execução local desta
+rodada estão registrados na tabela; o workflow remoto só conta como validado
+quando um run real estiver concluído.
+
+O smoke test empacotado cobre inicialização do executável, criação do banco,
+importação de um histórico legado por JSON e preservação do backup, update do
+ZIP, reinício do processo, preservação byte a byte do banco e desinstalação.
+O pipeline testa ainda o MPV empacotado com um vídeo audiovisual sintético,
+seek e EOF natural. O smoke do AppImage testa MPV/FFmpeg/FFprobe e
+Firefox/GeckoDriver extraídos da imagem, abre o aplicativo, aplica atualização
+e confere a preservação de `state.db`. As fixtures Go/TS cobrem busca,
+capítulos/leitor, conta OAuth e mutations contra servidores locais; não são
+login real, sincronização de conta real nem uma jornada visual em janela
+instalada.
+
+| Verificação de release | Resultado nesta rodada |
+|---|---|
+| `go test ./... -count=1` | Passou no Windows em 19/10/2026 após a correção do teste de timeout. |
+| `CGO_ENABLED=1 go test -race ./... -count=1` | Primeira execução identificou leitura concorrente de um timeout global mutável; o timeout foi tornado constante e o teste passou na repetição no Ubuntu 24.04/WSL. |
+| `cd frontend; npm exec -- tsc --noEmit` | Passou numa cópia temporária isolada do frontend em 19/10/2026. |
+| `cd frontend; npm test -- --run` | Passou: 27/27 testes numa cópia temporária isolada do frontend. |
+| ZIP portátil Windows — reconstruído com recursos PE Wails, 19/10/2026 | `AnimeCaos-3.0.0-windows-amd64.zip`, 612.758.558 bytes; SHA-256 `caea18f996575df07d5c68444e52e4557337ffcd51f4bc3f401de6ce680f6938`. Inclui MPV, FFmpeg/FFprobe, Firefox 157.0.1, GeckoDriver 0.37.1 e WebView2 fixo 155.0.4283.62. |
+| Instalador Inno Setup — recompilado com o stage novo, 19/10/2026 | `AnimeCaos-3.0.0-windows-setup.exe`, 433.118.388 bytes; SHA-256 `60a83095241671d6fb535e389b5949dbba40bee373a7aa3c673edef19df8b6df`. Compilado por Inno Setup 6.7.1 oficial; sem assinatura Authenticode. A jornada Inno install/update/uninstall e VM limpa não foram executadas nesta rodada. |
+| WebView2 do Windows | Wails usou o runtime local 155.0.4283.62 incluído no pacote. A instância empacotada abriu uma janela e renderizou a tela inicial; o teste não substitui uma VM limpa. |
+| Firefox e MPV do stage Linux | Firefox/GeckoDriver resolveu o iframe criado por JavaScript; MPV/FFmpeg decodificou H.264/AAC, avançou a posição e fez seek no vídeo de teste. |
+| AppImage Ubuntu 24.04 x86_64 — reconstruído, 19/10/2026 | `AnimeCaos-3.0.0-x86_64.AppImage`, 283.871.736 bytes; SHA-256 `5fe8bfcfdf71317e1599527d8fcb56fc1a6f5cb15ce2803fa9bc24a22967cd42`. Firefox 157.0.1, GeckoDriver 0.37.1, MPV e FFmpeg/FFprobe estão incluídos. |
+| Startup/update AppImage + banco — reconstruído, 19/10/2026 | `verify-appimage.sh` passou em Ubuntu 24.04/WSL: a imagem abriu, testou iframe JavaScript e MPV H.264/AAC com seek, aplicou atualização e preservou `state.db`. É um smoke local, não validação numa VM limpa. |
+| Ícone Windows no executável e instalador | O PE do executável extraído do ZIP e o ícone associado ao instalador Inno foram extraídos com `System.Drawing.Icon.ExtractAssociatedIcon`; inspeção visual confirmou o logo AnimeCaos nos dois. Stage do instalador usa o mesmo executável Wails. A janela após instalação em VM limpa ainda não foi inspecionada. |
+| Inno Setup local | Instalador oficial 6.7.1 baixado do GitHub oficial, assinatura Authenticode `Valid` (Pyrsys B.V.) e compilação concluída com `ISCC.exe`. |
+| Checksums dos pacotes | `cd /mnt/d/AnimeCaos/release && sha256sum -c SHA256SUMS` passou para o ZIP Windows, instalador Windows e AppImage. |
+| AniList/MAL reais | Não executado; fixtures validam o protocolo sem alterar contas externas |
+
+Comandos da reconstrução desta rodada:
+
+```powershell
+go run ./cmd/package -version 3.0.0 -skip-ui
+& 'D:\AnimeCaos\build\tools\inno-setup-6.7.1\ISCC.exe' '/DPackageDir=D:\AnimeCaos\release\stage-windows-4195403612' '/DAppVersion=3.0.0' 'deploy/go/windows.iss'
+```
+
+```bash
+export PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export ANIMECAOS_FIREFOX_BUNDLE_DIR=/mnt/d/AnimeCaos/bin/release-linux/firefox
+export ANIMECAOS_GECKODRIVER_BUNDLE_PATH=/mnt/d/AnimeCaos/bin/release-linux/geckodriver
+cd /mnt/d/AnimeCaos
+go run ./cmd/package -version 3.0.0 -skip-ui
+bash deploy/go/build-appimage.sh release/stage-linux-1455756168 3.0.0
+cd release
+sha256sum AnimeCaos-3.0.0-windows-amd64.zip AnimeCaos-3.0.0-windows-setup.exe AnimeCaos-3.0.0-x86_64.AppImage > SHA256SUMS
+sha256sum -c SHA256SUMS
+```
+
+O compilador Inno Setup 6.7.1 foi baixado do GitHub do fornecedor e a
+assinatura Authenticode foi conferida antes da instalação local. Os scripts de
+empacotamento substituíram os artefatos e stages anteriores de mesma plataforma
+e versão; versões diferentes na pasta `release/` não são removidas.
+
+Comando usado para validar o AppImage final (o executável testado corresponde
+ao mesmo hash do arquivo copiado para `release/`):
+
+```bash
+wsl -d Ubuntu-24.04 -- bash -lc 'set -e; export PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; cd /mnt/d/AnimeCaos; bash deploy/go/verify-appimage.sh release/AnimeCaos-3.0.0-x86_64.AppImage /tmp/animecaos-build-verify-20261019-instanceid'
+```
+
+O AppImage foi construído com bibliotecas/runtime para Ubuntu 24.04, mas ainda
+precisa passar por uma VM/instalação limpa. A compatibilidade declarada não
+inclui outras distribuições Linux. A validação do instalador Windows em VM
+limpa, a primeira execução remota dos workflows, assinatura de código e
+assinatura Sigstore de uma release continuam pendentes.
+
+O cofre Linux exige Secret Service em sessão de usuário; o smoke AppImage em
+CI sem daemon de segredos valida a abertura do app, mas não prova criação de
+credenciais em GNOME Keyring/KWallet. Rotacione o Client Secret MAL que foi
+exposto no suporte antes de qualquer release.
+
+## HTTP 502 ao abrir o instalador Windows — 19/10/2026
+
+A janela de erro era a instância antiga `AnimeCaos-dev.exe`, não o WebView2 do
+instalador: dev e produção compartilhavam `com.animecaos.App`, e o processo dev
+continuava aberto depois que seu servidor Vite parou. O endpoint local do dev
+em `127.0.0.1:34115` respondia HTTP 502. O segundo lançamento da build instalada
+foi encaminhado para essa janela pelo mutex compartilhado. Agora os build tags
+`dev` e produção selecionam, respectivamente, `com.animecaos.App.dev` e
+`com.animecaos.App.production`.
+
+| Comando/validação | Resultado |
+|---|---|
+| `go test ./... -count=1` | Passou em todos os pacotes Go. |
+| `go test -tags desktop,production . -run '^TestAppInstanceIDUsesProductionNamespace$' -count=1` | Passou; a configuração exata de tags do executável empacotado usa o ID de produção. |
+| `go test -tags dev . -run '^TestAppInstanceIDUsesDevelopmentNamespace$' -count=1` | Passou; a build `dev` usa seu próprio ID. |
+| `Invoke-WebRequest -Uri 'http://127.0.0.1:34115/' -TimeoutSec 4 -UseBasicParsing` | Reproduziu HTTP 502 no servidor Vite da instância dev antiga. |
+| Executável Windows do stage iniciado com `ANIMECAOS_DATA_DIR` isolado enquanto o PID dev 105132 permanecia ativo | Processo empacotado separado (PID 107500), banco de teste criado e homepage renderizada em janela 1280×820. A janela usada era a cópia do executável incluído no instalador, não uma instalação Inno; a jornada de instalação permanece pendente. |
+| `bash deploy/go/verify-appimage.sh release/AnimeCaos-3.0.0-x86_64.AppImage /tmp/animecaos-build-verify-20261019-instanceid` | Passou em Ubuntu 24.04/WSL: app abriu, atualização aplicada e banco preservado. |
+
+Smoke Windows usado para separar o diretório de dados da instalação real:
+
+```powershell
+$env:ANIMECAOS_DATA_DIR='D:\AnimeCaos\build\instance-id-smoke-20261019'
+Start-Process -FilePath 'D:\AnimeCaos\release\stage-windows-3181843791\AnimeCaos.exe'
+```
+
 ## AniList e MyAnimeList — conta e sincronização automática — 19/10/2026
 
-Configurações e a tela Contas compartilham cards com os favicons locais, estado da conexão, login pelo navegador, atualizar perfil, desconectar e erro de OAuth. O Client Secret MAL é opcional, pode ser salvo/removido localmente e nunca volta ao frontend. O jogador só marca o episódio como assistido no EOF natural ou quando encerra com pelo menos 80% da duração conhecida; a sincronização consulta a lista antes de escrever, não regride o progresso e mantém obras concluídas. As gravações de lista foram verificadas contra fixtures HTTP, sem utilizar uma conta real.
+Configurações e a tela Contas compartilham cards com os favicons locais, estado da conexão, login pelo navegador, atualizar perfil, desconectar e erro de OAuth. Os campos de Client ID/Secret MAL foram removidos da interface; o Client ID é configuração do app, e um segredo previamente salvo continua no cofre para compatibilidade. O teste de integração frontend foi ajustado para o Rich Presence como switch e não configura segredo pela tela. O jogador só marca o episódio como assistido no EOF natural ou quando encerra com pelo menos 80% da duração conhecida; a sincronização consulta a lista antes de escrever, não regride o progresso e mantém obras concluídas. As gravações de lista foram verificadas contra fixtures HTTP, sem utilizar uma conta real.
 
 | Comando/validação | Resultado |
 |---|---|
 | `go test ./... -count=1` (reexecução em 19/10/2026) | Passou em todos os pacotes. A tentativa anterior descrita abaixo recebeu `net::ERR_UNSAFE_PORT` em fixture Chromium e passou na repetição. |
 | `cd frontend; npm exec -- tsc --noEmit` (19/10/2026) | Passou sem diagnósticos. |
-| `cd frontend; npm test -- --run` (19/10/2026) | A primeira execução teve 26/27: falhou o teste de navegação das setas do destaque. A repetição completa passou com 27/27; o teste isolado também passou. O teste novo de integrações confere logos, Client Secret, conexão AniList e perfil. |
+| `cd frontend; npm test -- --run` (19/10/2026) | A primeira execução teve 26/27: falhou o teste de navegação das setas do destaque. A repetição completa passou com 27/27; o teste isolado também passou. O teste de integrações conferia logos, configuração local do Client Secret, conexão AniList e perfil antes da remoção dos campos. |
 | `TestSyncUpdatesMALListAtWatchThreshold`, `TestSyncMarksAniListCompleteOnlyAtFinalEpisode`, `TestSyncDoesNotMoveMALProgressBackwards`, `TestMALTokenExchangeUsesBasicClientAuthentication` e `TestMALRefreshUsesBasicAuthenticationAndPreservesRefreshToken` | Passaram dentro do pacote `internal/integrations`; verificam leitura prévia, headers, HTTP Basic com segredo, renovação, progresso, status, proteção contra regressão e mutations contra `httptest`. |
 | `TestEpisodeWatchedRequiresEOFOrEightyPercent` | Passou dentro do pacote `internal/player`; fechar aos 31 s ou sem duração não marca como assistido. |
 | Download de `https://anilist.co/favicon.ico` e `https://myanimelist.net/favicon.ico` | Ambos responderam HTTP 200; os favicons foram guardados em `frontend/public/`. |
@@ -16,7 +122,11 @@ Configurações e a tela Contas compartilham cards com os favicons locais, estad
 
 `go env CGO_ENABLED` retornou `0`; `go test -race ./...` não foi executado neste ambiente. `git diff --check` passou com avisos de normalização LF/CRLF nos arquivos modificados.
 
-O endpoint OAuth do MAL redirecionou o Client ID configurado para a página de login (HTTP 303). A troca do código falso no endpoint de token com autenticação Basic e senha vazia ainda retornou `invalid_client`; o painel agora permite salvar o Client Secret correspondente se esse cliente exigir segredo. Não foi usado código real nem conta autenticada.
+O endpoint OAuth do MAL redirecionou o Client ID do app para a página de login (HTTP 303). A troca do código falso no endpoint de token com autenticação Basic e senha vazia retornou `invalid_client`. Os controles de credenciais foram removidos da tela do usuário; o login de primeira conexão continua pendente até o cadastro OAuth do AnimeCaos suportar cliente público para desktop ou usar um intermediário seguro. Não foi usado código real nem conta autenticada.
+
+### Interface de integrações — 20/10/2026
+
+Os campos MAL de cadastro OAuth saíram de Configurações e o Client ID passou a ser resolvido internamente pelo serviço. Um segredo que já esteja no cofre permanece disponível para a integração nesta instalação. O controle de Rich Presence Discord foi convertido para switch e as instruções do Developer Portal foram retiradas da interface. A suíte TypeScript/frontend não foi executada nesta alteração.
 
 ## Comandos locais
 
@@ -49,6 +159,15 @@ O catálogo não consulta títulos vazios ao abrir. A pesquisa tem estado local 
 | `cd frontend; npm exec -- tsc --noEmit` | Passou após implementar o fluxo de leitor. |
 | `cd frontend; npm test -- --run` | Passou: 26 testes, incluindo pesquisa → capítulos → páginas, progresso salvo e retry de erro de páginas. |
 | Inspeção visual da janela Wails | Não executada nesta sessão: a inicialização de automação de tela falhou antes de disponibilizar a janela. A inspeção manual permanece pendente. |
+
+## Pesquisa contextual de mangás — 19/10/2026
+
+O campo global muda o nome acessível e o placeholder para “Buscar mangás...” no catálogo, na lista de capítulos e no leitor. Enviar uma consulta a partir dessas telas abre o catálogo com essa busca; `Ctrl+K` foca o mesmo campo sem trocar para a área de animes. Fora das rotas de mangá, a busca de animes mantém seu fluxo atual.
+
+| Comando/validação | Resultado |
+|---|---|
+| `cd frontend; npm exec -- tsc --noEmit` | Passou em 19/10/2026 numa cópia isolada do frontend; dependências não estavam instaladas no `frontend/node_modules` do projeto. |
+| `cd frontend; npm test -- --run` | Passou: 27/27 testes em 19/10/2026 na mesma cópia. O teste de interface percorre catálogo → capítulos → leitor, envia a busca pelo cabeçalho e verifica o atalho `Ctrl+K`. |
 
 O teste Go inicial falhou ao tentar criar o temporário em `C:\Users\caosdev\AppData\Local\Temp` (C: sem espaço). Usar temporários/cache no D: permitiu executar o live. O acesso HTTPS direto pelo `Invoke-WebRequest`/Schannel também falhou com `ProtocolVersion`, mas o cliente Go do aplicativo consultou MangaDex com sucesso. O usuário não precisa mudar DNS por causa desse resultado local.
 
@@ -535,3 +654,84 @@ A janela de desenvolvimento foi inspecionada em 900×600 px na tela Configuraç�
 | `cd frontend; npm exec -- tsc --noEmit` | Passou sem diagnósticos TypeScript |
 | `git diff --check` | Passou; Git avisou apenas que normalizará LF para CRLF nos arquivos alterados |
 | Testes automatizados | Não executados nesta alteração de CSS |
+
+## Integração visual e OAuth Discord — 20/10/2026
+
+A tela de integrações agora exibe o símbolo local do Discord, um controle de Rich Presence com indicação Ativo/Desativado e instruções curtas para configurar o nome, ícone e asset `logo` no Developer Portal. Os cartões de Discord/AniList/MAL ajustam as colunas ao espaço disponível. A tela Contas explica que o Discord identifica o perfil; o histórico assistido é sincronizado apenas pelo AniList/MAL.
+
+O OAuth Discord usa callback loopback, `state`, `iss`, PKCE S256 e gravação no cofre seguro. Fixtures validam o fluxo de sucesso e a recusa/cancelamento com retorno imediato. O teste de presença valida payload, anime/episódio, relógio MPV, pausa e retomada.
+
+| Comando | Resultado |
+|---|---|
+| `go test ./internal/integrations ./internal/app ./internal/netx` | Passou |
+| `go test ./...` | Passou em todos os pacotes |
+| `cd frontend; npm exec -- tsc --noEmit` | Passou sem diagnósticos TypeScript |
+| `cd frontend; npm test -- --run` | Passou: 27 testes |
+| `go env CGO_ENABLED` | `0`; `go test -race ./...` não foi executado porque CGO está desabilitado |
+| `git diff --check` | Passou; Git avisou sobre normalização LF/CRLF em arquivos modificados |
+
+Não foi possível validar a autorização com uma conta real nem a presença no Discord Desktop nesta rodada. Para testar o fluxo externo, o Developer Portal precisa ter o cliente público habilitado e a URI `http://127.0.0.1:9744/` registrada. Para a imagem no perfil, configure o nome/ícone da aplicação e a arte com a chave `logo`. Até essa validação, o estado de conta real e a apresentação da arte permanecem pendentes.
+
+## Refatoração de Configurações — 20/10/2026
+
+A tela agora usa seções abertas em uma coluna, índice contextual, resumo de integrações e persistência automática. A fila de Configurações pertence ao `App`: aplica alterações imediatamente, aguarda 350 ms para agrupar edições, serializa chamadas Wails e mantém a escolha quando há falha. Manutenção tem feedback independente. Os testes DOM cobrem debounce/coalescência, ausência de gravação ao abrir, gravações em sequência, retry, navegação ao índice e Contas, ativação de switch pela barra de espaço e campos condicionais.
+
+| Verificação | Resultado nesta rodada |
+|---|---|
+| Executado no diretório `frontend/`: `npm exec -- tsc --noEmit` | Passou sem diagnósticos TypeScript em 20/10/2026. |
+| Executado no diretório `frontend/`: `npm test -- --run` | Passou: 30/30 testes DOM em 20/10/2026. |
+| `git diff --check` na raiz | Passou sem erros de whitespace; o Git emitiu avisos de normalização LF/CRLF em arquivos já modificados na árvore de trabalho. |
+| Inspeção visual Wails em 1440×900, 1280×720, 960×600, 760 px e largura móvel | Pendente. A tentativa de iniciar o helper Computer Use falhou ao criar os assets do kernel (`The system cannot find the path specified`); nenhuma ação foi feita na janela do app. O CSS responsivo e os testes DOM foram revisados. |
+
+## Descoberta da página de Mangás — 20/10/2026
+
+A entrada de Mangás agora segue a descoberta da Home: destaque manual com navegação, prateleiras de títulos populares, capítulos adicionados recentemente e obras em publicação, gêneros do catálogo MangaDex e retomada de leitura. A API MangaDex é a fonte dos metadados; o bloco “Em alta” mede atividade de publicação recente, não audiência. O catálogo MangaDex não fornece uma temporada de anime confiável para classificar mangás, então a tela não inventa essa relação.
+
+| Comando/verificação | Resultado nesta rodada |
+|---|---|
+| `go test ./...` | Passou em todos os pacotes. |
+| Executado em `frontend/`: `npm exec -- tsc --noEmit` | Passou sem diagnósticos TypeScript. |
+| Executado em `frontend/`: `npm test -- --run` | Passou: 31 testes. |
+| `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado porque CGO está desabilitado. |
+| `git diff --check` | Passou sem erros de whitespace; Git avisou que arquivos alterados com LF podem ser normalizados para CRLF. |
+| Consulta live das novas prateleiras e inspeção visual na janela Wails | Pendentes. Os testes usam fixtures e DOM; não comprovam disponibilidade live nem acabamento visual em cada resolução. |
+
+## Paridade visual entre Mangás e Home — 20/10/2026
+
+A rota de Mangás passou a reutilizar o banner `spotlight`, os cabeçalhos `shelf-heading`, os trilhos `home-shelf`/`Rail`, os cartões de pôster para retomada e a largura de conteúdo da Home. A busca embutida no destaque foi removida; o cabeçalho contextual é o campo único para buscar mangás. O teste DOM confirma o banner compartilhado, uma única caixa de busca, cartão de retomada, descoberta por gênero e abertura do fluxo de capítulo.
+
+| Comando/verificação | Resultado nesta rodada |
+|---|---|
+| Executado em `frontend/`: `npm exec -- tsc --noEmit` | Passou sem diagnósticos TypeScript. |
+| Executado em `frontend/`: `npm test -- --run` | Passou: 31 testes. |
+| `git diff --check` | Passou sem erros de whitespace; avisos de normalização LF/CRLF podem aparecer nos arquivos já modificados. |
+| Inspeção visual Wails em janela | Pendente; a revisão desta correção comparou a estrutura JSX/CSS compartilhada e validou o contrato pelo DOM. |
+
+## CTA das capas na Home — 20/10/2026
+
+As capas de “Continuar assistindo”, “Em alta” e “Temporada atual” revelam “Ver anime” no hover e no foco de teclado. A sobreposição não é um controle separado: ativar o card preserva o destino e a ação já existentes. A animação da sobreposição é desligada com `prefers-reduced-motion`. Um teste DOM cobre as três prateleiras e a navegação de um card para a busca.
+
+| Comando/verificação | Resultado nesta rodada |
+|---|---|
+| Executado em `frontend/`: `npm exec -- tsc --noEmit` | Passou sem diagnósticos TypeScript. |
+| Executado em `frontend/`: `npm test -- --run` | Passou: 32 testes. |
+| `git diff --check` | Passou sem erros de whitespace. Git avisou que arquivos já alterados na árvore de trabalho podem ser normalizados de LF para CRLF. |
+
+## Prévia de sinopse nas capas de mangá — 20/10/2026
+
+As capas das prateleiras de descoberta exibem um painel com título e sinopse após hover ou foco. A implementação usa o campo `description` já carregado pelo catálogo e não consulta `Preview` nem outro endpoint por card. Os textos auxiliares dos cabeçalhos das seções foram removidos; a ficha mantém o status junto ao título do card.
+
+| Comando/verificação | Resultado nesta rodada |
+|---|---|
+| Executado em `frontend/`: `npm exec -- tsc --noEmit` | Passou sem diagnósticos TypeScript. |
+| Executado em `frontend/`: `npm test -- --run` | Passou: 32 testes DOM; inclui painel, sinopse, associação `aria-describedby`, ausência de chamada por card e remoção dos subtítulos de seção. |
+| `git diff --check` | Passou sem erros de whitespace; avisos de normalização LF/CRLF foram emitidos para arquivos já modificados na árvore. |
+
+## Artes da mascote AnimeCaos — 20/10/2026
+
+As artes v3 registram a personagem com cabelo vermelho longo, liso e repartido ao meio, saia preta lisa e contorno preto. A versão mini é superdeformed, com cabeça maior e corpo simplificado; a cópia de 256×256 px foi derivada dela. O diretório `poses/` contém seis vistas (frente, perfis, fisheye e costas) e uma pose adicional de piscada. O diretório `reactions/` contém dez expressões. A integração visual aos cards de categoria ainda não foi feita.
+
+| Verificação | Resultado nesta rodada |
+|---|---|
+| Inspeção PowerShell com `System.Drawing.Bitmap` (`Width`, `Height`, alpha de `(0,0)` e pixel central) | Normal e mini v3: 1254×1254, alpha 0 no canto e 253 no centro. Miniatura: 256×256, alpha 0 no canto e 252 no centro. As sete poses e dez reações também têm alpha 0 no canto e conteúdo visível no centro. |
+| Testes TypeScript e DOM | Não executados: esta rodada altera apenas PNGs e documentação, sem componentes ou comportamento. |

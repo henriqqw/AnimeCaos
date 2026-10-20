@@ -36,7 +36,7 @@ func TestMPVIntegration(t *testing.T) {
 			defer c.Stop()
 			ctx, cancel := context.WithTimeout(context.Background(), 25*time.Second)
 			defer cancel()
-			if e := c.Start(ctx, fixture, "mpv", "", 0, "test"); e != nil {
+			if e := c.start(ctx, fixture, "mpv", "", 0, "test", []string{"--vo=null", "--ao=null", "--speed=0.25"}); e != nil {
 				t.Fatal(e)
 			}
 			stopped := false

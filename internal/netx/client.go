@@ -21,7 +21,7 @@ type HTTPError struct {
 
 func (e *HTTPError) Error() string {
 	if e.Code == "invalid_client" {
-		return "cliente OAuth recusado (invalid_client): confira Client ID, Client Secret, tipo e redirect registrados no MyAnimeList"
+		return "cliente OAuth recusado (invalid_client): confira Client ID, Client Secret e tipo/configuração do aplicativo no provedor"
 	}
 	if e.Code == "invalid_grant" {
 		return "código de autorização inválido ou expirado (invalid_grant); inicie um novo login"

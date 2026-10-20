@@ -1,0 +1,304 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Release tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Linux desktop build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Go tests
+        run: go test ./...
+      - name: Go race tests
+        if: runner.os == 'Linux'
+        run: go test -race ./...
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: TypeScript check
+        working-directory: frontend
+        run: npm exec -- tsc --noEmit
+      - name: Frontend tests
+        working-directory: frontend
+        run: npm test -- --run
+
+  windows:
+    name: Windows portable, installer, update, uninstall, and signatures
+    needs: verify
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Require release signing certificate
+        env:
+          WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PFX_BASE64) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
+            throw 'Configure os secrets WINDOWS_CERTIFICATE_PFX_BASE64 e WINDOWS_CERTIFICATE_PASSWORD antes de criar uma tag de release.'
+          }
+      - name: Install pinned media tools
+        shell: pwsh
+        run: |
+          choco install mpvio.install --version=0.41.0 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Não foi possível instalar mpv 0.41.0' }
+          choco install ffmpeg --version=9.0.2 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Não foi possível instalar FFmpeg 9.0.2' }
+          choco install innosetup --version=6.7.1 --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'Não foi possível instalar Inno Setup 6.7.1' }
+          $mpv = Get-ChildItem "$env:ChocolateyInstall\lib\mpvio.install" -Filter mpv.exe -Recurse -File | Select-Object -First 1
+          $ffmpeg = Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Filter ffmpeg.exe -Recurse -File | Select-Object -First 1
+          $ffprobe = Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Filter ffprobe.exe -Recurse -File | Select-Object -First 1
+          if (-not $mpv -or -not $ffmpeg -or -not $ffprobe) { throw 'Os pacotes não forneceram todos os executáveis de mídia' }
+          New-Item -ItemType Directory -Force bin | Out-Null
+          Copy-Item $mpv.FullName bin/mpv.exe -Force
+          Get-ChildItem $mpv.DirectoryName -Filter '*.dll' -File | Copy-Item -Destination bin -Force
+          Copy-Item $ffmpeg.FullName bin/ffmpeg.exe -Force
+          Copy-Item $ffprobe.FullName bin/ffprobe.exe -Force
+          $mpvLicense = Get-ChildItem "$env:ChocolateyInstall\lib\mpvio.install" -Filter LICENSE.txt -Recurse -File | Select-Object -First 1
+          $mpvVerification = Get-ChildItem "$env:ChocolateyInstall\lib\mpvio.install" -Filter VERIFICATION.txt -Recurse -File | Select-Object -First 1
+          $ffmpegLicense = Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Filter LICENSE.txt -Recurse -File | Select-Object -First 1
+          $ffmpegVerification = Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Filter VERIFICATION.txt -Recurse -File | Select-Object -First 1
+          if (-not $mpvLicense -or -not $mpvVerification -or -not $ffmpegLicense -or -not $ffmpegVerification) { throw 'Os pacotes de mídia não trouxeram licença e verificação de origem' }
+          New-Item -ItemType Directory -Force release/licenses/media/mpv, release/licenses/media/ffmpeg | Out-Null
+          Copy-Item $mpvLicense.FullName release/licenses/media/mpv/ -Force
+          Copy-Item $mpvVerification.FullName release/licenses/media/mpv/ -Force
+          Copy-Item $ffmpegLicense.FullName release/licenses/media/ffmpeg/ -Force
+          Copy-Item $ffmpegVerification.FullName release/licenses/media/ffmpeg/ -Force
+          Copy-Item (Join-Path (Split-Path $mpvLicense.FullName) 'LICENSE.mpv-install.txt') release/licenses/media/mpv/ -Force
+          Copy-Item (Get-ChildItem "$env:ChocolateyInstall\lib\mpvio.install" -Filter '*.nuspec' -Recurse -File | Select-Object -First 1).FullName release/licenses/media/mpv/package.nuspec -Force
+          Copy-Item (Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Filter '*.nuspec' -Recurse -File | Select-Object -First 1).FullName release/licenses/media/ffmpeg/package.nuspec -Force
+          & bin/mpv.exe --version | Select-Object -First 1
+          if ($LASTEXITCODE -ne 0) { throw 'mpv empacotado não inicia' }
+          & bin/ffmpeg.exe -version | Select-Object -First 1
+          if ($LASTEXITCODE -ne 0) { throw 'FFmpeg empacotado não inicia' }
+      - name: Download and verify fixed WebView2 runtime
+        shell: pwsh
+        run: ./deploy/go/download-webview2-runtime.ps1
+      - name: Download and verify Firefox and GeckoDriver runtimes
+        shell: pwsh
+        run: ./deploy/go/download-browser-runtime.ps1
+      - name: Collect Go and frontend license material
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release/licenses/frontend | Out-Null
+          go install github.com/google/go-licenses/v2@v2.0.1
+          $goBin = Join-Path (go env GOPATH) 'bin'
+          $env:PATH = "$goBin;$env:PATH"
+          $env:GOFLAGS = '-tags=desktop,production'
+          & (Join-Path $goBin 'go-licenses.exe') save . --ignore github.com/henriqqw/animecaos --force --save_path=release/licenses/go-third-party
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao reunir licenças das dependências Go' }
+          & (Join-Path $goBin 'go-licenses.exe') report . --ignore github.com/henriqqw/animecaos | Out-File -Encoding utf8 release/licenses/go-dependencies.csv
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar relatório Go' }
+          Push-Location frontend
+          npx --yes --package=license-checker@25.0.1 -- license-checker --production --json --out ../release/licenses/frontend/production.json
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar relatório de licenças npm' }
+          Pop-Location
+      - name: Download app and build portable ZIP
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          $projectVersion = (Get-Content wails.json -Raw | ConvertFrom-Json).info.productVersion
+          if ($projectVersion -ne $version) { throw "Tag $version diverge de wails.json ($projectVersion)" }
+          go run ./cmd/package -version $version
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao empacotar AnimeCaos para Windows' }
+          $stage = Get-ChildItem release -Directory -Filter 'stage-windows-*' | Sort-Object LastWriteTime | Select-Object -Last 1
+          if (-not $stage) { throw 'Stage Windows não encontrado' }
+          $env:PATH = "$($stage.FullName)\bin;$env:PATH"
+          $env:ANIMECAOS_BROWSER_TEST = '1'
+          $env:ANIMECAOS_FIREFOX_PATH = Join-Path $stage.FullName 'bin/firefox/firefox.exe'
+          $env:ANIMECAOS_GECKODRIVER_PATH = Join-Path $stage.FullName 'bin/geckodriver.exe'
+          go test ./internal/providers -run '^TestBundledFirefoxDynamicPlayerFixture$' -count=1 -v
+          if ($LASTEXITCODE -ne 0) { throw 'Firefox/GeckoDriver empacotados não resolveram o iframe criado por JavaScript' }
+          Remove-Item Env:ANIMECAOS_BROWSER_TEST, Env:ANIMECAOS_FIREFOX_PATH, Env:ANIMECAOS_GECKODRIVER_PATH
+          $env:ANIMECAOS_WEBVIEW2_PATH = Join-Path $stage.FullName 'bin/webview2'
+          go test ./internal/platform -run '^TestBundledWebView2RuntimeVersion$' -count=1 -v
+          if ($LASTEXITCODE -ne 0) { throw 'O Wails não reconheceu a versão do WebView2 empacotado' }
+          Remove-Item Env:ANIMECAOS_WEBVIEW2_PATH
+          $env:PATH = "$($stage.FullName)\bin;$env:PATH"
+          $env:ANIMECAOS_PLAYER_TEST = '1'
+          go test ./internal/player -run '^TestMPVIntegration$' -count=1
+          if ($LASTEXITCODE -ne 0) { throw 'MPV não decodificou/fez seek na mídia de teste empacotada' }
+          Remove-Item Env:ANIMECAOS_PLAYER_TEST
+          Copy-Item release/licenses "$($stage.FullName)\licenses\dependency-reports" -Recurse -Force
+          $mediaDir = Join-Path $stage.FullName 'licenses/media'
+          New-Item -ItemType Directory -Force $mediaDir | Out-Null
+          Copy-Item release/licenses/media/mpv "$mediaDir/mpv-package" -Recurse -Force
+          Copy-Item release/licenses/media/ffmpeg "$mediaDir/ffmpeg-package" -Recurse -Force
+          & (Join-Path $stage.FullName 'bin/mpv.exe') --version | Out-File -Encoding utf8 "$mediaDir/mpv-version.txt"
+          & (Join-Path $stage.FullName 'bin/ffmpeg.exe') -version | Out-File -Encoding utf8 "$mediaDir/ffmpeg-version.txt"
+          & (Join-Path $stage.FullName 'bin/ffmpeg.exe') -L | Out-File -Encoding utf8 "$mediaDir/ffmpeg-license.txt"
+          Get-FileHash "$($stage.FullName)\bin\mpv.exe", "$($stage.FullName)\bin\ffmpeg.exe", "$($stage.FullName)\bin\ffprobe.exe" -Algorithm SHA256 | Format-Table -AutoSize | Out-File -Encoding utf8 "$mediaDir/binary-sha256.txt"
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'animecaos-release-signing.pfx'
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_PFX_BASE64))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
+          if (-not $signtool) { throw 'SignTool não está instalado no runner' }
+          foreach ($file in @("$($stage.FullName)\AnimeCaos.exe", "$($stage.FullName)\animecaos-cli.exe")) {
+            & $signtool.FullName sign /fd SHA256 /f $pfxPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $file
+            if ($LASTEXITCODE -ne 0) { throw "Não foi possível assinar $file" }
+            & $signtool.FullName verify /pa /all $file
+            if ($LASTEXITCODE -ne 0) { throw "A assinatura de $file não passou na verificação" }
+          }
+          & "$env:GITHUB_WORKSPACE/scripts/write-release-manifest.ps1" -Stage $stage.FullName -Version $version -Platform windows -Architecture amd64
+          $portable = "release/AnimeCaos-$version-windows-amd64.zip"
+          Remove-Item $portable -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path "$($stage.FullName)\*" -DestinationPath $portable -CompressionLevel Optimal
+          $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
+          if (-not $iscc) { $iscc = Get-ChildItem "${env:ProgramFiles(x86)}\Inno Setup *\ISCC.exe" | Select-Object -First 1 }
+          if (-not $iscc) { throw 'Inno Setup compiler não está no runner' }
+          & $iscc.Source "/DPackageDir=$($stage.FullName)" "/DAppVersion=$version" deploy/go/windows.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar instalador Inno Setup' }
+          & $signtool.FullName sign /fd SHA256 /f $pfxPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td SHA256 "release/AnimeCaos-$version-windows-setup.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Não foi possível assinar o instalador Inno Setup' }
+          & $signtool.FullName verify /pa /all "release/AnimeCaos-$version-windows-setup.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Assinatura do instalador não passou na verificação' }
+          Write-Output "Version=$version" >> $env:GITHUB_OUTPUT
+        env:
+          WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        id: package
+      - name: Verify portable, install, update, and uninstall
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.TrimStart('v')
+          & deploy/go/verify-windows-install.ps1 -Installer "release/AnimeCaos-$version-windows-setup.exe" -PortableZip "release/AnimeCaos-$version-windows-amd64.zip" -UpdateZip "release/AnimeCaos-$version-windows-amd64.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: |
+            release/AnimeCaos-*-windows-amd64.zip
+            release/AnimeCaos-*-windows-setup.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  linux:
+    name: Linux AppImage and update smoke test
+    needs: verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install native build, media, keyring, and smoke-test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libgirepository1.0-dev librsvg2-dev mpv ffmpeg xvfb dbus-x11 libsecret-1-0 jq
+      - name: Stage Linux media executables
+        run: |
+          mkdir -p bin
+          install -m 0755 "$(command -v mpv)" bin/mpv
+          install -m 0755 "$(command -v ffmpeg)" bin/ffmpeg
+          install -m 0755 "$(command -v ffprobe)" bin/ffprobe
+      - name: Download and verify Firefox and GeckoDriver runtimes
+        run: bash deploy/go/download-browser-runtime-linux.sh
+      - name: Collect Go license material
+        run: |
+          mkdir -p release/licenses/frontend
+          go install github.com/google/go-licenses/v2@v2.0.1
+          export GOFLAGS='-tags=desktop,production,webkit2_41'
+          "$(go env GOPATH)/bin/go-licenses" save . --ignore github.com/henriqqw/animecaos --force --save_path=release/licenses/go-third-party
+          "$(go env GOPATH)/bin/go-licenses" report . --ignore github.com/henriqqw/animecaos > release/licenses/go-dependencies.csv
+        env:
+          GOFLAGS: -tags=desktop,production,webkit2_41
+      - name: Collect frontend license report
+        working-directory: frontend
+        run: npm exec --yes --package=license-checker@25.0.1 -- license-checker --production --json --out ../release/licenses/frontend/production.json
+      - name: Package AppImage
+        id: package
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          project_version="$(node -p "require('./wails.json').info.productVersion")"
+          [[ "$version" == "$project_version" ]] || { echo "Tag $version diverge de wails.json ($project_version)" >&2; exit 1; }
+          go run ./cmd/package -version "$version"
+          stage="$(find release -maxdepth 1 -type d -name 'stage-linux-*' | sort | tail -n 1)"
+          [[ -n "$stage" ]] || { echo 'Stage Linux não encontrado' >&2; exit 1; }
+          ANIMECAOS_BROWSER_TEST=1 ANIMECAOS_FIREFOX_PATH="$stage/bin/firefox/firefox" ANIMECAOS_GECKODRIVER_PATH="$stage/bin/geckodriver" go test ./internal/providers -run '^TestBundledFirefoxDynamicPlayerFixture$' -count=1 -v
+          cp -a release/licenses "$stage/licenses/dependency-reports"
+          mkdir -p "$stage/licenses/media"
+          "$stage/bin/mpv" --version > "$stage/licenses/media/mpv-version.txt"
+          "$stage/bin/ffmpeg" -version > "$stage/licenses/media/ffmpeg-version.txt"
+          "$stage/bin/ffmpeg" -L > "$stage/licenses/media/ffmpeg-license.txt"
+          dpkg-query -W -f='${binary:Package}\t${Version}\n' mpv ffmpeg > "$stage/licenses/media/debian-package-versions.tsv"
+          cp /usr/share/doc/mpv/copyright "$stage/licenses/media/mpv-copyright.txt"
+          cp /usr/share/doc/ffmpeg/copyright "$stage/licenses/media/ffmpeg-copyright.txt"
+          sha256sum "$stage/bin/mpv" "$stage/bin/ffmpeg" "$stage/bin/ffprobe" > "$stage/licenses/media/binary-sha256.txt"
+          xvfb-run -a env PATH="$stage/bin:$PATH" ANIMECAOS_PLAYER_TEST=1 go test ./internal/player -run '^TestMPVIntegration$' -count=1
+          pwsh -File scripts/write-release-manifest.ps1 -Stage "$stage" -Version "$version" -Platform linux -Architecture x86_64
+          bash deploy/go/bootstrap-appimage-tools.sh
+          bash deploy/go/build-appimage.sh "$stage" "$version"
+          appimage="release/AnimeCaos-$version-x86_64.AppImage"
+          chmod +x "$appimage"
+          bash deploy/go/verify-appimage.sh "$appimage" "$RUNNER_TEMP/animecaos-appimage-data"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-release
+          path: release/AnimeCaos-*-x86_64.AppImage
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Sign manifests and create GitHub Release
+    needs: [windows, linux]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-release'
+          path: release
+          merge-multiple: true
+      - uses: sigstore/cosign-installer@v3
+      - name: Create checksums and keyless Sigstore signature
+        run: |
+          cd release
+          sha256sum AnimeCaos-*-windows-amd64.zip AnimeCaos-*-windows-setup.exe AnimeCaos-*-x86_64.AppImage > SHA256SUMS
+          cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
+      - name: Publish immutable release artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release create "$tag" release/AnimeCaos-*-windows-amd64.zip release/AnimeCaos-*-windows-setup.exe release/AnimeCaos-*-x86_64.AppImage release/SHA256SUMS release/SHA256SUMS.sigstore.json --verify-tag --generate-notes

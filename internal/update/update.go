@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-var Version = "3.0.0-dev"
+var Version = "3.0.0"
 
 type Info struct {
 	Version     string `json:"version"`
@@ -228,6 +228,31 @@ func Apply(helper, packagePath, target string, pid int) error {
 	return cmd.Start()
 }
 func RunHelper(packagePath, target string, pid int) error {
+	return runHelper(packagePath, target, pid, launchUpdatedApp)
+}
+
+func launchUpdatedApp(path string) error {
+	cmd := exec.Command(path)
+	platform.Hide(cmd)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	timer := time.NewTimer(3 * time.Second)
+	defer timer.Stop()
+	select {
+	case err := <-done:
+		if err != nil {
+			return fmt.Errorf("o aplicativo atualizado encerrou durante a inicialização: %w", err)
+		}
+		return fmt.Errorf("o aplicativo atualizado encerrou durante a inicialização")
+	case <-timer.C:
+		return nil
+	}
+}
+
+func runHelper(packagePath, target string, pid int, launch func(string) error) error {
 	if !filepath.IsAbs(target) || filepath.Clean(target) == filepath.VolumeName(target)+string(os.PathSeparator) {
 		return fmt.Errorf("destino de atualização inválido")
 	}
@@ -267,7 +292,7 @@ func RunHelper(packagePath, target string, pid int) error {
 			os.Rename(backup, target)
 			return e
 		}
-		if e = exec.Command(target).Start(); e != nil {
+		if e = launch(target); e != nil {
 			os.Rename(target, target+".failed")
 			os.Rename(backup, target)
 			return e
@@ -328,9 +353,7 @@ func RunHelper(packagePath, target string, pid int) error {
 		os.Rename(backup, target)
 		return e
 	}
-	cmd := exec.Command(filepath.Join(target, "AnimeCaos.exe"))
-	platform.Hide(cmd)
-	if e = cmd.Start(); e != nil {
+	if e = launch(filepath.Join(target, "AnimeCaos.exe")); e != nil {
 		os.Rename(target, target+".failed")
 		os.Rename(backup, target)
 		return e

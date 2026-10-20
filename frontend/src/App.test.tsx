@@ -9,9 +9,10 @@ import {
   within,
   waitFor,
 } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import App from "./App";
 import { api } from "./api";
-import type { Anime, Settings, SearchResult, History, Download, LocalFile, Manga, Chapter, Account } from "./types";
+import type { Anime, Settings, SearchResult, History, Download, LocalFile, Manga, MangaProgress, Chapter, Account } from "./types";
 const events = vi.hoisted(() => new Map<string, (data: unknown) => void>());
 vi.mock("./api", () => ({
   api: {
@@ -28,6 +29,8 @@ vi.mock("./api", () => ({
     Cancel: vi.fn(),
     Image: vi.fn(),
     MangaSearch: vi.fn(),
+    MangaDiscover: vi.fn(),
+    MangaByCategory: vi.fn(),
     Chapters: vi.fn(),
     ChaptersLanguage: vi.fn(),
     Pages: vi.fn(),
@@ -35,8 +38,6 @@ vi.mock("./api", () => ({
     SaveMangaProgress: vi.fn(),
     DownloadManga: vi.fn(),
     Accounts: vi.fn(),
-    MALClientSecretConfigured: vi.fn(),
-    SetMALClientSecret: vi.fn(),
     Login: vi.fn(),
     Logout: vi.fn(),
     RefreshAccount: vi.fn(),
@@ -65,7 +66,6 @@ const settings: Settings = {
   autoplay: true,
   audio: "legendado",
   discord: false,
-  malClientId: "public-id",
   width: 1280,
   height: 820,
   x: 0,
@@ -89,8 +89,6 @@ beforeEach(() => {
   vi.mocked(api.SaveSettings).mockResolvedValue();
   vi.mocked(api.ClearCache).mockResolvedValue();
   vi.mocked(api.Accounts).mockResolvedValue([]);
-  vi.mocked(api.MALClientSecretConfigured).mockResolvedValue(false);
-  vi.mocked(api.SetMALClientSecret).mockResolvedValue();
   vi.mocked(api.Login).mockResolvedValue();
   vi.mocked(api.Logout).mockResolvedValue();
   vi.mocked(api.RefreshAccount).mockResolvedValue({ provider: "anilist", connected: true, id: 1, name: "Conta", avatar: "", animeCount: 0, episodes: 0, minutes: 0, error: "" });
@@ -105,6 +103,8 @@ beforeEach(() => {
   vi.mocked(api.Cancel).mockResolvedValue();
   vi.mocked(api.Image).mockResolvedValue("");
   vi.mocked(api.MangaSearch).mockResolvedValue([]);
+  vi.mocked(api.MangaDiscover).mockResolvedValue({ featured: [], popular: [], recentlyUpdated: [], publishing: [], categories: [], warning: "" });
+  vi.mocked(api.MangaByCategory).mockResolvedValue([]);
   vi.mocked(api.Chapters).mockResolvedValue([]);
   vi.mocked(api.ChaptersLanguage).mockResolvedValue([]);
   vi.mocked(api.Pages).mockResolvedValue([]);
@@ -116,6 +116,7 @@ beforeEach(() => {
     disconnect() {}
     unobserve() {}
   } as unknown as typeof IntersectionObserver;
+  Element.prototype.scrollIntoView = vi.fn();
 });
 afterEach(cleanup);
 async function searchScreen() {
@@ -125,6 +126,45 @@ async function searchScreen() {
   return screen.getAllByRole("searchbox", { name: "Buscar animes" })[0];
 }
 describe("interface funcional", () => {
+  it("mostra descoberta de mangás no padrão da Home e filtra uma categoria", async () => {
+    const popular = { id: "popular-1", title: "One Piece", description: "Aventura no mar", cover: "", banner: "", status: "ongoing", languages: ["pt-br"] } as Manga;
+    const result = { id: "genre-1", title: "Dandadan", description: "Mistério e ação", cover: "", status: "ongoing", languages: ["pt-br"] } as Manga;
+    vi.mocked(api.MangaDiscover).mockResolvedValue({
+      featured: [popular], popular: [popular], recentlyUpdated: [], publishing: [],
+      categories: [{ id: "genre-id", name: "Ação" }], warning: "",
+    });
+    vi.mocked(api.MangaHistory).mockResolvedValue([{
+      manga: popular,
+      chapter: { id: "chapter-12", title: "", number: "12", volume: "", language: "pt-br", pages: 40 },
+      page: 16,
+      updated: 10,
+    } as MangaProgress]);
+    vi.mocked(api.MangaByCategory).mockResolvedValue([result]);
+    const { container } = render(<App />);
+    const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
+    fireEvent.click(within(navigation).getByRole("button", { name: "Mangás" }));
+    expect(await screen.findByRole("heading", { name: "Top mangás" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Categorias" })).toBeTruthy();
+    expect(container.querySelector(".manga-library > .spotlight")).toBeTruthy();
+    expect(screen.getAllByRole("searchbox", { name: "Buscar mangás" })).toHaveLength(1);
+    expect(container.querySelector(".manga-category-list")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ação" }).getAttribute("data-tone")).toBe("ember");
+    expect(container.querySelector(".manga-history-card.card .card-poster")).toBeTruthy();
+    expect(screen.queryByText("As obras mais acompanhadas no catálogo.")).toBeNull();
+    expect(screen.queryByText("Escolha um gênero e encontre sua próxima leitura.")).toBeNull();
+    const mangaCard = container.querySelector(".manga-shelf-card") as HTMLButtonElement;
+    fireEvent.mouseEnter(mangaCard);
+    const mangaPreview = await screen.findByRole("tooltip");
+    expect(mangaPreview.textContent).toContain("One Piece");
+    expect(mangaPreview.textContent).toContain("Aventura no mar");
+    expect(mangaCard.getAttribute("aria-describedby")).toBe(mangaPreview.id);
+    expect(api.Preview).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Ação" }));
+    expect(await screen.findByRole("heading", { name: "Ação" })).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Dandadan/ })).toBeTruthy();
+    expect(api.MangaByCategory).toHaveBeenCalledWith(expect.any(String), "genre-id");
+  });
+
   it("pesquisa, abre capítulos, lê páginas e salva o progresso do mangá", async () => {
     const manga = { id: "manga-1", title: "One Piece", description: "A tripulação parte em uma aventura.", cover: "", status: "ongoing", languages: ["pt-br"] } as Manga;
     const chapter = { id: "chapter-1", title: "Romance Dawn", number: "1", volume: "1", language: "pt-br", pages: 2 } as Chapter;
@@ -134,17 +174,27 @@ describe("interface funcional", () => {
     render(<App />);
     const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
     fireEvent.click(within(navigation).getByRole("button", { name: "Mangás" }));
-    expect(await screen.findByRole("heading", { name: "Leia mangás" })).toBeTruthy();
+    expect(await screen.findByRole("heading", { name: "Sua próxima história começa aqui" })).toBeTruthy();
+    const headerSearch = screen.getByRole("searchbox", { name: "Buscar mangás" });
+    expect(headerSearch.getAttribute("placeholder")).toBe("Buscar mangás...");
+    expect(screen.queryByRole("searchbox", { name: "Buscar animes" })).toBeNull();
     expect(api.MangaSearch).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByRole("searchbox", { name: "Título do mangá" }), { target: { value: "One Piece" } });
-    fireEvent.submit(screen.getByRole("searchbox", { name: "Título do mangá" }).closest("form")!);
+    fireEvent.change(headerSearch, { target: { value: "One Piece" } });
+    fireEvent.submit(headerSearch.closest("form")!);
     const result = await screen.findByRole("button", { name: /One Piece/ });
     expect(api.MangaSearch).toHaveBeenCalledWith(expect.any(String), "One Piece");
+    fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("searchbox", { name: "Buscar mangás" })));
+    expect(screen.getByRole("heading", { name: "Sua próxima história começa aqui" })).toBeTruthy();
     fireEvent.click(result);
     expect(await screen.findByRole("heading", { name: "Capítulos" })).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Buscar mangás" })).toBeTruthy();
+    expect(screen.queryByRole("searchbox", { name: "Buscar animes" })).toBeNull();
     expect(await screen.findByText(/Romance Dawn/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Ler capítulo" }));
     expect(await screen.findByAltText("Página 1")).toBeTruthy();
+    expect(screen.getByRole("searchbox", { name: "Buscar mangás" })).toBeTruthy();
+    expect(screen.queryByRole("searchbox", { name: "Buscar animes" })).toBeNull();
     expect(screen.getByRole("combobox", { name: "Modo de leitura" })).toBeTruthy();
     await waitFor(() => expect(api.SaveMangaProgress).toHaveBeenCalledWith(expect.objectContaining({ manga, chapter, page: 0 })));
   });
@@ -158,8 +208,9 @@ describe("interface funcional", () => {
     render(<App />);
     const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
     fireEvent.click(within(navigation).getByRole("button", { name: "Mangás" }));
-    fireEvent.change(screen.getByRole("searchbox", { name: "Título do mangá" }), { target: { value: "Mangá de teste" } });
-    fireEvent.submit(screen.getByRole("searchbox", { name: "Título do mangá" }).closest("form")!);
+    const searchbox = screen.getByRole("searchbox", { name: "Buscar mangás" });
+    fireEvent.change(searchbox, { target: { value: "Mangá de teste" } });
+    fireEvent.submit(searchbox.closest("form")!);
     fireEvent.click(await screen.findByRole("button", { name: /Mangá de teste/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Ler capítulo" }));
     expect(await screen.findByRole("alert")).toBeTruthy();
@@ -274,6 +325,25 @@ describe("interface funcional", () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Assistir" }));
     await waitFor(() => expect(api.Search).toHaveBeenCalledWith(expect.any(String), "Demon Slayer", 1, featured));
+  });
+  it("mostra Ver anime nas capas das prateleiras da Home e mantém a ação do card", async () => {
+    const trending = { id: "anime-trending", provider: "anilist", title: "Demon Slayer", anilistId: 101 } as Anime;
+    const seasonal = { id: "anime-seasonal", provider: "anilist", title: "Frieren" } as Anime;
+    vi.mocked(api.Discover).mockResolvedValue({ trending: [trending], seasonal: [seasonal], warning: "" });
+    vi.mocked(api.History).mockResolvedValue([{
+      anime: { id: "anime-history", provider: "anilist", title: "Mob Psycho 100" },
+      episode: { id: "episode-1", season: 1, number: 1 },
+      position: 30,
+      updated: 10,
+      needsResolve: false,
+    } as History]);
+    vi.mocked(api.Search).mockResolvedValue({ items: [], page: 1, hasNext: false, warnings: [] });
+    render(<App />);
+
+    await waitFor(() => expect(screen.getAllByText("Ver anime", { exact: true })).toHaveLength(3));
+    const labels = screen.getAllByText("Ver anime", { exact: true });
+    fireEvent.click(labels[1]);
+    await waitFor(() => expect(api.Search).toHaveBeenCalledWith(expect.any(String), "Demon Slayer", 1, trending));
   });
   it("navega os destaques com as setas do teclado", async () => {
     const first = { id: "a", provider: "anilist", title: "Anime A" } as Anime;
@@ -421,56 +491,96 @@ describe("interface funcional", () => {
     await waitFor(() => expect(api.Preview).toHaveBeenCalledWith(expect.any(String), "Hunter x Hunter", 11061));
     expect((await screen.findByRole("tooltip")).textContent).toContain("148 episódios");
   });
-  it("mostra tema persistido e oferece escolha claro, escuro ou sistema", async () => {
+  it("mostra índice, aplica o tema imediatamente e salva preferências automaticamente", async () => {
     render(<App />);
     await screen.findByRole("navigation", { name: "Navegação principal" });
     const main = await screen.findByRole("main");
     expect(main.closest(".app")?.getAttribute("data-theme")).toBe("system");
     fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
     expect(screen.getByRole("heading", { name: "Aparência" })).toBeTruthy();
-    const theme = screen.getByLabelText("Tema");
-    expect(theme).toBeTruthy();
-    expect(screen.getByRole("option", { name: "Claro" })).toBeTruthy();
-    expect(screen.getByRole("option", { name: "Escuro" })).toBeTruthy();
-    const saveButton = screen.getByRole("button", { name: "Salvar alterações" }) as HTMLButtonElement;
-    expect(saveButton.disabled).toBe(true);
-    fireEvent.change(theme, { target: { value: "dark" } });
-    expect(screen.getByRole("status").textContent).toBe("Alterações pendentes");
-    fireEvent.click(saveButton);
-    await waitFor(() => expect(api.SaveSettings).toHaveBeenCalledWith({ ...settings, theme: "dark" }));
-    expect((await screen.findByRole("status")).textContent).toBe("Tudo salvo");
+    const settingsIndex = screen.getByRole("navigation", { name: "Índice das configurações" });
+    expect(settingsIndex).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Salvar alterações" })).toBeNull();
+    expect(api.SaveSettings).not.toHaveBeenCalled();
+    fireEvent.click(within(settingsIndex).getByRole("button", { name: "Downloads" }));
+    expect(within(settingsIndex).getByRole("button", { name: "Downloads" }).getAttribute("aria-current")).toBe("location");
+    fireEvent.click(screen.getByRole("button", { name: "Claro" }));
+    expect(main.closest(".app")?.getAttribute("data-theme")).toBe("light");
+    expect(screen.getByText("Salvando…").textContent).toBe("Salvando…");
+    await waitFor(() => expect(api.SaveSettings).toHaveBeenCalledWith({ ...settings, theme: "light" }));
+    expect((await screen.findByText("Salvo")).textContent).toBe("Salvo");
   });
-  it("identifica AniList e MyAnimeList e conecta a conta pela tela de integrações", async () => {
+  it("coalesce mudanças rápidas em um salvamento com o estado mais recente", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
+    fireEvent.click(screen.getByRole("button", { name: "Escuro" }));
+    fireEvent.change(screen.getByLabelText("Escala da interface"), { target: { value: "1.25" } });
+    await waitFor(() => expect(api.SaveSettings).toHaveBeenCalledTimes(1));
+    expect(api.SaveSettings).toHaveBeenCalledWith({ ...settings, theme: "dark", uiScale: 1.25 });
+    expect(await screen.findByText("125%")).toBeTruthy();
+  });
+  it("serializa gravações enquanto uma chamada anterior ainda está em andamento", async () => {
+    let finishFirst!: () => void;
+    vi.mocked(api.SaveSettings).mockImplementationOnce(() => new Promise<void>((resolve) => { finishFirst = resolve; })).mockResolvedValue();
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
+    fireEvent.click(screen.getByRole("button", { name: "Escuro" }));
+    await waitFor(() => expect(api.SaveSettings).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("switch", { name: "Próximo episódio automático" }));
+    await act(async () => new Promise((resolve) => window.setTimeout(resolve, 400)));
+    expect(api.SaveSettings).toHaveBeenCalledTimes(1);
+    await act(async () => finishFirst());
+    await waitFor(() => expect(api.SaveSettings).toHaveBeenCalledTimes(2));
+    expect(api.SaveSettings).toHaveBeenNthCalledWith(2, { ...settings, theme: "dark", autoplay: false });
+  });
+  it("preserva uma preferência após falha e permite tentar salvar novamente", async () => {
+    vi.mocked(api.SaveSettings).mockRejectedValueOnce(new Error("falha temporária")).mockResolvedValueOnce();
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
+    fireEvent.click(screen.getByRole("button", { name: "Escuro" }));
+    expect(await screen.findByText("Não foi possível salvar.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Escuro" }) as HTMLButtonElement).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    await waitFor(() => expect(api.SaveSettings).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("Salvo")).toBeTruthy();
+  });
+  it("mantém switches acessíveis, mostra campos condicionais e navega para gerenciar contas", async () => {
     const disconnected = [
+      { provider: "discord", connected: false, id: 0, name: "", avatar: "", animeCount: 0, episodes: 0, minutes: 0, error: "" },
       { provider: "anilist", connected: false, id: 0, name: "", avatar: "", animeCount: 0, episodes: 0, minutes: 0, error: "" },
       { provider: "mal", connected: false, id: 0, name: "", avatar: "", animeCount: 0, episodes: 0, minutes: 0, error: "" },
     ] satisfies Account[];
     const connected = [
-      { ...disconnected[0], connected: true, id: 42, name: "Perfil AniList", animeCount: 12, episodes: 76 },
-      disconnected[1],
+      disconnected[0],
+      { ...disconnected[1], connected: true, id: 42, name: "Perfil AniList", animeCount: 12, episodes: 76 },
+      disconnected[2],
     ] satisfies Account[];
-    vi.mocked(api.Accounts).mockResolvedValueOnce(disconnected).mockResolvedValueOnce(connected);
+    vi.mocked(api.Accounts).mockResolvedValueOnce(disconnected).mockResolvedValueOnce(disconnected).mockResolvedValueOnce(connected);
     render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
 
-    const anilistLogo = await screen.findByRole("img", { name: "AniList logo" });
-    expect(anilistLogo.getAttribute("src")).toBe("/anilist.ico");
-    expect(screen.getByRole("img", { name: "MyAnimeList logo" }).getAttribute("src")).toBe("/myanimelist.ico");
+    await screen.findByText("AniList");
+    expect(Array.from(document.querySelectorAll<HTMLImageElement>(".settings-account-summary img")).map((img) => img.getAttribute("src"))).toEqual(["/discord.svg", "/anilist.ico", "/myanimelist.ico"]);
+    expect(screen.getByRole("switch", { name: "Discord Rich Presence" })).toBeTruthy();
     expect(screen.getByText(/pelo menos 80%/)).toBeTruthy();
-    const clientSecret = screen.getByLabelText("MyAnimeList Client Secret (opcional)");
-    expect(clientSecret.getAttribute("type")).toBe("password");
-    fireEvent.change(clientSecret, { target: { value: "test-client-secret" } });
-    fireEvent.click(screen.getByRole("button", { name: "Salvar segredo" }));
-    await screen.findByText("Client Secret salvo neste computador.");
-    expect(api.SetMALClientSecret).toHaveBeenCalledWith("test-client-secret");
-    expect((clientSecret as HTMLInputElement).value).toBe("");
+    const autoplay = screen.getByRole("switch", { name: "Próximo episódio automático" }) as HTMLInputElement;
+    autoplay.focus();
+    await userEvent.keyboard(" ");
+    expect(autoplay.checked).toBe(false);
+    fireEvent.click(screen.getByRole("switch", { name: "Fechar painel ao concluir" }));
+    expect(screen.getByLabelText("Aguardar antes de fechar")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Player"), { target: { value: "custom" } });
+    expect(screen.getByLabelText("Executável")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Gerenciar contas" }));
+    expect(await screen.findByRole("heading", { name: "Contas conectadas" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Conectar AniList" }));
-
     await screen.findByText("Perfil AniList");
     expect(api.Login).toHaveBeenCalledWith("login", "anilist");
     expect(screen.getByText(/76 episódios/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Conectar MyAnimeList" }));
     await waitFor(() => expect(api.Login).toHaveBeenLastCalledWith("login", "mal"));
+    fireEvent.click(screen.getByRole("button", { name: "Conectar Discord" }));
+    await waitFor(() => expect(api.Login).toHaveBeenLastCalledWith("login", "discord"));
   });
   it("oculta domínios das fontes em mensagens comuns", async () => {
     vi.mocked(api.Search).mockRejectedValue(new Error("GET https://api.animefire.one/animes/pesquisar falhou"));

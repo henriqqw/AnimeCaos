@@ -13,7 +13,7 @@ import (
 	"github.com/henriqqw/animecaos/internal/media"
 )
 
-var availabilitySourceTimeout = 12 * time.Second
+const availabilitySourceTimeout = 12 * time.Second
 
 var qualityHeightPattern = regexp.MustCompile(`(?i)(\d{3,4})\s*p`)
 
@@ -200,7 +200,11 @@ func promoteSearchGroup(anime *domain.Anime) {
 }
 
 func (s *Service) verifySource(parent context.Context, anime domain.Anime, requestedSeason int) (int, bool) {
-	ctx, cancel := context.WithTimeout(parent, availabilitySourceTimeout)
+	return s.verifySourceWithTimeout(parent, anime, requestedSeason, availabilitySourceTimeout)
+}
+
+func (s *Service) verifySourceWithTimeout(parent context.Context, anime domain.Anime, requestedSeason int, timeout time.Duration) (int, bool) {
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	provider, err := s.catalog.Provider(anime.Provider)
 	if err != nil {

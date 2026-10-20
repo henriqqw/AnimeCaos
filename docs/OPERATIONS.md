@@ -4,7 +4,7 @@
 
 - Go conforme `go.mod` (atualmente 1.26.0).
 - Node.js/npm compatíveis com as versões travadas em `frontend/package-lock.json`.
-- Wails CLI v2 e dependências nativas: WebView2 no Windows; GTK/WebKitGTK na configuração Linux usada pelo Wails.
+- Wails CLI v2 e dependências nativas para desenvolvimento: WebView2 no Windows; GTK/WebKitGTK na configuração Linux usada pelo Wails. Os pacotes de produção trazem WebView2 fixo no Windows e GTK/WebKitGTK selecionados dentro do AppImage.
 - MPV para reprodução e FFmpeg/FFprobe para operações de mídia.
 
 O localizador de executáveis procura primeiro no diretório do pacote e em `bin/`, depois no `PATH`. A documentação não pressupõe que esses programas estejam instalados na máquina.
@@ -20,7 +20,7 @@ wails dev
 
 `wails.json` configura o watcher e servidor frontend. Abrir a URL do Vite diretamente não fornece os bindings `window.go`; a página informa que deve ser aberta pelo aplicativo AnimeCaos.
 
-No Windows, o app mantém um ícone na área de notificação. Fechar pelo X oculta a janela; use o menu do ícone para abrir/minimizar/ocultar a janela ou escolher `Sair` para encerrar o processo. O ícone pode estar dentro do menu de ícones ocultos do Windows. Ao iniciar, uma posição salva fora dos monitores conectados é ignorada e a janela é centralizada.
+No Windows, o app mantém um ícone na área de notificação. Fechar pelo X oculta a janela; use o menu do ícone para abrir/minimizar/ocultar a janela ou escolher `Sair` para encerrar o processo. O ícone pode estar dentro do menu de ícones ocultos do Windows. Ao iniciar, uma posição salva fora dos monitores conectados é ignorada e a janela é centralizada. Os identificadores de instância do modo `wails dev` e do pacote instalado são distintos, para uma instância de desenvolvimento cujo Vite parou não interceptar a abertura do aplicativo instalado.
 
 ## CLI
 
@@ -45,7 +45,7 @@ A tela Diagnóstico pode mostrar caminhos locais e disponibilidade de ferramenta
 `cmd/package` prepara o stage portátil. `deploy/go/build-appimage.sh` monta AppImage Linux e `deploy/go/windows.iss` descreve o instalador Windows. Consulte [DISTRIBUTION.md](DISTRIBUTION.md) para dependências, limitações e formatos.
 
 ```powershell
-go run ./cmd/package -version 3.0.0-dev
+go run ./cmd/package -version 3.0.0
 ```
 
 Esse comando executa build por padrão e exige dependências de mídia; `-skip-ui` só serve quando existe frontend compilado compatível. O script AppImage exige o stage e ferramentas nativas no host Linux. Testes unitários não são prova de instalação limpa ou de release pronta.

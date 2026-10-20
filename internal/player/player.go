@@ -97,6 +97,12 @@ func (c *Controller) Stop() {
 	}
 }
 func (c *Controller) Start(parent context.Context, url, mode, path string, start float64, session string) error {
+	return c.start(parent, url, mode, path, start, session, nil)
+}
+
+// start accepts extra MPV options for package integration tests. Production
+// callers use Start and always keep the normal visible-window arguments.
+func (c *Controller) start(parent context.Context, url, mode, path string, start float64, session string, testMPVArgs []string) error {
 	c.startMu.Lock()
 	defer c.startMu.Unlock()
 	c.Stop()
@@ -118,6 +124,7 @@ func (c *Controller) Start(parent context.Context, url, mode, path string, start
 	args := []string{url}
 	if mode == "mpv" {
 		args = append(args, "--no-config", "--ytdl=no", "--idle=no", "--force-window=yes", "--ontop", "--autofit=70%", "--hls-bitrate=max", "--input-ipc-server="+ipc, "--start="+fmt.Sprint(start), "--msg-level=all=warn", "--demuxer-lavf-o=allowed_extensions=ALL")
+		args = append(args, testMPVArgs...)
 	}
 	cmd := exec.CommandContext(ctx, path, args...)
 	platform.Hide(cmd)

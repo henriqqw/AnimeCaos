@@ -98,7 +98,6 @@ type Settings struct {
 	Autoplay     bool    `json:"autoplay"`
 	Audio        string  `json:"audio"`
 	Discord      bool    `json:"discord"`
-	MALClientID  string  `json:"malClientId"`
 	Width        int     `json:"width"`
 	Height       int     `json:"height"`
 	X            int     `json:"x"`
@@ -109,8 +108,21 @@ type Manga struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Cover       string   `json:"cover"`
+	Banner      string   `json:"banner,omitempty"`
 	Status      string   `json:"status"`
 	Languages   []string `json:"languages"`
+}
+type MangaCategory struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+type MangaDiscovery struct {
+	Featured        []Manga         `json:"featured"`
+	Popular         []Manga         `json:"popular"`
+	RecentlyUpdated []Manga         `json:"recentlyUpdated"`
+	Publishing      []Manga         `json:"publishing"`
+	Categories      []MangaCategory `json:"categories"`
+	Warning         string          `json:"warning"`
 }
 type Chapter struct {
 	ID       string `json:"id"`

@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -115,6 +116,13 @@ func seleniumDriverPath() string {
 		seleniumDriver = driverPath
 	}
 	if seleniumDriver == "" {
+		if driverPath, err := findBundledGeckodriver(runtimeExecutableDir()); err == nil {
+			if _, firefoxErr := findFirefox(); firefoxErr == nil {
+				seleniumDriver = driverPath
+			}
+		}
+	}
+	if seleniumDriver == "" {
 		if driverPath, err := exec.LookPath("geckodriver"); err == nil {
 			// A GeckoDriver on PATH does not imply Firefox is installed. In that
 			// case keep the optional Selenium path from masking an available
@@ -125,6 +133,34 @@ func seleniumDriverPath() string {
 		}
 	}
 	return seleniumDriver
+}
+
+func runtimeExecutableDir() string {
+	executable, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	if resolved, err := filepath.EvalSymlinks(executable); err == nil {
+		executable = resolved
+	}
+	return filepath.Dir(executable)
+}
+
+func findBundledGeckodriver(executableDir string) (string, error) {
+	for _, path := range bundledGeckodriverLocations(executableDir, runtime.GOOS) {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return path, nil
+		}
+	}
+	return "", fmt.Errorf("GeckoDriver empacotado não foi encontrado")
+}
+
+func bundledGeckodriverLocations(executableDir, goos string) []string {
+	name := "geckodriver"
+	if goos == "windows" {
+		name += ".exe"
+	}
+	return []string{filepath.Join(executableDir, "bin", name), filepath.Join(executableDir, name)}
 }
 
 func findBrowser() (string, error) {

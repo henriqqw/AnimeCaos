@@ -14,7 +14,7 @@
 | Testes UI | Vitest 5, Testing Library, jsdom | Comportamento de componentes e navegação |
 | Testes Go | `go test` e `httptest` | Serviços, contratos de parser e integração controlada |
 
-As versões estão em `go.mod` e `frontend/package.json`. Dependências nativas do Wails variam por plataforma; consulte [operação](../OPERATIONS.md). A disponibilidade de um binário de MPV/FFmpeg no PATH ou pacote não é garantida pela linguagem ou framework.
+As versões estão em `go.mod` e `frontend/package.json`. O instalador e o ZIP portátil Windows incluem MPV/FFmpeg/FFprobe, Firefox/GeckoDriver e WebView2 Fixed Version; `internal/platform` aponta o Wails para o runtime junto ao app e prepara as permissões AppContainer do Windows. O AppImage inclui os binários de mídia, Firefox/GeckoDriver e bibliotecas GTK/WebKitGTK selecionadas. Requisitos inevitáveis do sistema operacional e ferramentas de desenvolvimento estão descritos em [operação](../OPERATIONS.md) e [distribuição](../DISTRIBUTION.md).
 
 ## Organização das camadas
 

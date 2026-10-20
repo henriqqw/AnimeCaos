@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -91,6 +92,169 @@ func (s *Service) Search(ctx context.Context, q string) ([]domain.Manga, error) 
 	}
 	return out, nil
 }
+
+type mangaListResponse struct {
+	Data []struct {
+		ID         string `json:"id"`
+		Attributes struct {
+			Title       map[string]string `json:"title"`
+			Description map[string]string `json:"description"`
+			Status      string            `json:"status"`
+			Languages   []string          `json:"availableTranslatedLanguages"`
+		} `json:"attributes"`
+		Relationships []struct {
+			Type       string `json:"type"`
+			Attributes struct {
+				FileName string `json:"fileName"`
+			} `json:"attributes"`
+		} `json:"relationships"`
+	} `json:"data"`
+}
+
+func mangaFromResponse(response mangaListResponse) []domain.Manga {
+	items := make([]domain.Manga, 0, len(response.Data))
+	for _, item := range response.Data {
+		cover := ""
+		for _, relation := range item.Relationships {
+			if relation.Type == "cover_art" && relation.Attributes.FileName != "" {
+				root := "https://uploads.mangadex.org/covers/" + item.ID + "/" + relation.Attributes.FileName
+				cover = root + ".256.jpg"
+				break
+			}
+		}
+		items = append(items, domain.Manga{
+			ID:          item.ID,
+			Title:       pick(item.Attributes.Title),
+			Description: pick(item.Attributes.Description),
+			Cover:       cover,
+			Banner:      strings.Replace(cover, ".256.jpg", ".512.jpg", 1),
+			Status:      item.Attributes.Status,
+			Languages:   item.Attributes.Languages,
+		})
+	}
+	return items
+}
+
+func (s *Service) list(ctx context.Context, params url.Values) ([]domain.Manga, error) {
+	params.Set("limit", "20")
+	params.Add("includes[]", "cover_art")
+	params.Add("contentRating[]", "safe")
+	params.Add("contentRating[]", "suggestive")
+	var response mangaListResponse
+	if err := s.get(ctx, "/manga?"+params.Encode(), &response); err != nil {
+		return nil, err
+	}
+	return mangaFromResponse(response), nil
+}
+
+// Discover builds the MangaDex-backed shelves shown on the manga landing page.
+// Manga catalogs do not have a dependable seasonal schedule, so the final shelf
+// is based on the source's explicit publication status instead of inferred anime seasons.
+func (s *Service) Discover(ctx context.Context) (domain.MangaDiscovery, error) {
+	result := domain.MangaDiscovery{
+		Featured:        []domain.Manga{},
+		Popular:         []domain.Manga{},
+		RecentlyUpdated: []domain.Manga{},
+		Publishing:      []domain.Manga{},
+		Categories:      []domain.MangaCategory{},
+	}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var failures []string
+	load := func(name string, params url.Values, target *[]domain.Manga) {
+		defer wg.Done()
+		items, err := s.list(ctx, params)
+		mu.Lock()
+		defer mu.Unlock()
+		if err != nil {
+			failures = append(failures, name+": "+err.Error())
+			return
+		}
+		*target = items
+	}
+	wg.Add(3)
+	go load("mais populares", url.Values{"order[followedCount]": {"desc"}}, &result.Popular)
+	go load("atualizações recentes", url.Values{"order[latestUploadedChapter]": {"desc"}}, &result.RecentlyUpdated)
+	go load("em publicação", url.Values{"status[]": {"ongoing"}, "order[followedCount]": {"desc"}}, &result.Publishing)
+	tags, tagErr := s.categories(ctx)
+	result.Categories = tags
+	wg.Wait()
+	if len(result.Popular) > 0 {
+		featuredCount := min(5, len(result.Popular))
+		result.Featured = append(result.Featured, result.Popular[:featuredCount]...)
+	}
+	if tagErr != nil {
+		failures = append(failures, "categorias: "+tagErr.Error())
+	}
+	if len(result.Popular)+len(result.RecentlyUpdated)+len(result.Publishing) == 0 {
+		if len(failures) > 0 {
+			return result, fmt.Errorf("não foi possível carregar a descoberta de mangás: %s", strings.Join(failures, "; "))
+		}
+		return result, fmt.Errorf("o catálogo não retornou mangás")
+	}
+	if len(failures) > 0 {
+		result.Warning = "Algumas seções do catálogo não puderam ser atualizadas."
+	}
+	return result, nil
+}
+
+func (s *Service) categories(ctx context.Context) ([]domain.MangaCategory, error) {
+	var response struct {
+		Data []struct {
+			ID         string `json:"id"`
+			Attributes struct {
+				Name  map[string]string `json:"name"`
+				Group string            `json:"group"`
+			} `json:"attributes"`
+		} `json:"data"`
+	}
+	if err := s.get(ctx, "/manga/tag", &response); err != nil {
+		return nil, err
+	}
+	preferred := []string{"Action", "Adventure", "Comedy", "Drama", "Fantasy", "Romance", "Sci-Fi", "Mystery", "Horror", "Thriller", "Slice of Life", "Sports", "Martial Arts", "Psychological"}
+	localized := map[string]string{
+		"action": "Ação", "adventure": "Aventura", "comedy": "Comédia", "drama": "Drama", "fantasy": "Fantasia",
+		"romance": "Romance", "sci-fi": "Ficção científica", "mystery": "Mistério", "horror": "Terror", "thriller": "Suspense",
+		"slice of life": "Cotidiano", "sports": "Esportes", "martial arts": "Artes marciais", "psychological": "Psicológico",
+	}
+	byName := make(map[string]domain.MangaCategory)
+	for _, tag := range response.Data {
+		if tag.Attributes.Group != "genre" {
+			continue
+		}
+		name := pick(tag.Attributes.Name)
+		if name == "" {
+			continue
+		}
+		key := tag.Attributes.Name["en"]
+		if key == "" {
+			key = name
+		}
+		label := localized[strings.ToLower(key)]
+		if label == "" {
+			label = name
+		}
+		byName[strings.ToLower(key)] = domain.MangaCategory{ID: tag.ID, Name: label}
+	}
+	out := make([]domain.MangaCategory, 0, len(preferred))
+	for _, name := range preferred {
+		if category, ok := byName[strings.ToLower(name)]; ok {
+			out = append(out, category)
+		}
+	}
+	return out, nil
+}
+
+func (s *Service) ByCategory(ctx context.Context, categoryID string) ([]domain.Manga, error) {
+	if strings.TrimSpace(categoryID) == "" {
+		return nil, fmt.Errorf("selecione uma categoria válida")
+	}
+	return s.list(ctx, url.Values{
+		"includedTags[]":       {categoryID},
+		"order[followedCount]": {"desc"},
+	})
+}
+
 func (s *Service) Chapters(ctx context.Context, id string) ([]domain.Chapter, error) {
 	return s.ChaptersLanguage(ctx, id, "")
 }

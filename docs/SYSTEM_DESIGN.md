@@ -1,6 +1,6 @@
 # System design — AnimeCaos
 
-Status: a especificação orienta o visual e vários padrões já estão presentes na interface React. Conferida em 17/10/2026. A extração futura de telas de `App.tsx` em componentes menores e a validação visual no app empacotado continuam pendentes; builds permanecem adiados.
+Status: a especificação orienta o visual e vários padrões já estão presentes na interface React. Conferida em 20/10/2026. A extração futura de telas de `App.tsx` em componentes menores e a validação visual no app empacotado continuam pendentes; builds permanecem adiados.
 
 ## Comportamentos registrados nesta revisão
 
@@ -79,15 +79,15 @@ Navegação principal: Início, Pesquisar, Minha Lista, Histórico, Downloads, M
 | Minha Lista | Grade compacta com busca/filtro e remoção direta reversível | Skeleton, lista vazia com chamada para pesquisar, erro recuperável |
 | Histórico | Continuar assistindo em primeiro plano, progresso e data em apoio; lista paginada em blocos de 24 itens | Controles anterior/próxima mostram intervalo e página; item sem ID seguro oferece busca; remover item atualiza os resultados e mantém uma página válida |
 | Downloads | Fila ativa separada dos concluídos, progresso, velocidade, estimativa e espaço | Aguardar, baixar, concluir, cancelar, duplicado, falha parcial, arquivo indisponível e offline |
-| Mangás | Pesquisa, itens salvos e progresso recente | Idioma e capítulos visíveis; estados vazios; erro com tentar novamente |
+| Mangás | Mesmo banner spotlight, largura, CTA e prateleiras da Home; categorias por gênero; Top mangás/Em alta/Em publicação e leitura retomável | Busca única no cabeçalho; categorias filtram pelo ID da tag; ranking usa seguidores; “Em alta” usa capítulos enviados recentemente; status de publicação vem do MangaDex; erro com retry e cache |
 | Leitor de mangá | Página ocupa a maior área; barra mínima com capítulo, página e navegação | Carregamento por página, falha individual, offline, alteração de orientação e retomada do progresso |
 | Contas | Estado de sessão, perfil e ações de conectar/atualizar/desconectar | Navegador aberto, retorno OAuth, erro de autorização, sem sessão, sessão expirada e sincronização |
-| Configurações | Grupos compactos com descrição curta; grade em duas colunas que empilha em telas estreitas; temas, escala, player, downloads, autoplay e integrações | Estado pendente/salvando/salvo, botão de gravação desabilitado sem alterações e controles nativos de diálogo claramente agrupados |
+| Configurações | Uma coluna contínua com índice; seções abertas, controles relacionados em duas colunas quando há espaço e resumo das contas | Índice acompanha a rolagem; temas segmentados; switches acessíveis; estado salvando/salvo/falha e retry sem botão global |
 | Diagnóstico | Dependências, logs técnicos e exportação controlada | Nomes/IDs de fontes e erros brutos podem aparecer aqui; ocultar tokens, cookies, URLs assinadas e dados pessoais |
 
 ## Componentes e regras
 
-- **AnimeCard:** capa com proporção uniforme, título em até duas linhas e no máximo dois metadados úteis. Área inteira é acionável e tem foco visível. Não mostrar a origem da opção.
+- **AnimeCard:** capa com proporção uniforme, título em até duas linhas e no máximo dois metadados úteis. Área inteira é acionável e tem foco visível. Nas prateleiras da Home, hover/foco também revela “Ver anime” sobre a capa; a sobreposição não cria uma ação separada e respeita movimento reduzido. Não mostrar a origem da opção.
 - **Rating:** estrela exibida em amarelo, independentemente do tema; o valor numérico permanece texto para não depender somente da cor.
 - **Spotlight:** banner legível com camada neutra suficiente para contraste, título, sinopse curta e uma ação principal. Não depender de uma imagem para transmitir nome ou botão.
 - **SearchBox:** rótulo acessível persistente, limpar e cancelar explícitos; Enter executa a busca. `Ctrl+F` foca a pesquisa. Resultados novos invalidam operações antigas.
@@ -100,8 +100,10 @@ Navegação principal: Início, Pesquisar, Minha Lista, Histórico, Downloads, M
 - **Continuar:** no Histórico e no carrossel “Continuar assistindo”, exibir o ícone de play da família visual da sidebar à esquerda do rótulo; o botão mantém seu nome acessível e a mesma ação de retomada.
 - **Ações de arquivos offline:** usar botões de ícone compactos para reproduzir/ler, abrir a pasta do arquivo e excluir. Cada controle mantém nome acessível e tooltip; exclusão conserva confirmação.
 - **Filtro de temporada:** usar menu próprio no estilo das superfícies do app, com opção atual identificada, foco visível e navegação por teclado; evitar menus nativos do sistema.
-- **Configurações:** agrupar opções relacionadas em cartões compactos; manter alinhamento consistente entre rótulos, descrições e controles; permitir duas colunas apenas quando houver largura suficiente. O salvamento manual apresenta estados explícitos e ações secundárias não devem alterar o estado de salvamento das preferências.
-- **Preview dos cards:** painel compacto ancorado ao card, com lado escolhido pelo espaço disponível, título de até duas linhas e sinopse de até três linhas. Não deve cobrir desnecessariamente o carrossel nem criar rolagem interna; movimento respeita `prefers-reduced-motion`.
+- **Configurações:** usar seções abertas em coluna única, separadas por divisores e com índice que quebra linha em telas estreitas. Cada grupo mantém rótulos e descrições próximos aos controles; campos relacionados podem usar duas colunas e empilham quando o espaço não comporta. A interface aplica a escolha imediatamente e apresenta o estado do autosave, com retry em falha. Switches compartilham o mesmo controle visual, estado acessível e foco visível. A seção Integrações mostra um resumo e encaminha a gestão de contas à tela própria. Manutenção informa cada resultado junto às ações e não altera o estado de preferências.
+- **Preview dos cards:** anime usa metadados carregados sob demanda; mangá usa título e sinopse já presentes no catálogo, sem chamadas por card nem subtítulo. O painel compacto fica ancorado ao card, escolhe o lado com espaço disponível e limita título a duas linhas e sinopse a três. Não deve criar rolagem interna nem cobrir desnecessariamente o carrossel; movimento respeita `prefers-reduced-motion`.
+- **Descoberta de mangás:** usa os mesmos componentes visuais `spotlight`, `home-shelf`, `shelf-heading` e `Rail` da Home e a mesma largura da área de conteúdo. O cabeçalho contextual é a única busca. O banner usa uma obra real do ranking e abre detalhes/capítulos. Prateleiras usam ordenações e status fornecidos pelo MangaDex; gêneros filtram pelo ID da tag. Como a fonte não publica temporada de anime para mangá, “Em publicação” ocupa a prateleira de séries ativas, sem inventar calendário sazonal. As imagens das prateleiras são lazy-load e a resposta agregada usa cache para reduzir chamadas ao catálogo.
+- **Mascote AnimeCaos:** manter a personagem com cabelo longo vermelho liso dividido ao meio, olhos vermelhos, chifres escuros, camiseta cropped de caveira e saia preta lisa. A arte aprovada usa chibi cartoon 2D, contorno preto espesso e paleta curta de vermelho, creme e carvão. A versão normal é de corpo inteiro; a mini é superdeformed, com cabeça maior e corpo simplificado. A miniatura de 256 px deriva da versão mini. `poses/` contém seis ângulos/vistas e uma pose adicional; `reactions/` contém dez expressões. As artes estão preparadas, mas ainda não ligadas à grade de categorias.
 
 ## Responsividade
 

@@ -376,13 +376,10 @@ func TestSearchAvailabilityDoesNotLetOneProviderStarveOthers(t *testing.T) {
 }
 
 func TestAvailabilitySourceTimeoutStopsAStalledProvider(t *testing.T) {
-	previousTimeout := availabilitySourceTimeout
-	availabilitySourceTimeout = 40 * time.Millisecond
-	defer func() { availabilitySourceTimeout = previousTimeout }()
 	provider := &availabilityFixtureProvider{name: "animefire", block: true}
 	s := &Service{catalog: &providers.Catalog{Providers: []domain.AnimeProvider{provider}}}
 	started := time.Now()
-	if _, valid := s.verifySource(context.Background(), domain.Anime{ID: "a1", Provider: "animefire"}, 0); valid {
+	if _, valid := s.verifySourceWithTimeout(context.Background(), domain.Anime{ID: "a1", Provider: "animefire"}, 0, 40*time.Millisecond); valid {
 		t.Fatal("a stalled provider was considered valid")
 	}
 	if elapsed := time.Since(started); elapsed > time.Second {

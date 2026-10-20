@@ -7,25 +7,32 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
 
 type Discord struct {
-	configMu sync.Mutex
-	mu       sync.Mutex
-	writeMu  sync.Mutex
-	conn     net.Conn
-	enabled  bool
-	title    string
-	episode  float64
-	started  int64
-	wake     chan struct{}
-	cancel   context.CancelFunc
-	done     chan struct{}
-	dial     func() (net.Conn, error)
+	configMu       sync.Mutex
+	mu             sync.Mutex
+	writeMu        sync.Mutex
+	conn           net.Conn
+	enabled        bool
+	title          string
+	season         int
+	episode        float64
+	epTitle        string
+	started        int64
+	paused         bool
+	lastPosition   float64
+	lastPositionAt time.Time
+	wake           chan struct{}
+	cancel         context.CancelFunc
+	done           chan struct{}
+	dial           func() (net.Conn, error)
 }
 
 func (d *Discord) Configure(enabled bool) {
@@ -61,20 +68,72 @@ func (d *Discord) Connected() bool { d.mu.Lock(); defer d.mu.Unlock(); return d.
 
 // Update changes desired state; network activity runs independently of playback.
 func (d *Discord) Update(title string, episode float64) error {
+	d.UpdatePlayback(DiscordPlayback{Title: title, Episode: episode, Playing: title != ""})
+	return nil
+}
+
+type DiscordPlayback struct {
+	Title        string
+	Season       int
+	Episode      float64
+	EpisodeTitle string
+	Position     float64
+	Playing      bool
+	Paused       bool
+}
+
+// UpdatePlayback maps the current MPV position to Discord's elapsed-time
+// timestamp. It sends IPC updates only when the item, pause state, or seek
+// changes; ordinary position ticks let Discord advance the clock itself.
+func (d *Discord) UpdatePlayback(playback DiscordPlayback) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if d.title != title || d.episode != episode {
-		d.started = time.Now().Unix()
+	active := strings.TrimSpace(playback.Title) != "" && (playback.Playing || playback.Paused)
+	changed := false
+	if !active {
+		changed = d.title != ""
+		d.title = ""
+		d.season = 0
+		d.episode = 0
+		d.epTitle = ""
+		d.started = 0
+		d.paused = false
+		d.lastPositionAt = time.Time{}
+	} else {
+		now := time.Now()
+		position := math.Max(0, playback.Position)
+		sameItem := d.title == playback.Title && d.season == playback.Season && d.episode == playback.Episode && d.epTitle == playback.EpisodeTitle
+		if !sameItem {
+			d.started = now.Unix() - int64(position)
+			changed = true
+		} else if playback.Paused != d.paused {
+			if playback.Paused {
+				d.started = 0
+			} else {
+				d.started = now.Unix() - int64(position)
+			}
+			changed = true
+		} else if playback.Playing && !playback.Paused && !d.lastPositionAt.IsZero() {
+			expected := d.lastPosition + now.Sub(d.lastPositionAt).Seconds()
+			if math.Abs(position-expected) > 6 {
+				d.started = now.Unix() - int64(position)
+				changed = true
+			}
+		}
+		d.title = playback.Title
+		d.season = playback.Season
+		d.episode = playback.Episode
+		d.epTitle = playback.EpisodeTitle
+		d.paused = playback.Paused
+		d.lastPosition = position
+		d.lastPositionAt = now
 	}
-	d.title = title
-	d.episode = episode
-	if d.enabled {
+	if changed && d.enabled {
 		select {
 		case d.wake <- struct{}{}:
 		default:
 		}
 	}
-	return nil
 }
 func discordFrame(c net.Conn) (uint32, []byte, error) {
 	var header [8]byte
@@ -130,7 +189,7 @@ func (d *Discord) connect(ctx context.Context) (net.Conn, error) {
 	if ctx.Err() != nil {
 		return fail(ctx.Err())
 	}
-	if err = d.write(c, 0, map[string]any{"v": 1, "client_id": "1494706525426421760"}); err != nil {
+	if err = d.write(c, 0, map[string]any{"v": 1, "client_id": DiscordClientID}); err != nil {
 		return fail(err)
 	}
 	c.SetReadDeadline(time.Now().Add(2 * time.Second))
@@ -182,7 +241,11 @@ func (d *Discord) loop(ctx context.Context, wake <-chan struct{}, done chan<- st
 			d.mu.Lock()
 			var activity any
 			if d.title != "" {
-				activity = map[string]any{"details": d.title, "state": fmt.Sprintf("Ep. %g", d.episode), "timestamps": map[string]int64{"start": d.started}, "assets": map[string]string{"large_image": "logo", "large_text": "AnimeCaos"}}
+				state := discordEpisodeState(d.season, d.episode, d.epTitle, d.paused)
+				activity = map[string]any{"details": truncateDiscordText(d.title), "state": state, "assets": map[string]string{"large_image": "logo", "large_text": "AnimeCaos"}}
+				if !d.paused && d.started > 0 {
+					activity.(map[string]any)["timestamps"] = map[string]int64{"start": d.started}
+				}
 			}
 			d.mu.Unlock()
 			if d.write(c, 1, map[string]any{"cmd": "SET_ACTIVITY", "args": map[string]any{"pid": os.Getpid(), "activity": activity}, "nonce": random()}) != nil {
@@ -196,4 +259,32 @@ func (d *Discord) loop(ctx context.Context, wake <-chan struct{}, done chan<- st
 		case <-wake:
 		}
 	}
+}
+
+func discordEpisodeState(season int, episode float64, title string, paused bool) string {
+	var parts []string
+	if paused {
+		parts = append(parts, "Pausado")
+	}
+	if season > 0 {
+		parts = append(parts, fmt.Sprintf("T%d", season))
+	}
+	if episode > 0 {
+		parts = append(parts, fmt.Sprintf("Ep. %g", episode))
+	}
+	if title = strings.TrimSpace(title); title != "" {
+		parts = append(parts, title)
+	}
+	if len(parts) == 0 {
+		return "Assistindo"
+	}
+	return truncateDiscordText(strings.Join(parts, " · "))
+}
+
+func truncateDiscordText(value string) string {
+	runes := []rune(strings.TrimSpace(value))
+	if len(runes) <= 128 {
+		return string(runes)
+	}
+	return string(runes[:125]) + "…"
 }

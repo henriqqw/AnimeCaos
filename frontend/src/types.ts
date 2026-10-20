@@ -61,7 +61,6 @@ export type Settings = {
   autoplay: boolean;
   audio: string;
   discord: boolean;
-  malClientId: string;
   width: number;
   height: number;
   x: number;
@@ -91,6 +90,7 @@ export type Account = {
   provider: string;
   connected: boolean;
   id: number;
+  externalId?: string;
   name: string;
   avatar: string;
   animeCount: number;
@@ -103,8 +103,18 @@ export type Manga = {
   title: string;
   description: string;
   cover: string;
+  banner?: string;
   status: string;
   languages: string[];
+};
+export type MangaCategory = { id: string; name: string };
+export type MangaDiscovery = {
+  featured: Manga[];
+  popular: Manga[];
+  recentlyUpdated: Manga[];
+  publishing: Manga[];
+  categories: MangaCategory[];
+  warning: string;
 };
 export type Chapter = {
   id: string;

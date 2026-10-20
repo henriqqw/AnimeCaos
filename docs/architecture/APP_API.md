@@ -16,7 +16,9 @@ As assinaturas exatas de tipos estão em `frontend/src/api.ts`; os DTOs e tags J
 | Reprodução | `Play(operationID, Anime, Episode[], index, resume)`, `PlayerCommand(command, value)`, `Adjacent(delta)`, `PlayLocal(path)`, `OfflinePages(path) → string[]` |
 | Downloads e arquivos | `Enqueue(Anime, Episode[]) → Download[]`, `Downloads() → Download[]`, `CancelDownload(id)`, `LocalFiles() → LocalFile[]`, `DeleteFile(path)`, `OpenDownloads()`, `OpenLocalFolder(path)` (abre a pasta do arquivo após validar que ele está dentro da biblioteca) |
 | Mangá | `MangaSearch(operationID, query) → Manga[]`, `Chapters(operationID, mangaID) → Chapter[]`, `ChaptersLanguage(operationID, mangaID, language) → Chapter[]`, `Pages(operationID, chapterID) → string[]`, `MangaHistory() → MangaProgress[]`, `SaveMangaProgress(MangaProgress)`, `DownloadManga(operationID, Manga, Chapter[])` |
-| Contas | `Accounts() → Account[]`, `MALClientSecretConfigured() → bool`, `SetMALClientSecret(secret)`, `Login(operationID, provider)`, `Logout(provider)`, `RefreshAccount(operationID, provider) → Account` |
+| Contas | `Accounts() → Account[]`, `Login(operationID, provider)` (`anilist`, `mal`, `discord`), `Logout(provider)`, `RefreshAccount(operationID, provider) → Account` |
+
+O DTO `Account` inclui `externalId` opcional para o ID Discord; tokens permanecem no cofre e não são enviados aos bindings. O login Discord abre o navegador e recebe o OAuth no loopback `127.0.0.1:9744`.
 | Atualização | `CheckUpdate(operationID) → Update`, `DownloadUpdate(operationID, Update) → path`, `InstallUpdate(path)` |
 
 Métodos que recebem `operationID` permitem ao frontend cancelar uma chamada ou substituir uma operação antiga. O serviço aplica timeouts próprios; consulte `internal/app/service.go` para valores e mudanças de implementação.

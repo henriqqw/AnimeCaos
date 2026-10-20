@@ -71,6 +71,13 @@ func main() {
 		return
 	}
 	var desktop Desktop
+	webviewOptions, e := platform.WebViewOptions()
+	if e != nil {
+		_ = os.MkdirAll(platform.DataDir(), 0700)
+		_ = os.WriteFile(filepath.Join(platform.DataDir(), "startup-error.log"), []byte(e.Error()), 0600)
+		fmt.Fprintln(os.Stderr, e)
+		return
+	}
 	service, e := app.New(context.Background(), platform.DataDir(), func(name string, data any) {
 		if desktop.ctx != nil {
 			if name == "quit" {
@@ -88,7 +95,7 @@ func main() {
 	}
 	defer service.Close()
 	settings := service.Settings()
-	e = wails.Run(&options.App{Title: "AnimeCaos", Width: max(900, settings.Width), Height: max(600, settings.Height), MinWidth: 800, MinHeight: 560, BackgroundColour: options.NewRGB(18, 20, 28), AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{service, &desktop},
+	e = wails.Run(&options.App{Title: "AnimeCaos", Width: max(900, settings.Width), Height: max(600, settings.Height), MinWidth: 800, MinHeight: 560, BackgroundColour: options.NewRGB(18, 20, 28), AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{service, &desktop}, Windows: webviewOptions,
 		OnStartup: func(ctx context.Context) {
 			desktop.ctx = ctx
 			width, height := max(900, settings.Width), max(600, settings.Height)
@@ -115,7 +122,7 @@ func main() {
 			return true
 		},
 		OnShutdown: func(context.Context) { platform.QuitTray() },
-		SingleInstanceLock: &options.SingleInstanceLock{UniqueId: "com.animecaos.App", OnSecondInstanceLaunch: func(options.SecondInstanceData) {
+		SingleInstanceLock: &options.SingleInstanceLock{UniqueId: appInstanceID, OnSecondInstanceLaunch: func(options.SecondInstanceData) {
 			if desktop.ctx != nil {
 				showMainWindow(desktop.ctx)
 			}

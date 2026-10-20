@@ -120,9 +120,6 @@ func New(parent context.Context, dir string, emit func(string, any)) (*Service, 
 	}
 	c := netx.New()
 	s := &Service{ctx: ctx, cancel: cancel, ops: map[string]operation{}, db: db, gateway: g, emit: emit, settings: db.Defaults(), discord: &integrations.Discord{}, imageSlots: make(chan struct{}, 3), availabilityCache: map[string]availabilityCacheEntry{}}
-	if s.settings.MALClientID == "" {
-		s.settings.MALClientID = integrations.MALClientID
-	}
 	s.catalog = &providers.Catalog{Providers: []domain.AnimeProvider{providers.NewAnimeFire(c), providers.NewSushiAnimes(c), providers.NewOnlineCC(c), providers.NewOtakulogia(c)}, Store: db}
 	s.metadata = integrations.NewMetadata(c, db)
 	s.accounts = integrations.NewAccounts(db, s.metadata)
@@ -672,7 +669,6 @@ func (s *Service) play(id string, a domain.Anime, episodes []domain.Episode, ind
 		}
 	}
 	settings := s.Settings()
-	s.discord.Update(a.Title, ep.Number)
 	var session string
 	var activeRelease func()
 	var lastStartErr error
@@ -877,10 +873,22 @@ func (s *Service) onPlayer(state player.State) {
 	finish := !state.Playing && !p.Finished
 	if finish {
 		s.current.Finished = true
-		s.discord.Update("", 0)
 	}
 	autoplay := s.settings.Autoplay
 	s.mu.Unlock()
+	if state.Playing || state.Paused {
+		s.discord.UpdatePlayback(integrations.DiscordPlayback{
+			Title:        p.Anime.Title,
+			Season:       ep.Season,
+			Episode:      ep.Number,
+			EpisodeTitle: ep.Title,
+			Position:     state.Position,
+			Playing:      state.Playing,
+			Paused:       state.Paused,
+		})
+	} else {
+		s.discord.Update("", 0)
+	}
 	s.emit("player", PlayerEvent{state, p.Anime, ep})
 	if save {
 		p.Anime.Availability = nil
@@ -910,7 +918,7 @@ func (s *Service) syncWatched(a domain.Anime, ep domain.Episode) {
 	ctx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
 	defer cancel()
 	for _, account := range s.accounts.Profiles() {
-		if !account.Connected {
+		if !account.Connected || (account.Provider != "anilist" && account.Provider != "mal") {
 			continue
 		}
 		id := a.AniListID
@@ -920,7 +928,7 @@ func (s *Service) syncWatched(a domain.Anime, ep domain.Episode) {
 		if id <= 0 {
 			continue
 		}
-		if e := s.accounts.Sync(ctx, account.Provider, s.Settings().MALClientID, id, int(ep.Number), a.EpisodeCount); e != nil {
+		if e := s.accounts.Sync(ctx, account.Provider, integrations.MALClientID, id, int(ep.Number), a.EpisodeCount); e != nil {
 			s.emit("error", "Sincronização: "+e.Error())
 		}
 	}
@@ -1049,7 +1057,6 @@ func (s *Service) PlayLocal(path string) error {
 	if s.db.Get("history", a.Key(), &history) == nil && !history.NeedsResolve && history.Episode.Season == ep.Season && history.Episode.Number == ep.Number {
 		position = history.Position
 	}
-	s.discord.Update(a.Title, ep.Number)
 	e = s.player.Start(s.ctx, resolved, v.PlayerMode, v.PlayerPath, position, session)
 	if e != nil {
 		s.onPlayer(player.State{Session: session, Error: e.Error()})
@@ -1106,6 +1113,47 @@ func (s *Service) MangaSearch(id, q string) ([]domain.Manga, error) {
 	defer end()
 	return s.manga.Search(ctx, q)
 }
+func (s *Service) MangaDiscover(id string) (domain.MangaDiscovery, error) {
+	ctx, end := s.operation(id, 30*time.Second)
+	defer end()
+	const cacheKey = "manga:discovery:v1"
+	var cached domain.MangaDiscovery
+	hasCached, stale := s.db.CacheGet(cacheKey, &cached)
+	if hasCached && !stale {
+		return cached, nil
+	}
+	fresh, err := s.manga.Discover(ctx)
+	if err != nil {
+		if hasCached {
+			cached.Warning = "O catálogo está temporariamente indisponível; mostrando os dados salvos."
+			return cached, nil
+		}
+		return domain.MangaDiscovery{}, err
+	}
+	if err := s.db.CachePut(cacheKey, fresh, 15*time.Minute, 6*time.Hour); err != nil {
+		fresh.Warning = strings.TrimSpace(strings.Join([]string{fresh.Warning, "Não foi possível atualizar o cache local."}, "; "))
+	}
+	return fresh, nil
+}
+func (s *Service) MangaByCategory(id, categoryID string) ([]domain.Manga, error) {
+	ctx, end := s.operation(id, 30*time.Second)
+	defer end()
+	key := "manga:category:v1:" + categoryID
+	var cached []domain.Manga
+	hasCached, stale := s.db.CacheGet(key, &cached)
+	if hasCached && !stale {
+		return cached, nil
+	}
+	fresh, err := s.manga.ByCategory(ctx, categoryID)
+	if err != nil {
+		if hasCached {
+			return cached, nil
+		}
+		return nil, err
+	}
+	_ = s.db.CachePut(key, fresh, 15*time.Minute, 6*time.Hour)
+	return fresh, nil
+}
 func (s *Service) Chapters(id, mangaID string) ([]domain.Chapter, error) {
 	ctx, end := s.operation(id, 90*time.Second)
 	defer end()
@@ -1158,20 +1206,16 @@ func (s *Service) DownloadManga(id string, m domain.Manga, chapters []domain.Cha
 	return nil
 }
 func (s *Service) Accounts() []integrations.Account { return s.accounts.Profiles() }
-func (s *Service) MALClientSecretConfigured() bool  { return s.accounts.MALClientSecretConfigured() }
-func (s *Service) SetMALClientSecret(secret string) error {
-	return s.accounts.SetMALClientSecret(secret)
-}
 func (s *Service) Login(id, provider string) error {
 	ctx, end := s.operation(id, 2*time.Minute)
 	defer end()
-	return s.accounts.Login(ctx, provider, s.Settings().MALClientID)
+	return s.accounts.Login(ctx, provider, integrations.MALClientID)
 }
 func (s *Service) Logout(provider string) error { return s.accounts.Logout(provider) }
 func (s *Service) RefreshAccount(id, provider string) (integrations.Account, error) {
 	ctx, end := s.operation(id, 30*time.Second)
 	defer end()
-	return s.accounts.Profile(ctx, provider, s.Settings().MALClientID)
+	return s.accounts.Profile(ctx, provider, integrations.MALClientID)
 }
 func (s *Service) CheckUpdate(id string) (update.Info, error) {
 	ctx, end := s.operation(id, 30*time.Second)

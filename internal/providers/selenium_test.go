@@ -5,15 +5,73 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFindFirefoxRejectsMissingConfiguredBinary(t *testing.T) {
 	t.Setenv("ANIMECAOS_FIREFOX_PATH", filepath.Join(t.TempDir(), "missing-firefox.exe"))
 	if path, err := findFirefox(); err == nil || path != "" {
 		t.Fatalf("expected configured missing Firefox to fail, got path=%q err=%v", path, err)
+	}
+}
+
+func TestBundledBrowserPathsMatchWindowsAndAppImageLayouts(t *testing.T) {
+	root := t.TempDir()
+	windows := bundledFirefoxLocations(root, "windows")
+	if len(windows) != 1 || windows[0] != filepath.Join(root, "bin", "firefox", "firefox.exe") {
+		t.Fatalf("Windows Firefox path = %#v", windows)
+	}
+	linuxFirefox := bundledFirefoxLocations(root, "linux")
+	if len(linuxFirefox) != 2 || linuxFirefox[0] != filepath.Join(root, "bin", "firefox", "firefox") || linuxFirefox[1] != filepath.Clean(filepath.Join(root, "..", "lib", "firefox", "firefox")) {
+		t.Fatalf("Linux Firefox paths = %#v", linuxFirefox)
+	}
+	if got := bundledGeckodriverLocations(root, "windows"); len(got) != 2 || got[0] != filepath.Join(root, "bin", "geckodriver.exe") {
+		t.Fatalf("Windows GeckoDriver paths = %#v", got)
+	}
+	if got := bundledGeckodriverLocations(root, "linux"); len(got) != 2 || got[1] != filepath.Join(root, "geckodriver") {
+		t.Fatalf("Linux AppImage GeckoDriver paths = %#v", got)
+	}
+}
+
+func TestBundledFirefoxDynamicPlayerFixture(t *testing.T) {
+	if os.Getenv("ANIMECAOS_BROWSER_TEST") != "1" {
+		t.Skip("set ANIMECAOS_BROWSER_TEST=1 to exercise the bundled Firefox runtime")
+	}
+	driverPath := strings.TrimSpace(os.Getenv("ANIMECAOS_GECKODRIVER_PATH"))
+	if driverPath == "" {
+		var err error
+		driverPath, err = findBundledGeckodriver(runtimeExecutableDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := findFirefox(); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		if r.URL.Path == "/" {
+			_, _ = w.Write([]byte(`<!doctype html><html><body><div class="player-container"></div><script>
+setTimeout(() => { const frame = document.createElement('iframe'); frame.src = '/embed/episode-1'; document.querySelector('.player-container').appendChild(frame); }, 150);
+</script></body></html>`))
+			return
+		}
+		_, _ = w.Write([]byte(`<html><body>fixture player</body></html>`))
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 18*time.Second)
+	defer cancel()
+	urls, err := seleniumPlayerURLs(ctx, server.URL, driverPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(urls) != 1 || urls[0].URL != server.URL+"/embed/episode-1" {
+		t.Fatalf("bundled Firefox did not return dynamically created player iframe: %#v", urls)
 	}
 }
 

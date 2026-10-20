@@ -11,10 +11,110 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
+
+func TestDiscoverUsesCatalogOrderingAndGenreTags(t *testing.T) {
+	var mu sync.Mutex
+	var requests []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/manga/tag" {
+			json.NewEncoder(w).Encode(map[string]any{"data": []any{
+				map[string]any{"id": "action-id", "attributes": map[string]any{"name": map[string]string{"en": "Action"}, "group": "genre"}},
+				map[string]any{"id": "theme-id", "attributes": map[string]any{"name": map[string]string{"en": "Martial Arts"}, "group": "theme"}},
+			}})
+			return
+		}
+		if r.URL.Path != "/manga" {
+			http.NotFound(w, r)
+			return
+		}
+		query := r.URL.Query()
+		mu.Lock()
+		requests = append(requests, r.URL.RawQuery)
+		mu.Unlock()
+		title, id := "Newest", "newest-id"
+		if query.Get("status[]") == "ongoing" {
+			title, id = "Ongoing", "ongoing-id"
+		} else if query.Get("order[followedCount]") == "desc" {
+			title, id = "Popular", "popular-id"
+		}
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{map[string]any{
+			"id": id,
+			"attributes": map[string]any{
+				"title": map[string]string{"en": title}, "description": map[string]string{"en": "Description"},
+				"status": "ongoing", "availableTranslatedLanguages": []string{"pt-br"},
+			},
+			"relationships": []any{map[string]any{"type": "cover_art", "attributes": map[string]string{"fileName": "cover"}}},
+		}}})
+	}))
+	defer server.Close()
+	s := New(netx.New())
+	s.Base = server.URL
+	s.Gate.Interval = 0
+
+	discovery, err := s.Discover(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(discovery.Popular) != 1 || discovery.Popular[0].ID != "popular-id" || len(discovery.Featured) != 1 || discovery.Featured[0].ID != "popular-id" {
+		t.Fatalf("popular/featured shelves were not built from the follower ranking: %#v", discovery)
+	}
+	if len(discovery.RecentlyUpdated) != 1 || discovery.RecentlyUpdated[0].ID != "newest-id" || len(discovery.Publishing) != 1 || discovery.Publishing[0].ID != "ongoing-id" {
+		t.Fatalf("catalog shelves do not reflect their requested sort/status: %#v", discovery)
+	}
+	if discovery.Popular[0].Cover != "https://uploads.mangadex.org/covers/popular-id/cover.256.jpg" || discovery.Popular[0].Banner != "https://uploads.mangadex.org/covers/popular-id/cover.512.jpg" {
+		t.Fatalf("unexpected cover variants: %#v", discovery.Popular[0])
+	}
+	if len(discovery.Categories) != 1 || discovery.Categories[0].ID != "action-id" || discovery.Categories[0].Name != "Ação" {
+		t.Fatalf("expected the translated genre but not a theme tag: %#v", discovery.Categories)
+	}
+	mu.Lock()
+	got := append([]string(nil), requests...)
+	mu.Unlock()
+	sort.Strings(got)
+	if len(got) != 3 {
+		t.Fatalf("expected three catalog requests, got %d", len(got))
+	}
+	contains := func(fragment string) bool {
+		for _, request := range got {
+			if strings.Contains(request, fragment) {
+				return true
+			}
+		}
+		return false
+	}
+	if !contains("order%5BfollowedCount%5D=desc") || !contains("order%5BlatestUploadedChapter%5D=desc") || !contains("status%5B%5D=ongoing") {
+		t.Fatalf("expected follower, recent chapter, and ongoing queries; got %v", got)
+	}
+}
+
+func TestByCategoryFiltersByOfficialTagID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		if query.Get("includedTags[]") != "action-id" || query.Get("order[followedCount]") != "desc" {
+			t.Errorf("unexpected category query: %s", r.URL.RawQuery)
+		}
+		if query.Get("contentRating[]") == "" || query.Get("limit") != "20" {
+			t.Errorf("category request omitted content or result bounds: %s", r.URL.RawQuery)
+		}
+		json.NewEncoder(w).Encode(map[string]any{"data": []any{}})
+	}))
+	defer server.Close()
+	s := New(netx.New())
+	s.Base = server.URL
+	s.Gate.Interval = 0
+	if _, err := s.ByCategory(context.Background(), "action-id"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ByCategory(context.Background(), " "); err == nil {
+		t.Fatal("empty category id was accepted")
+	}
+}
 
 func TestChapterDownloadAndCBZ(t *testing.T) {
 	var base string

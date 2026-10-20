@@ -1,6 +1,21 @@
 # Revisão técnica — AnimeCaos
 
-Data: 19/10/2026. Escopo desta etapa: janela desktop Windows, geometria persistida, bandeja do sistema, backend Go, interface React/TypeScript, integrações de conta, busca com disponibilidade, scraping/MPV, fila de downloads e legado Python mantido como referência. `wails dev` foi executado para abrir o app; não houve build de distribuição nem empacotamento. A árvore antiga está preservada em `../Legacy/`.
+Data: 19/10/2026. O escopo desta revisão também inclui os pacotes locais Windows/Linux com Firefox/GeckoDriver, MPV/FFmpeg/FFprobe e WebView2, CI, instaladores, update e material de licenças. O portátil, instalador e AppImage foram gerados; os smoke tests locais do AppImage passaram. Esta revisão não publicou artefatos. A árvore Python antiga está preservada em `../Legacy/`.
+
+### [P1] Pacotes não incluíam todos os runtimes que o app usa — corrigido no stage
+
+- **Evidência:** a configuração anterior podia depender de MPV/FFmpeg no `PATH`, Firefox/GeckoDriver do computador e do WebView2 Evergreen instalado. Isso fazia um app abrir em desenvolvimento e falhar em máquinas sem ferramentas externas.
+- **Correção:** o empacotador agora exige MPV, FFmpeg/FFprobe, Firefox e GeckoDriver em `bin/`; Windows também carrega WebView2 Fixed Version junto ao app, selecionado por `WebviewBrowserPath`. O AppImage inclui Firefox, mídia e suas bibliotecas GTK/WebKitGTK selecionadas. O helper Windows configura ACL de leitura AppContainer uma vez no primeiro início para cobrir Windows 10 e ZIP portátil.
+- **Validação:** o stage Windows passou no Firefox/GeckoDriver com iframe dinâmico e MPV com seek; Wails reconheceu WebView2 155.0.4283.62 dentro do stage. O AppImage final passou no Ubuntu 24.04/WSL: Firefox/GeckoDriver extraídos da imagem executaram a fixture Selenium, MPV fez decode/seek e o smoke abriu, atualizou e preservou o banco.
+- **Limite:** a instalação offline do Windows ainda precisa ser verificada em VM limpa, e a validação do AppImage precisa ser repetida numa VM/instalação Linux limpa. Os runtimes fixos exigem atualização e revalidação a cada release; workflows remotos e assinatura dos artefatos ainda dependem de credenciais e configuração.
+
+### [P1] linuxdeploy alterava os binários de Firefox e GeckoDriver — corrigido no empacotamento AppImage
+
+- **Evidência:** a imagem extraída continha GeckoDriver estático com RPATH modificado; o executável de 0,37.1 retornava `SIGSEGV`, embora a cópia do stage funcionasse. `linuxdeploy` também reescrevia o launcher/binário Firefox durante a coleta.
+- **Impacto:** a aplicação Linux não conseguiria iniciar scraping dinâmico apesar de carregar Firefox e GeckoDriver dentro do AppImage.
+- **Correção:** o script guarda as cópias upstream, executa a coleta de dependências e licenças, restaura Firefox/GeckoDriver sem alterações, verifica os bytes e empacota o AppDir com o `appimagetool` incluído na ferramenta, sem uma segunda varredura.
+- **Cobertura:** `verify-appimage.sh` extrai e testa Firefox/GeckoDriver do próprio artefato, executa iframe JavaScript e MPV, abre o app, aplica update e confirma que `state.db` mantém o hash.
+- **Limite:** a verificação ocorreu em Ubuntu 24.04/WSL; a VM limpa ainda precisa ser testada.
 
 ## Achados corrigidos nesta etapa
 
@@ -153,19 +168,24 @@ Os pontos visuais desta sequência foram conferidos em `App.tsx` e `style.css` e
 - **Prévia recortada pelo carrossel — corrigido.** O `overflow-y: hidden` da rail cortava o painel de hover mesmo com `z-index`. O painel agora é portal em `document.body`, usa posição viewport-fixed, reposiciona em scroll/resize e aceita o cursor durante a transição.
 - **Controle de sidebar indisponível — corrigido no layout.** O botão estava oculto abaixo de 760 px e tinha margem negativa no desktop. Há agora um controle no cabeçalho compacto e outro junto à marca no desktop, com transições e preferência persistida. Teste DOM verifica o estado persistido; visibilidade geométrica precisa ser validada na janela real.
 - **Ação do destaque e carrosséis — atualizado.** Hero usa ícone play e rótulo “Assistir”; setas de rail e teclado continuam disponíveis. A ação busca as opções do anime, não inicia playback sem seleção.
-- **Ícone Wails — fonte atualizada, binário pendente.** `build/appicon.png` e `build/windows/icon.ico` agora são cópias da marca e foram liberados de `build/` no `.gitignore`. O executável não foi reconstruído nesta etapa; o ícone mostrado por um binário já existente não muda e a incorporação efetiva ainda precisa de validação quando builds forem retomados.
+- **Ícone Wails — corrigido e verificado no executável de distribuição.** A compilação anterior usava `go build` diretamente e não gerava os recursos PE do Wails. `cmd/package` agora chama a CLI Wails na versão fixada pelo módulo para compilar o executável Windows, incorporando ícone, manifesto e metadados. Em 19/10/2026, o ícone associado ao executável do novo ZIP foi extraído e comparado visualmente com a marca; o stage usado no instalador contém o mesmo executável. O instalador foi compilado pelo Inno Setup 6.7.1 oficial. A instalação e inspeção da janela em uma VM limpa ainda não foram feitas.
 - **Capa antiga/histórico.** O importador aproveita cache AniList/imagens legadas e o serviço permite salvar a capa recuperada. O código tem testes de cache e persistência; não foi repetida uma migração sobre diretório real de usuário nesta revisão.
 
-Esse trecho registra o estado de código. Não é uma inspeção visual de um executável empacotado.
+Os itens visuais acima descrevem a implementação e a validação registrada. A checagem do ícone extraído confirma o recurso PE do executável empacotado, mas não substitui uma instalação limpa para verificar título, barra de tarefas e atalhos no Windows.
 
 ## Achados pendentes
 
-### [P2] Client Secret e tokens OAuth ficam sem criptografia em repouso — confirmado
+### [P2] Login Discord e Rich Presence ainda dependem de configuração e validação no Developer Portal — pendente
 
-- **Evidência:** `internal/store/store.go` serializa valores do bucket `auth` como JSON na base SQLite `state.db`. O Client Secret local do MAL e os tokens AniList/MAL não usam DPAPI/Keychain/libsecret nem criptografia de aplicação.
-- **Impacto:** alguém com acesso ao perfil/diretório de dados do usuário pode ler credenciais persistidas e reutilizar tokens ainda válidos.
-- **Mitigação atual:** o segredo MAL não é embutido no executável nem devolvido à interface; o usuário pode removê-lo em Configurações, e credenciais não devem aparecer em logs.
-- **Encaminhamento:** avaliar armazenamento protegido pelo sistema operacional por plataforma, incluindo migração de tokens já persistidos e fallback explícito. Não tratar as permissões do diretório como criptografia.
+- **Evidência em 20/10/2026:** fixtures locais validam o callback OAuth com PKCE, leitura do perfil, cofre de credenciais e payload de Rich Presence; nenhuma autorização real nem inspeção em cliente Discord Desktop foi feita nesta rodada. O guia de cliente público do Discord demonstra a troca via SDK `Client::GetToken`; a chamada HTTP equivalente do adaptador Go ainda precisa de confirmação live.
+- **Impacto:** se o Developer Portal não tiver o callback local `http://127.0.0.1:9744/`, o cliente público habilitado e a arte `logo`, o vínculo ou a imagem da presença não funcionarão corretamente.
+- **Encaminhamento:** configurar nome/ícone, habilitar cliente público e cadastrar o callback exato; enviar a arte `logo`; testar autorização, reprodução, pausa, seek e parada em um Discord Desktop com compartilhamento de atividade habilitado. Se a troca HTTP for recusada, substituir por `Client::GetToken` via SDK oficial ou por um backend confidencial sem distribuir segredo no app. A conta Discord apenas identifica o perfil; progresso de episódios continua nas integrações AniList/MAL.
+
+### [P2] Credenciais de contas em instalações antigas no SQLite — mitigado no caminho ativo; revisão de release pendente
+
+- **Evidência atual:** tokens AniList/MAL e Client Secret MAL novos são gravados em `internal/securestore` via Windows Credential Manager ou Linux Secret Service. A migração legacy grava primeiro no cofre e só então apaga a linha antiga com `secure_delete`, checkpoint e `VACUUM`; testes verificam os dois caminhos.
+- **Limite:** cópias do diretório de dados, snapshots/backup anteriores e o Client Secret MAL que foi compartilhado fora do banco ativo não podem ser limpos pelo app. O cofre Linux precisa estar desbloqueado/disponível. Não foi validada ainda uma conta real em cada sistema operacional.
+- **Ação de publicação:** rotacionar no painel MyAnimeList o segredo exposto durante o suporte; remover a cópia antiga de backups sob controle do usuário; confirmar o cofre Linux em uma sessão gráfica limpa.
 
 ### [P2] Teste da home verifica navegação de busca, mas não o ciclo de resultados reais — parcialmente coberto
 
@@ -217,7 +237,7 @@ As seguintes observações foram registradas numa rodada anterior e servem como 
 
 - As fontes responderam a consultas de Demon Slayer, Frieren, Solo Leveling, Jujutsu Kaisen e One Piece; contagens/agrupamentos variaram entre provedores.
 - O parser/resolvedor secundário retornou 404 para algumas páginas de episódio, e pesquisa por “Demon Slayer” chegou a apresentar Berserk sem referência canônica; a busca por alias expandido e filtro fraco foram adicionados em resposta.
-- Login em conta real AniList/MyAnimeList ainda não foi executado. O fluxo MAL chegou à página de login, mas a troca do código falso retornou `invalid_client` sem Client Secret; a interface agora permite configurar o segredo sem expô-lo ao frontend. Consulte o registro de integrações de 19/10/2026 em `docs/TESTING.md`.
+- Login em conta real AniList/MyAnimeList ainda não foi executado. O fluxo MAL chegou à página de login, mas a troca do código falso retornou `invalid_client` sem Client Secret. Os campos de credencial de desenvolvedor foram removidos da UI; antes da publicação, o cadastro precisa funcionar como cliente público para desktop ou a troca deve passar por um serviço seguro. Consulte o registro de integrações em `docs/TESTING.md`.
 
 Consulte `docs/TESTING.md` para os comandos opt-in. Atualize esta seção somente depois de rodar de novo e registrar o dia, ambiente e resultado real.
 

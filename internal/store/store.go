@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -84,6 +85,33 @@ func (s *Store) Get(bucket, key string, v any) error {
 }
 func (s *Store) Delete(bucket, key string) error {
 	_, e := s.sql().Exec(`DELETE FROM records WHERE bucket=? AND key=?`, bucket, key)
+	return e
+}
+
+// DeleteSensitive removes a credential record and asks SQLite to scrub the
+// deleted bytes from the database and WAL. It is used only after the system
+// credential vault confirms that the migrated value has been stored.
+func (s *Store) DeleteSensitive(bucket, key string) error {
+	ctx := context.Background()
+	conn, e := s.DB.Conn(ctx)
+	if e != nil {
+		return e
+	}
+	defer conn.Close()
+	if _, e = conn.ExecContext(ctx, `PRAGMA secure_delete=ON`); e != nil {
+		return e
+	}
+	if _, e = conn.ExecContext(ctx, `DELETE FROM records WHERE bucket=? AND key=?`, bucket, key); e != nil {
+		return e
+	}
+	var busy, logPages, checkpointedPages int
+	if e = conn.QueryRowContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`).Scan(&busy, &logPages, &checkpointedPages); e != nil {
+		return e
+	}
+	if busy != 0 {
+		return fmt.Errorf("não foi possível limpar o WAL de credenciais (busy=%d)", busy)
+	}
+	_, e = conn.ExecContext(ctx, `VACUUM`)
 	return e
 }
 func (s *Store) List(bucket string) ([]json.RawMessage, error) {

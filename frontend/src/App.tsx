@@ -12,7 +12,9 @@ import {
   type LocalFile,
   type Account,
   type Manga,
+  type MangaCategory,
   type Chapter,
+  type MangaDiscovery,
   type MangaProgress,
   type PlayerEvent,
   type Update,
@@ -55,6 +57,8 @@ const navPaths: Record<string, string> = {
   play: "m8 5 11 7-11 7V5Z",
   trash: "M4 7h16M10 11v6m4-6v6M5.5 7l1 13h11l1-13M9 7V4h6v3",
   folder: "M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v1M3.5 10.5h17l-2 8.5h-15l-1-8.5Z",
+  folderOpen: "M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v1M3 12l2-2h16l-2 9H5l-2-7Z",
+  refresh: "M20 7v5h-5M4 17v-5h5m10.5-5A7 7 0 0 0 7.4 5.3L5 8m14 8-2.4 2.7A7 7 0 0 1 6.5 16.7",
   history: "M3 12a9 9 0 1 0 2.6-6.4L3 8m0-5v5h5m4-1v5l3 2",
   downloads: "M12 3v12m-5-5 5 5 5-5M4 19v2h16v-2",
   manga: "M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5v-13ZM4 16h16M8 6h8m-8 3h8",
@@ -96,6 +100,11 @@ export default function App() {
     [queue, setQueue] = useState<Download[]>([]),
     [queueLoaded, setQueueLoaded] = useState(false),
     [panel, setPanel] = useState(false);
+  const [settingsSaveState, setSettingsSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const settingsRef = useRef<Settings | null>(null);
+  const pendingSettingsRef = useRef<Settings | null>(null);
+  const settingsSaveTimer = useRef<number | null>(null);
+  const settingsSaveRunning = useRef(false);
   const report = (e: unknown) => {
     const m = message(e);
     if (/context canceled|operation was canceled/i.test(m)) return;
@@ -116,6 +125,51 @@ export default function App() {
       report(e);
     }
   };
+  const flushSettingsSave = async () => {
+    if (settingsSaveRunning.current) return;
+    settingsSaveRunning.current = true;
+    let failed = false;
+    try {
+      while (pendingSettingsRef.current) {
+        const snapshot = pendingSettingsRef.current;
+        pendingSettingsRef.current = null;
+        setSettingsSaveState("saving");
+        try {
+          await api.SaveSettings(snapshot);
+          localStorage.setItem("animecaos-theme", snapshot.theme || "system");
+          if (pendingSettingsRef.current) continue;
+          setSettingsSaveState("saved");
+        } catch {
+          if (!pendingSettingsRef.current) pendingSettingsRef.current = snapshot;
+          setSettingsSaveState("error");
+          failed = true;
+          break;
+        }
+      }
+    } finally {
+      settingsSaveRunning.current = false;
+      if (pendingSettingsRef.current && !failed) {
+        settingsSaveTimer.current = window.setTimeout(() => void flushSettingsSave(), 0);
+      }
+    }
+  };
+  const updateSettings = (patch: Partial<Settings>, immediate = false) => {
+    const current = settingsRef.current;
+    if (!current) return;
+    const next = { ...current, ...patch };
+    settingsRef.current = next;
+    pendingSettingsRef.current = next;
+    setSettings(next);
+    setSettingsSaveState("saving");
+    if (settingsSaveTimer.current) window.clearTimeout(settingsSaveTimer.current);
+    settingsSaveTimer.current = window.setTimeout(() => void flushSettingsSave(), immediate ? 0 : 350);
+  };
+  const retrySettingsSave = () => {
+    if (!pendingSettingsRef.current && settingsRef.current) pendingSettingsRef.current = settingsRef.current;
+    setSettingsSaveState("saving");
+    if (settingsSaveTimer.current) window.clearTimeout(settingsSaveTimer.current);
+    settingsSaveTimer.current = window.setTimeout(() => void flushSettingsSave(), 0);
+  };
   const navigate = (next: Route) => {
     setTrail((v) => [...v, route]);
     setRoute(next);
@@ -126,8 +180,9 @@ export default function App() {
       if (v.length) setRoute(v[v.length - 1]);
       return v.slice(0, -1);
     });
+  const isMangaRoute = route.name === "manga" || route.name === "chapters" || route.name === "reader";
   const focusHomeSearch = () => {
-    if (route.name !== "home") navigate({ name: "home" });
+    if (!isMangaRoute && route.name !== "home") navigate({ name: "home" });
     window.setTimeout(() => {
       const input = document.querySelector<HTMLInputElement>(".header-search input");
       input?.focus();
@@ -135,7 +190,7 @@ export default function App() {
     }, 0);
   };
   useEffect(() => {
-    setHeaderQuery(route.name === "search" ? route.query || route.anime?.title || "" : "");
+    setHeaderQuery(route.name === "search" || route.name === "manga" ? route.query || route.anime?.title || "" : "");
   }, [route.name, route.query, route.anime?.id]);
   const refreshLibrary = () => api.Library().then(setLibrary).catch(report);
   const favorite = async (a: Anime) => {
@@ -153,6 +208,7 @@ export default function App() {
     api
       .Initial()
       .then((v) => {
+        settingsRef.current = v.settings;
         setSettings(v.settings);
         setVersion(v.version);
       })
@@ -175,6 +231,9 @@ export default function App() {
       }),
     ];
     return () => off.forEach((f) => f());
+  }, []);
+  useEffect(() => () => {
+    if (settingsSaveTimer.current) window.clearTimeout(settingsSaveTimer.current);
   }, []);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
@@ -267,13 +326,19 @@ export default function App() {
             e.preventDefault();
             const query = headerQuery.trim();
             if (!query) return;
+            if (isMangaRoute) {
+              if (route.name === "manga") setRoute({ name: "manga", query });
+              else navigate({ name: "manga", query });
+              setError("");
+              return;
+            }
             if (route.name === "search") {
               setRoute({ name: "search", query });
               setError("");
             } else navigate({ name: "search", query });
           }}>
             <NavIcon name="search" />
-            <input type="search" aria-label="Buscar animes" placeholder="Buscar animes..." value={headerQuery} onChange={(e) => setHeaderQuery(e.target.value)} />
+            <input type="search" aria-label={isMangaRoute ? "Buscar mangás" : "Buscar animes"} placeholder={isMangaRoute ? "Buscar mangás..." : "Buscar animes..."} value={headerQuery} onChange={(e) => setHeaderQuery(e.target.value)} />
             <kbd>Ctrl K</kbd>
           </form>
           <button
@@ -366,6 +431,9 @@ export default function App() {
                   page: p.page,
                 })
               }
+              initialQuery={route.query}
+              sharedQuery={headerQuery}
+              syncQuery={setHeaderQuery}
               report={report}
             />
           )}
@@ -394,11 +462,9 @@ export default function App() {
             <SettingsView
               settings={settings}
               navigate={(name) => navigate({ name })}
-              save={async (v) => {
-                await api.SaveSettings(v);
-                localStorage.setItem("animecaos-theme", v.theme || "system");
-                setSettings(v);
-              }}
+              onChange={updateSettings}
+              saveState={settingsSaveState}
+              retrySave={retrySettingsSave}
               report={report}
             />
           )}
@@ -471,13 +537,7 @@ export default function App() {
             <input
               type="checkbox"
               checked={settings.autoplay}
-              onChange={(e) =>
-                run(async () => {
-                  const v = { ...settings, autoplay: e.target.checked };
-                  await api.SaveSettings(v);
-                  setSettings(v);
-                })
-              }
+              onChange={(e) => updateSettings({ autoplay: e.target.checked })}
             />{" "}
             Autoplay
           </label>
@@ -516,8 +576,8 @@ function Busy({ cancel, message = "Carregando…" }: { cancel?: () => void; mess
     </div>
   );
 }
-function Cards({ items, open, layout = "grid", label = "Animes", showAvailability = false }: { items: Anime[]; open: (a: Anime) => void; layout?: "grid" | "rail"; label?: string; showAvailability?: boolean }) {
-  const cards = items.map((a) => <Card key={key(a)} a={a} open={() => open(a)} showAvailability={showAvailability} />);
+function Cards({ items, open, layout = "grid", label = "Animes", showAvailability = false, showOpenOverlay = false }: { items: Anime[]; open: (a: Anime) => void; layout?: "grid" | "rail"; label?: string; showAvailability?: boolean; showOpenOverlay?: boolean }) {
+  const cards = items.map((a) => <Card key={key(a)} a={a} open={() => open(a)} showAvailability={showAvailability} showOpenOverlay={showOpenOverlay} />);
   if (layout === "rail") return <Rail label={label}>{cards}</Rail>;
   return (
     <div className="cards">
@@ -555,7 +615,7 @@ function Rail({ children, label }: { children: ReactNode; label: string }) {
     </div>
   );
 }
-function Card({ a, open, subtitle, action, onImageFailure, showAvailability = false }: { a: Anime; open: () => void; subtitle?: string; action?: ReactNode; onImageFailure?: () => void; showAvailability?: boolean }) {
+function Card({ a, open, subtitle, action, onImageFailure, showAvailability = false, showOpenOverlay = false }: { a: Anime; open: () => void; subtitle?: string; action?: ReactNode; onImageFailure?: () => void; showAvailability?: boolean; showOpenOverlay?: boolean }) {
   const [preview, setPreview] = useState<Anime>();
   const [previewStyle, setPreviewStyle] = useState<CSSProperties>();
   const previewId = useId();
@@ -675,6 +735,10 @@ function Card({ a, open, subtitle, action, onImageFailure, showAvailability = fa
           {showAvailability && a.availability && <span className="quality-badge" title={`${a.availability.sourcesVerified.length} fonte(s) validada(s) · ${a.availability.sampleEpisode}`}>
             {a.availability.quality || "Qualidade não identificada"}
           </span>}
+          {showOpenOverlay && <>
+            <span className="card-open-overlay" aria-hidden="true" />
+            <span className="card-open-cta" aria-hidden="true">Ver anime <NavIcon name="arrow" /></span>
+          </>}
         </span>
         <strong className="card-title" title={a.title}>{a.title}</strong>
         {showAvailability && (a.year > 0 || a.episodeCount > 0 || a.format === "MOVIE") && <small className="card-meta">{[
@@ -785,14 +849,14 @@ function Home({
           </div>
         </section>
       )}
-      <HistoryView limit={8} variant="shelf" open={openHistory} report={report} />
+      <HistoryView limit={8} variant="shelf" open={openHistory} report={report} showOpenOverlay />
       <section className="home-shelf">
         <div className="shelf-heading"><h3>Em alta</h3></div>
-        <Cards items={data.trending} open={open} layout="rail" label="Em alta" />
+        <Cards items={data.trending} open={open} layout="rail" label="Em alta" showOpenOverlay />
       </section>
       <section className="home-shelf">
         <div className="shelf-heading"><h3>Temporada atual</h3></div>
-        <Cards items={data.seasonal} open={open} layout="rail" label="Temporada atual" />
+        <Cards items={data.seasonal} open={open} layout="rail" label="Temporada atual" showOpenOverlay />
       </section>
     </>
   );
@@ -1148,12 +1212,14 @@ function HistoryView({
   report,
   limit,
   variant = "list",
+  showOpenOverlay = false,
 }: {
   open: (a: Anime) => void;
   search?: (a: Anime) => void;
   report: (e: unknown) => void;
   limit?: number;
   variant?: "list" | "shelf";
+  showOpenOverlay?: boolean;
 }) {
   const [h, setH] = useState<History[]>(), [resuming, setResuming] = useState(""), [page, setPage] = useState(1), [recoveredCovers, setRecoveredCovers] = useState<Record<string, string>>({}), [failedCovers, setFailedCovers] = useState<Record<string, boolean>>({});
   const recoverCover = (title: string, historyKey: string, request = op(), preferredAniListID = 0) => {
@@ -1199,6 +1265,7 @@ function HistoryView({
               key={id}
               a={anime}
               open={() => open(anime)}
+              showOpenOverlay={showOpenOverlay}
               subtitle={x.needsResolve ? "Histórico antigo" : `T${x.episode.season} · Ep. ${x.episode.number} · ${time(x.position)}`}
               onImageFailure={() => {
                 setFailedCovers((current) => ({ ...current, [id]: true }));
@@ -1379,11 +1446,25 @@ function DownloadsView({
   }, [queue.filter((x) => x.status === "done").length]);
   return (
     <>
-      <div className="toolbar">
-        <button onClick={() => api.OpenDownloads().catch(report)}>
-          Abrir pasta
+      <div className="toolbar downloads-toolbar">
+        <button
+          className="downloads-toolbar-action"
+          type="button"
+          aria-label="Abrir pasta de downloads"
+          title="Abrir pasta de downloads"
+          onClick={() => api.OpenDownloads().catch(report)}
+        >
+          <NavIcon name="folderOpen" />
         </button>
-        <button onClick={load}>Atualizar biblioteca</button>
+        <button
+          className="downloads-toolbar-action"
+          type="button"
+          aria-label="Atualizar biblioteca"
+          title="Atualizar biblioteca"
+          onClick={load}
+        >
+          <NavIcon name="refresh" />
+        </button>
       </div>
       <Queue items={queue} report={report} openAnime={openAnime} />
       <h3>Disponíveis offline</h3>
@@ -1450,43 +1531,206 @@ function MangaCover({ manga, className = "" }: { manga: Manga; className?: strin
 const mangaStatus = (status: string) =>
   ({ ongoing: "Em publicação", completed: "Concluído", hiatus: "Em pausa", cancelled: "Cancelado" }[status] || status || "Status não informado");
 
+function MangaRailCard({ manga, label, index, open }: { manga: Manga; label: string; index: number; open: (manga: Manga) => void }) {
+  const [preview, setPreview] = useState(false);
+  const [previewStyle, setPreviewStyle] = useState<CSSProperties>();
+  const previewId = useId();
+  const cardRef = useRef<HTMLButtonElement>(null);
+  const showTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const positionPreview = () => {
+    const card = cardRef.current;
+    if (!card || window.innerWidth <= 760 || window.innerHeight < 220) return undefined;
+    const rect = card.getBoundingClientRect();
+    const margin = 16;
+    const gap = 12;
+    const width = Math.min(280, window.innerWidth - margin * 2);
+    const maxHeight = Math.min(200, window.innerHeight - margin * 2);
+    const rightSpace = window.innerWidth - rect.right - gap - margin;
+    const leftSpace = rect.left - gap - margin;
+    const placeRight = rightSpace >= width || rightSpace >= leftSpace;
+    const panelWidth = Math.min(width, Math.max(0, placeRight ? rightSpace : leftSpace));
+    const left = placeRight ? rect.right + gap : rect.left - gap - panelWidth;
+    const top = Math.max(margin, Math.min(rect.top + Math.min(24, rect.height * .12), window.innerHeight - maxHeight - margin));
+    const theme = getComputedStyle(card.closest(".app") || card);
+    return {
+      position: "fixed",
+      left: Math.max(margin, Math.min(left, window.innerWidth - panelWidth - margin)),
+      top,
+      width: panelWidth,
+      maxHeight,
+      "--surface-raised": theme.getPropertyValue("--surface-raised"),
+      "--text": theme.getPropertyValue("--text"),
+      "--border": theme.getPropertyValue("--border"),
+      "--shadow": theme.getPropertyValue("--shadow"),
+      "--accent": theme.getPropertyValue("--accent"),
+      "--muted": theme.getPropertyValue("--muted"),
+    } as CSSProperties;
+  };
+  const showPreview = () => {
+    if (window.innerWidth <= 760) return;
+    if (showTimer.current) clearTimeout(showTimer.current);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    showTimer.current = setTimeout(() => {
+      const style = positionPreview();
+      if (!style) return;
+      setPreviewStyle(style);
+      setPreview(true);
+    }, 450);
+  };
+  const hidePreview = () => {
+    if (showTimer.current) clearTimeout(showTimer.current);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => {
+      setPreview(false);
+      setPreviewStyle(undefined);
+    }, 180);
+  };
+  const keepPreviewOpen = () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  };
+  useEffect(() => () => {
+    if (showTimer.current) clearTimeout(showTimer.current);
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
+  useEffect(() => {
+    if (!preview) return;
+    let frame = 0;
+    const reposition = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const style = positionPreview();
+        if (style) setPreviewStyle(style);
+        else setPreview(false);
+      });
+    };
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [preview]);
+
+  const summary = manga.description?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  return <>
+    <button
+      ref={cardRef}
+      type="button"
+      className="manga-shelf-card"
+      aria-describedby={preview ? previewId : undefined}
+      onClick={() => open(manga)}
+      onMouseEnter={showPreview}
+      onMouseLeave={hidePreview}
+      onFocus={showPreview}
+      onBlur={hidePreview}
+    >
+      <span className="manga-shelf-poster">
+        <MangaCover manga={manga} />
+        {label === "Top mangás" && <span className="manga-rank" aria-label={`Posição ${index + 1}`}>{index + 1}</span>}
+        <span className="manga-poster-overlay" aria-hidden="true" />
+        <span className="manga-poster-cta" aria-hidden="true">Ver mangá <NavIcon name="arrow" /></span>
+      </span>
+      <span className="manga-shelf-title" title={manga.title}>{manga.title}</span>
+      <small className="manga-shelf-meta">{mangaStatus(manga.status)}</small>
+    </button>
+    {preview && previewStyle && createPortal(
+      <div className="preview manga-preview" id={previewId} role="tooltip" style={previewStyle} onMouseEnter={keepPreviewOpen} onMouseLeave={hidePreview}>
+        <strong className="preview-title">{manga.title}</strong>
+        {summary && <p className="preview-description">{summary}</p>}
+      </div>,
+      document.body,
+    )}
+  </>;
+}
+
+function MangaRail({ items, label, open }: { items: Manga[]; label: string; open: (manga: Manga) => void }) {
+  return (
+    <Rail label={label}>
+      {items.map((manga, index) => <MangaRailCard key={manga.id} manga={manga} label={label} index={index} open={open} />)}
+    </Rail>
+  );
+}
+
 function MangaView({
   open,
   resume,
+  initialQuery,
+  sharedQuery,
+  syncQuery,
   report,
 }: {
   open: (m: Manga) => void;
   resume: (p: MangaProgress) => void;
+  initialQuery?: string;
+  sharedQuery: string;
+  syncQuery: (query: string) => void;
   report: (e: unknown) => void;
 }) {
-  const [q, setQ] = useState(""),
-    [items, setItems] = useState<Manga[]>([]),
+  const [items, setItems] = useState<Manga[]>([]),
     [history, setHistory] = useState<MangaProgress[]>([]),
     [busy, setBusy] = useState(false),
     [searched, setSearched] = useState(false),
-    [searchError, setSearchError] = useState("");
-  const id = useRef("");
+    [submittedQuery, setSubmittedQuery] = useState(""),
+    [searchError, setSearchError] = useState(""),
+    [discovery, setDiscovery] = useState<MangaDiscovery>(),
+    [discoveryBusy, setDiscoveryBusy] = useState(true),
+    [discoveryError, setDiscoveryError] = useState(""),
+    [activeCategory, setActiveCategory] = useState<MangaCategory>(),
+    [spot, setSpot] = useState(0),
+    [heroImageFailed, setHeroImageFailed] = useState(false),
+    [heroCoverFallback, setHeroCoverFallback] = useState(false);
+  const id = useRef(""), discoveryID = useRef("");
+  const loadDiscovery = async () => {
+    if (discoveryID.current) void api.Cancel(discoveryID.current).catch(() => {});
+    const requestID = op();
+    discoveryID.current = requestID;
+    setDiscoveryBusy(true);
+    setDiscoveryError("");
+    try {
+      const result = await api.MangaDiscover(requestID);
+      if (discoveryID.current !== requestID) return;
+      setDiscovery(result);
+      setDiscoveryError("");
+    } catch (error) {
+      if (discoveryID.current === requestID) setDiscoveryError(message(error));
+    } finally {
+      if (discoveryID.current === requestID) setDiscoveryBusy(false);
+    }
+  };
   useEffect(() => {
     let active = true;
     api.MangaHistory().then((entries) => { if (active) setHistory(entries); }).catch(report);
+    void loadDiscovery();
     return () => {
       active = false;
       if (id.current) void api.Cancel(id.current).catch(() => {});
+      if (discoveryID.current) {
+        const requestID = discoveryID.current;
+        discoveryID.current = "";
+        void api.Cancel(requestID).catch(() => {});
+      }
     };
   }, []);
-  const search = async (value = q) => {
+  const search = async (value = sharedQuery) => {
     const query = value.trim();
     if (id.current) void api.Cancel(id.current).catch(() => {});
+    id.current = "";
     if (!query) {
       setItems([]);
       setSearched(false);
       setSearchError("Digite o título do mangá para pesquisar.");
+      setBusy(false);
       return;
     }
     id.current = op();
     const current = id.current;
     setBusy(true);
     setSearched(true);
+    setSubmittedQuery(query);
+    setActiveCategory(undefined);
     setSearchError("");
     setItems([]);
     try {
@@ -1498,47 +1742,156 @@ function MangaView({
       if (current === id.current) setBusy(false);
     }
   };
+  const clearSearch = () => {
+    if (id.current) void api.Cancel(id.current).catch(() => {});
+    id.current = "";
+    syncQuery("");
+    setItems([]);
+    setSearched(false);
+    setActiveCategory(undefined);
+    setSearchError("");
+    setBusy(false);
+  };
+  const browseCategory = async (category: MangaCategory) => {
+    if (id.current) void api.Cancel(id.current).catch(() => {});
+    id.current = op();
+    const requestID = id.current;
+    syncQuery("");
+    setBusy(true);
+    setSearched(true);
+    setSubmittedQuery("");
+    setActiveCategory(category);
+    setSearchError("");
+    setItems([]);
+    try {
+      const result = await api.MangaByCategory(requestID, category.id);
+      if (id.current === requestID) setItems(result);
+    } catch (error) {
+      if (id.current === requestID) setSearchError(message(error));
+    } finally {
+      if (id.current === requestID) setBusy(false);
+    }
+  };
+  const updateQuery = (value: string) => {
+    syncQuery(value);
+    if (searchError) setSearchError("");
+  };
+  useEffect(() => {
+    const query = initialQuery?.trim();
+    if (!query) return;
+    syncQuery(query);
+    void search(query);
+  }, [initialQuery]);
+  const featured = discovery?.featured || [];
+  const spotlight = featured[spot % Math.max(1, featured.length)];
+  useEffect(() => { setHeroImageFailed(false); setHeroCoverFallback(false); }, [spotlight?.id]);
+  useEffect(() => {
+    const count = Math.min(5, featured.length);
+    if (count < 2) return;
+    const timer = window.setInterval(() => setSpot((value) => (value + 1) % count), 7000);
+    return () => window.clearInterval(timer);
+  }, [featured.length]);
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable=true]")) return;
+      const rail = target?.closest<HTMLElement>(".cards.rail");
+      if (rail) {
+        event.preventDefault();
+        rail.scrollBy({ left: (event.key === "ArrowRight" ? 1 : -1) * Math.max(240, rail.clientWidth * .75), behavior: "smooth" });
+        return;
+      }
+      if (target?.closest(".manga-spotlight") || target === document.body) {
+        const count = Math.min(5, featured.length);
+        if (!count) return;
+        event.preventDefault();
+        setSpot((value) => (value + (event.key === "ArrowRight" ? 1 : -1) + count) % count);
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [featured.length]);
   return (
     <section className="manga-library" aria-label="Biblioteca de mangás">
-      <div className="manga-library-intro"><h1>Leia mangás</h1><p>Encontre uma obra, escolha o idioma e continue de onde parou.</p></div>
-      <form className="search manga-search" role="search" onSubmit={(e) => { e.preventDefault(); void search(); }}>
-        <input type="search" aria-label="Título do mangá" placeholder="Buscar por título" value={q} onChange={(e) => setQ(e.target.value)} />
-        <button type="submit" disabled={busy || !q.trim()}>Pesquisar</button>
-      </form>
-      {history.length > 0 && (
-        <section className="manga-history" aria-label="Continuar lendo">
-          <div className="manga-section-heading"><div><h2>Continue lendo</h2><small>Seu progresso fica salvo neste dispositivo</small></div></div>
-          <div className="manga-history-grid">
-            {history.slice().sort((a, b) => b.updated - a.updated).map((progress) => (
-              <article className="manga-history-card" key={progress.manga.id}>
-                <button type="button" className="manga-history-open" onClick={() => resume(progress)}>
-                  <MangaCover manga={progress.manga} />
-                  <span className="manga-history-copy"><strong>{progress.manga.title}</strong><small>Cap. {progress.chapter.number || progress.chapter.title || "—"}</small><small>Página {progress.page + 1}</small></span>
-                </button>
-                <button type="button" className="manga-resume-button" onClick={() => resume(progress)}>Continuar lendo</button>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
+      <section className="spotlight manga-spotlight" aria-labelledby="manga-discovery-title">
+        {spotlight && !heroImageFailed && (spotlight.banner || spotlight.cover) && <Image className="spotlight-image" src={heroCoverFallback ? spotlight.cover : spotlight.banner || spotlight.cover} alt="" onLoadFailure={() => {
+          if (!heroCoverFallback && spotlight.banner && spotlight.cover && spotlight.banner !== spotlight.cover) setHeroCoverFallback(true);
+          else setHeroImageFailed(true);
+        }} />}
+        <div className="spotlight-shade" aria-hidden="true" />
+        <div className="spotlight-copy">
+          <span className="spotlight-eyebrow">MANGÁS PARA DESCOBRIR</span>
+          <h2 id="manga-discovery-title" title={spotlight?.title}>{spotlight?.title || "Sua próxima história começa aqui"}</h2>
+          <p>{spotlight?.description?.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, 220) || "Encontre uma obra, explore gêneros e continue a leitura de onde parou."}</p>
+          {spotlight && <button type="button" className="spotlight-action" onClick={() => open(spotlight)}><NavIcon name="manga" /> Ver mangá</button>}
+        </div>
+        {featured.length > 1 && <div className="spotlight-dots" role="group" aria-label="Destaques de mangás">
+          {featured.map((manga, index) => <button type="button" key={manga.id} aria-label={`Destaque ${index + 1}: ${manga.title}`} aria-pressed={spot === index} onClick={() => setSpot(index)}><span /></button>)}
+        </div>}
+      </section>
+      {discovery?.warning && <p className="manga-discovery-warning" role="status">Algumas prateleiras não puderam ser atualizadas. {discovery.warning}</p>}
+      {discoveryError && !discovery && <div className="manga-inline-error" role="alert"><span>Não foi possível carregar o catálogo de descoberta.</span><button type="button" onClick={() => void loadDiscovery()}>Tentar novamente</button></div>}
       {busy && <div className="manga-status" role="status" aria-live="polite"><span className="search-loading-spinner" />Buscando no catálogo…</div>}
-      {searchError && <div className="manga-inline-error" role="alert"><span>{searchError}</span>{q.trim() && <button type="button" onClick={() => void search()}>Tentar novamente</button>}</div>}
-      {!busy && searched && !searchError && items.length === 0 && <Empty>Nenhum mangá encontrado. Tente buscar pelo título original.</Empty>}
+      {searchError && <div className="manga-inline-error" role="alert"><span>{searchError}</span>{activeCategory ? <button type="button" onClick={() => void browseCategory(activeCategory)}>Tentar novamente</button> : sharedQuery.trim() && <button type="button" onClick={() => void search()}>Tentar novamente</button>}</div>}
+      {!busy && searched && !searchError && items.length === 0 && <div className="manga-welcome manga-empty-results"><span className="manga-welcome-icon"><NavIcon name="search" /></span><strong>Nenhum mangá encontrado</strong><p>{activeCategory ? "Não há obras disponíveis nesta categoria agora." : `Não encontramos “${submittedQuery}”. Tente outro título ou uma forma alternativa de escrita.`}</p><button type="button" onClick={clearSearch}>Voltar ao catálogo</button></div>}
       {items.length > 0 && (
         <section className="manga-results-section" aria-label="Resultados de mangá">
-          <div className="manga-section-heading"><div><h2>Resultados</h2><small>{items.length} {items.length === 1 ? "obra" : "obras"}</small></div></div>
+          <div className="manga-section-heading">
+            <div><span className="manga-eyebrow">CATÁLOGO</span><h2>{activeCategory ? activeCategory.name : `Resultados para “${submittedQuery}”`}</h2><small>{items.length} {items.length === 1 ? "obra encontrada" : "obras encontradas"}</small></div>
+            <button type="button" className="manga-clear-search" onClick={clearSearch}>Limpar busca</button>
+          </div>
           <div className="manga-results">
             {items.map((manga) => (
               <button type="button" className="manga-result-card" key={manga.id} onClick={() => open(manga)}>
                 <MangaCover manga={manga} />
-                <span className="manga-result-copy"><strong>{manga.title}</strong><small>{mangaStatus(manga.status)}</small>{manga.languages?.length > 0 && <small>{manga.languages.slice(0, 3).join(" · ")}</small>}</span>
+                <span className="manga-result-copy"><strong>{manga.title}</strong><span className="manga-result-meta"><small>{mangaStatus(manga.status)}</small>{manga.languages?.slice(0, 2).map((language) => <small className="manga-language-tag" key={language}>{language.toLocaleUpperCase()}</small>)}</span>{manga.description && <small className="manga-result-description">{manga.description}</small>}</span>
                 <span className="manga-card-action">Ver capítulos <NavIcon name="arrow" /></span>
               </button>
             ))}
           </div>
         </section>
       )}
-      {!searched && history.length === 0 && !busy && <div className="manga-welcome"><span className="manga-welcome-icon"><NavIcon name="manga" /></span><strong>Sua próxima leitura começa aqui</strong><p>Pesquise por uma obra para ver os capítulos disponíveis.</p></div>}
+      {history.length > 0 && (
+        <section className="home-shelf manga-history" aria-label="Continuar lendo">
+          <div className="shelf-heading"><h3>Continue lendo</h3><span className="manga-section-count">{history.length} {history.length === 1 ? "leitura" : "leituras"}</span></div>
+          <Rail label="Continue lendo">
+            {history.slice().sort((a, b) => b.updated - a.updated).map((progress) => (
+              <article className="card manga-history-card" key={progress.manga.id}>
+                <button type="button" onClick={() => resume(progress)}>
+                  <span className="card-poster"><MangaCover manga={progress.manga} /></span>
+                  <strong className="card-title" title={progress.manga.title}>{progress.manga.title}</strong>
+                  <small className="card-subtitle">Cap. {progress.chapter.number || progress.chapter.title || "—"} · Página {progress.page + 1}{progress.chapter.pages > 0 ? ` de ${progress.chapter.pages}` : ""}</small>
+                </button>
+                {progress.chapter.pages > 0 && <progress className="manga-history-progress" value={Math.min(progress.page + 1, progress.chapter.pages)} max={progress.chapter.pages} aria-label={`Progresso em ${progress.manga.title}`} />}
+                <div className="card-actions"><button type="button" className="continue-action" onClick={() => resume(progress)}><NavIcon name="play" />Continuar lendo</button></div>
+              </article>
+            ))}
+          </Rail>
+        </section>
+      )}
+      {!searched && <section className="manga-category-section" aria-labelledby="manga-category-title">
+        <div className="manga-category-heading">
+          <div className="manga-category-heading-copy"><span className="manga-eyebrow">CATÁLOGO</span><h3 id="manga-category-title">Categorias</h3></div>
+          {(discovery?.categories.length || 0) > 0 && <span className="manga-section-count">{discovery!.categories.length} gêneros</span>}
+        </div>
+        <div className="manga-category-list" role="group" aria-label="Filtrar mangás por categoria">
+          {(discovery?.categories || []).map((category, index) => <button type="button" className="manga-category-chip" aria-label={category.name} key={category.id} onClick={() => void browseCategory(category)}>
+            <span className="manga-category-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+            <strong className="manga-category-name">{category.name}</strong>
+            <span className="manga-category-action" aria-hidden="true"><NavIcon name="arrow" /></span>
+          </button>)}
+          {discoveryBusy && !discovery && <span className="manga-category-loading">Carregando categorias…</span>}
+        </div>
+      </section>}
+      {!searched && discoveryBusy && !discovery && <div className="manga-discovery-loading" role="status" aria-label="Carregando recomendações"><div className="skeleton-grid">{Array.from({ length: 6 }, (_, index) => <div className="skeleton-card" key={index}><div className="skeleton poster-skeleton" /><div className="skeleton line-skeleton" /><div className="skeleton short-skeleton" /></div>)}</div></div>}
+      {!searched && discovery && <>
+        {discovery.popular.length > 0 && <section className="home-shelf manga-shelf-section" aria-labelledby="manga-top-title"><div className="shelf-heading"><h3 id="manga-top-title">Top mangás</h3></div><MangaRail items={discovery.popular} label="Top mangás" open={open} /></section>}
+        {discovery.recentlyUpdated.length > 0 && <section className="home-shelf manga-shelf-section" aria-labelledby="manga-updated-title"><div className="shelf-heading"><h3 id="manga-updated-title">Em alta</h3></div><MangaRail items={discovery.recentlyUpdated} label="Em alta" open={open} /></section>}
+        {discovery.publishing.length > 0 && <section className="home-shelf manga-shelf-section" aria-labelledby="manga-publishing-title"><div className="shelf-heading"><h3 id="manga-publishing-title">Em publicação</h3></div><MangaRail items={discovery.publishing} label="Em publicação" open={open} /></section>}
+      </>}
+      {!searched && history.length === 0 && !busy && !discoveryBusy && discovery && discovery.popular.length === 0 && discovery.recentlyUpdated.length === 0 && discovery.publishing.length === 0 && <div className="manga-welcome manga-first-visit"><span className="manga-welcome-icon"><NavIcon name="manga" /></span><strong>Comece explorando o catálogo</strong><p>Busque pelo nome de uma obra ou escolha uma categoria para encontrar capítulos e abrir o leitor.</p></div>}
       <footer className="manga-credit">Catálogo e leitura fornecidos pelo <button type="button" onClick={() => desktop().OpenLink("https://mangadex.org")}>MangaDex</button>.</footer>
     </section>
   );
@@ -1828,8 +2181,9 @@ function AccountsPanel({ compact = false }: { compact?: boolean }) {
     }
   };
   const providers = [
-    { id: "anilist", name: "AniList", icon: "/anilist.ico", description: "Sincronize seu progresso com o AniList." },
-    { id: "mal", name: "MyAnimeList", icon: "/myanimelist.ico", description: "Sincronize seu progresso com o MyAnimeList." },
+    { id: "discord", name: "Discord", icon: "/discord.svg", description: "Vincule sua conta para identificar seu perfil no AnimeCaos.", tracksProgress: false },
+    { id: "anilist", name: "AniList", icon: "/anilist.ico", description: "Sincronize seu progresso com o AniList.", tracksProgress: true },
+    { id: "mal", name: "MyAnimeList", icon: "/myanimelist.ico", description: "Sincronize seu progresso com o MyAnimeList.", tracksProgress: true },
   ];
   return (
     <div className={`account-connections${compact ? " account-connections-compact" : ""}`}>
@@ -1840,10 +2194,12 @@ function AccountsPanel({ compact = false }: { compact?: boolean }) {
           return (
             <article className="account-provider" key={provider.id} aria-busy={busy === provider.id}>
               <header className="account-provider-heading">
-                <img className="account-provider-icon" src={provider.icon} alt={`${provider.name} logo`} />
+                <img className={`account-provider-icon${provider.id === "discord" ? " discord-provider-icon" : ""}`} src={provider.icon} alt={`${provider.name} logo`} />
                 <div className="account-provider-brand">
                   <h3>{provider.name}</h3>
-                  <p>{connected ? account?.name || "Conta conectada" : provider.description}</p>
+                  <p className={account?.error && !connected ? "account-provider-error" : ""}>
+                    {connected ? account?.name || "Conta conectada" : account?.error || provider.description}
+                  </p>
                 </div>
                 <span className={`account-provider-status${connected ? " is-connected" : ""}`}>
                   {!accountsLoaded ? "Verificando…" : connected ? "Conectada" : "Desconectada"}
@@ -1851,9 +2207,9 @@ function AccountsPanel({ compact = false }: { compact?: boolean }) {
               </header>
               {connected ? (
                 <>
-                  <p className="account-provider-stats">
+                  {provider.tracksProgress && <p className="account-provider-stats">
                     {account?.animeCount ?? 0} animes · {account?.episodes ?? 0} episódios · {Math.round((account?.minutes ?? 0) / 60)} h
-                  </p>
+                  </p>}
                   <div className="account-provider-actions">
                     <button type="button" className="settings-secondary" disabled={!!busy} onClick={() => void refresh(provider.id)}>
                       {busy === provider.id ? "Atualizando…" : "Atualizar perfil"}
@@ -1866,147 +2222,173 @@ function AccountsPanel({ compact = false }: { compact?: boolean }) {
                   {busy === provider.id ? "Aguardando autorização…" : `Conectar ${provider.name}`}
                 </button>
               )}
+              {provider.id === "discord" && <p className="account-provider-note">O vínculo identifica seu perfil; a presença é controlada separadamente em Configurações. Episódios assistidos são sincronizados pelo AniList/MAL.</p>}
             </article>
           );
         })}
       </div>
       {error && <p className="account-connection-error" role="alert">{error}</p>}
       {loginInProgress && <button type="button" className="account-cancel-login" onClick={() => api.Cancel("login").catch((e) => setError(String(e)))}>Cancelar login</button>}
-      <p className="account-sync-note">O AnimeCaos atualiza as contas conectadas quando o episódio termina ou quando você assiste pelo menos 80% dele. O título precisa ter correspondência identificada no serviço.</p>
+      <p className="account-sync-note">AniList e MyAnimeList são atualizados quando o episódio termina ou quando você assiste pelo menos 80% dele, se o título tiver correspondência no serviço. O login do Discord identifica o perfil; a presença depende do Discord Desktop aberto.</p>
     </div>
   );
 }
 
 function AccountsView() {
-  return <section className="accounts-view"><header><h3>Contas conectadas</h3><p>Conecte suas contas para acompanhar automaticamente os episódios assistidos.</p></header><AccountsPanel /></section>;
+  return <section className="accounts-view"><header><h3>Contas conectadas</h3><p>Vincule seu perfil Discord e sincronize episódios assistidos no AniList ou MyAnimeList.</p></header><AccountsPanel /></section>;
 }
 
-function MALClientSecretField() {
-  const [secret, setSecret] = useState(""),
-    [configured, setConfigured] = useState(false),
-    [busy, setBusy] = useState(false),
-    [message, setMessage] = useState("");
+function SettingsAccountSummary({ navigate }: { navigate: (name: string) => void }) {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   useEffect(() => {
-    api.MALClientSecretConfigured().then(setConfigured).catch((e) => setMessage(e instanceof Error ? e.message : String(e)));
+    let active = true;
+    api.Accounts().then((items) => { if (active) setAccounts(items); }).catch(() => { if (active) setLoadFailed(true); }).finally(() => { if (active) setLoaded(true); });
+    return () => { active = false; };
   }, []);
-  const save = async () => {
-    setBusy(true);
-    setMessage("");
-    try {
-      await api.SetMALClientSecret(secret);
-      setConfigured(true);
-      setSecret("");
-      setMessage("Client Secret salvo neste computador.");
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const remove = async () => {
-    setBusy(true);
-    setMessage("");
-    try {
-      await api.SetMALClientSecret("");
-      setConfigured(false);
-      setMessage("Client Secret removido.");
-    } catch (e) {
-      setMessage(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const providers = [
+    { id: "discord", name: "Discord", icon: "/discord.svg" },
+    { id: "anilist", name: "AniList", icon: "/anilist.ico" },
+    { id: "mal", name: "MyAnimeList", icon: "/myanimelist.ico" },
+  ];
   return (
-    <div className="mal-secret-field">
-      <div className="settings-field">
-        <label className="settings-field-label" htmlFor="settings-mal-secret">MyAnimeList Client Secret (opcional)</label>
-        <input id="settings-mal-secret" type="password" autoComplete="new-password" spellCheck={false} value={secret} onChange={(e) => setSecret(e.target.value)} placeholder={configured ? "Segredo salvo; digite para substituir" : "Deixe vazio para cliente sem segredo"} />
-        <small>O valor não volta para a interface depois de salvo. Se o seu aplicativo MAL for público, deixe vazio.</small>
-      </div>
-      <div className="mal-secret-actions">
-        {!!secret && <button type="button" className="settings-secondary" disabled={busy} onClick={() => void save()}>{busy ? "Salvando…" : "Salvar segredo"}</button>}
-        {configured && !secret && <button type="button" className="settings-secondary" disabled={busy} onClick={() => void remove()}>{busy ? "Removendo…" : "Remover segredo"}</button>}
-      </div>
-      {message && <small className="mal-secret-status" role="status">{message}</small>}
+    <div className="settings-account-summary" aria-label="Estado das contas">
+      {providers.map((provider) => {
+        const account = accounts.find((item) => item.provider === provider.id);
+        const connected = !!account?.connected;
+        return <div className="settings-account-row" key={provider.id}>
+          <img src={provider.icon} alt="" />
+          <span>{provider.name}</span>
+          <small className={connected ? "is-connected" : ""}>{!loaded ? "Verificando…" : loadFailed ? "Não disponível" : connected ? account?.name || "Conectada" : "Desconectada"}</small>
+        </div>;
+      })}
+      {loadFailed && <p role="alert">Não foi possível consultar o estado das contas.</p>}
+      <p>AniList e MyAnimeList sincronizam episódios concluídos ou assistidos em pelo menos 80%, quando há correspondência.</p>
+      <button type="button" className="settings-secondary settings-link-button" onClick={() => navigate("accounts")}>Gerenciar contas <NavIcon name="arrow" /></button>
     </div>
   );
 }
 
+function SettingsSwitch({
+  label,
+  description,
+  checked,
+  onChange,
+  icon,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  icon?: ReactNode;
+}) {
+  return <label className="settings-switch-row">
+    <span className="settings-switch-copy">
+      {icon}
+      <span><strong>{label}</strong><small>{description}</small></span>
+    </span>
+    <input type="checkbox" role="switch" aria-label={label} checked={checked} onChange={(event) => onChange(event.target.checked)} />
+    <span className="settings-switch-track" aria-hidden="true"><span /></span>
+  </label>;
+}
+
 function SettingsView({
   settings,
-  save,
+  onChange,
+  saveState,
+  retrySave,
   report,
   navigate,
 }: {
   settings: Settings;
-  save: (s: Settings) => Promise<void>;
+  onChange: (s: Partial<Settings>, immediate?: boolean) => void;
+  saveState: "idle" | "saving" | "saved" | "error";
+  retrySave: () => void;
   report: (e: unknown) => void;
   navigate: (name: string) => void;
 }) {
-  const [v, setV] = useState(settings),
-    [saveState, setSaveState] = useState<"idle" | "dirty" | "saving" | "saved">("idle"),
-    [update, setUpdate] = useState<Update>(),
+  const v = settings;
+  const [update, setUpdate] = useState<Update>(),
     [packagePath, setPackage] = useState(""),
     [toolStatus, setToolStatus] = useState(""),
-    [checkingUpdate, setCheckingUpdate] = useState(false);
-  const editVersion = useRef(0);
-  const patch = (x: Partial<Settings>) => {
-    editVersion.current += 1;
-    setV({ ...v, ...x });
-    setSaveState("dirty");
+    [toolError, setToolError] = useState(false),
+    [checkingUpdate, setCheckingUpdate] = useState(false),
+    [downloadsDraft, setDownloadsDraft] = useState(v.downloadsDir),
+    [activeSection, setActiveSection] = useState("settings-appearance");
+  const patch = (x: Partial<Settings>) => onChange(x);
+  useEffect(() => setDownloadsDraft(v.downloadsDir), [v.downloadsDir]);
+  useEffect(() => {
+    const main = document.querySelector("main");
+    if (!main) return;
+    const updateActive = () => {
+      const threshold = main.getBoundingClientRect().top + 150;
+      const sections = ["settings-appearance", "settings-playback", "settings-downloads", "settings-integrations", "settings-maintenance"];
+      let current = sections[0];
+      for (const id of sections) {
+        const element = document.getElementById(id);
+        if (element && element.getBoundingClientRect().top <= threshold) current = id;
+      }
+      setActiveSection(current);
+    };
+    updateActive();
+    main.addEventListener("scroll", updateActive, { passive: true });
+    window.addEventListener("resize", updateActive);
+    return () => { main.removeEventListener("scroll", updateActive); window.removeEventListener("resize", updateActive); };
+  }, []);
+  const sectionLinks = [
+    ["settings-appearance", "Aparência"], ["settings-playback", "Reprodução"], ["settings-downloads", "Downloads"], ["settings-integrations", "Integrações"], ["settings-maintenance", "Manutenção"],
+  ] as const;
+  const scrollToSection = (id: string) => {
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    document.getElementById(id)?.scrollIntoView({ behavior: reduceMotion ? "instant" : "smooth", block: "start" });
+    setActiveSection(id);
+  };
+  const runTool = async (success: string, action: () => Promise<unknown>) => {
+    setToolStatus("");
+    setToolError(false);
+    try { await action(); setToolStatus(success); }
+    catch (error) { setToolError(true); setToolStatus(userMessage(message(error))); }
   };
   return (
-    <form
-      className="settings-page"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (saveState === "idle" || saveState === "saved" || saveState === "saving") return;
-        const submittedVersion = editVersion.current;
-        setSaveState("saving");
-        try {
-          await save(v);
-          setSaveState(editVersion.current === submittedVersion ? "saved" : "dirty");
-        } catch (error) {
-          setSaveState("dirty");
-          report(error);
-        }
-      }}
-    >
+    <div className="settings-page">
       <div className="settings-intro">
         <div>
-          <h3>Personalize o AnimeCaos</h3>
-          <p>Ajuste reprodução, downloads e aparência em um só lugar.</p>
+          <h3>Configurações</h3>
+          <p>Preferências do app, reprodução e integrações.</p>
         </div>
-        {saveState !== "idle" && (
-          <span className={`settings-save-state is-${saveState}`} role="status">
-            {saveState === "dirty" ? "Alterações pendentes" : saveState === "saving" ? "Salvando…" : "Tudo salvo"}
-          </span>
-        )}
+        <div className="settings-save-state-wrap">
+          {saveState === "saving" && <span className="settings-save-state is-saving" role="status">Salvando…</span>}
+          {saveState === "saved" && <span className="settings-save-state is-saved" role="status">Salvo</span>}
+          {saveState === "error" && <div className="settings-save-error" role="alert">Não foi possível salvar. <button type="button" onClick={retrySave}>Tentar novamente</button></div>}
+        </div>
       </div>
 
-      <div className="settings-grid">
-        <SettingsSection icon="settings" title="Aparência" description="Deixe a interface do seu jeito.">
-          <div className="settings-fields">
+      <nav className="settings-index" aria-label="Índice das configurações">
+        {sectionLinks.map(([id, label]) => <button type="button" key={id} className={activeSection === id ? "active" : ""} aria-current={activeSection === id ? "location" : undefined} onClick={() => scrollToSection(id)}>{label}</button>)}
+      </nav>
+
+      <div className="settings-sections">
+        <SettingsSection id="settings-appearance" icon="settings" title="Aparência" description="Deixe a interface do seu jeito.">
+          <div className="settings-fields settings-fields-columns">
             <div className="settings-field">
-              <label className="settings-field-label" htmlFor="settings-theme">Tema</label>
-              <select id="settings-theme" value={v.theme || "system"} onChange={(e) => patch({ theme: e.target.value as Settings["theme"] })}>
-                <option value="system">Sistema</option>
-                <option value="light">Claro</option>
-                <option value="dark">Escuro</option>
-              </select>
+              <span className="settings-field-label" id="settings-theme-label">Tema</span>
+              <div className="settings-theme-options" role="group" aria-labelledby="settings-theme-label">
+                {([["system", "Sistema"], ["light", "Claro"], ["dark", "Escuro"]] as const).map(([value, label]) => <button type="button" key={value} aria-pressed={(v.theme || "system") === value} onClick={() => patch({ theme: value })}>{label}</button>)}
+              </div>
             </div>
             <div className="settings-field">
               <label className="settings-field-label" htmlFor="settings-scale">Escala da interface</label>
               <div className="settings-range">
                 <input id="settings-scale" type="range" min="1" max="1.5" step="0.05" value={v.uiScale} onChange={(e) => patch({ uiScale: +e.target.value })} />
-                <span className="settings-range-value" aria-hidden="true">{Math.round(v.uiScale * 100)}%</span>
+                <output className="settings-range-value" htmlFor="settings-scale">{Math.round(v.uiScale * 100)}%</output>
               </div>
             </div>
           </div>
         </SettingsSection>
 
-        <SettingsSection icon="play" title="Reprodução" description="Escolha como o anime deve tocar.">
-          <div className="settings-fields">
+        <SettingsSection id="settings-playback" icon="play" title="Reprodução" description="Escolha como o anime deve tocar.">
+          <div className="settings-fields settings-fields-columns">
             <div className="settings-field">
               <label className="settings-field-label" htmlFor="settings-player">Player</label>
               <select id="settings-player" value={v.playerMode} onChange={(e) => patch({ playerMode: e.target.value })}>
@@ -2031,89 +2413,66 @@ function SettingsView({
                 <option value="dublado">Dublado</option>
               </select>
             </div>
-            <label className="settings-toggle">
-              <input type="checkbox" checked={v.autoplay} onChange={(e) => patch({ autoplay: e.target.checked })} />
-              <span><strong>Próximo episódio automático</strong><small>Continuar quando o episódio terminar.</small></span>
-            </label>
+            <SettingsSwitch label="Próximo episódio automático" description="Continuar quando o episódio terminar." checked={v.autoplay} onChange={(checked) => patch({ autoplay: checked })} />
             {v.playerMode !== "mpv" && <p className="settings-note">Os controles no app e a reprodução automática requerem o MPV.</p>}
           </div>
         </SettingsSection>
 
-        <SettingsSection icon="downloads" title="Downloads" description="Organize onde e como os arquivos são baixados." className="settings-section-wide">
+        <SettingsSection id="settings-downloads" icon="downloads" title="Downloads" description="Organize onde e como os arquivos são baixados.">
           <div className="settings-fields settings-fields-columns">
             <div className="settings-field settings-field-wide">
               <label className="settings-field-label" htmlFor="settings-downloads-dir">Pasta de downloads</label>
               <div className="settings-input-action">
-                <input id="settings-downloads-dir" value={v.downloadsDir} onChange={(e) => patch({ downloadsDir: e.target.value })} />
-                <button type="button" className="settings-secondary" onClick={() => desktop().ChooseDirectory().then((p) => p && patch({ downloadsDir: p })).catch(report)}>Escolher pasta</button>
+                <input id="settings-downloads-dir" value={downloadsDraft} onChange={(e) => setDownloadsDraft(e.target.value)} onBlur={() => { if (downloadsDraft !== v.downloadsDir) patch({ downloadsDir: downloadsDraft }); }} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
+                <button type="button" className="settings-secondary" onClick={() => desktop().ChooseDirectory().then((p) => { if (p) { setDownloadsDraft(p); patch({ downloadsDir: p }); } }).catch(report)}>Escolher pasta</button>
               </div>
             </div>
             <div className="settings-field">
               <label className="settings-field-label" htmlFor="settings-concurrent">Downloads simultâneos</label>
-              <input id="settings-concurrent" type="number" min="1" max="5" value={v.concurrent} onChange={(e) => patch({ concurrent: +e.target.value })} />
+              <input id="settings-concurrent" type="number" min="1" max="5" value={v.concurrent} onChange={(e) => { const value = Number(e.target.value); if (Number.isInteger(value) && value >= 1 && value <= 5) patch({ concurrent: value }); }} />
               <small>Entre 1 e 5 tarefas.</small>
             </div>
-            <label className="settings-toggle settings-toggle-inline">
-              <input type="checkbox" checked={v.autoClose} onChange={(e) => patch({ autoClose: e.target.checked })} />
-              <span><strong>Fechar painel ao concluir</strong><small>Ocultar downloads quando a fila terminar.</small></span>
-            </label>
+            <SettingsSwitch label="Fechar painel ao concluir" description="Ocultar downloads quando a fila terminar." checked={v.autoClose} onChange={(checked) => patch({ autoClose: checked })} />
             {v.autoClose && (
               <div className="settings-field">
                 <label className="settings-field-label" htmlFor="settings-close-delay">Aguardar antes de fechar</label>
-                <div className="settings-number-suffix"><input id="settings-close-delay" type="number" min="0" max="60000" step="500" value={v.autoCloseMs} onChange={(e) => patch({ autoCloseMs: +e.target.value })} /><span>ms</span></div>
+                <div className="settings-number-suffix"><input id="settings-close-delay" type="number" min="0" max="60000" step="500" value={v.autoCloseMs} onChange={(e) => { const value = Number(e.target.value); if (Number.isInteger(value) && value >= 0 && value <= 60000) patch({ autoCloseMs: value }); }} /><span>ms</span></div>
               </div>
             )}
           </div>
         </SettingsSection>
 
-        <SettingsSection icon="list" title="Integrações" description="Discord, AniList e MyAnimeList; acompanhe automaticamente os episódios assistidos.">
+        <SettingsSection id="settings-integrations" icon="list" title="Integrações" description="Sincronize seu progresso e compartilhe o que está assistindo.">
           <div className="settings-fields">
-            <label className="settings-toggle">
-              <input type="checkbox" checked={v.discord} onChange={(e) => patch({ discord: e.target.checked })} />
-              <span><strong>Discord Rich Presence</strong><small>Mostrar o que você está assistindo.</small></span>
-            </label>
-            <div className="settings-field">
-              <label className="settings-field-label" htmlFor="settings-mal-client">MyAnimeList Client ID</label>
-              <input id="settings-mal-client" value={v.malClientId} onChange={(e) => patch({ malClientId: e.target.value })} />
-              <small>Salve as alterações antes de conectar se você editar este ID.</small>
-            </div>
-            <MALClientSecretField />
-            <AccountsPanel compact />
-            <button type="button" className="settings-secondary settings-link-button" onClick={() => navigate("accounts")}>Contas conectadas <NavIcon name="arrow" /></button>
+            <SettingsSwitch label="Discord Rich Presence" description="Mostre AnimeCaos, anime, episódio e tempo no Discord Desktop." checked={v.discord} onChange={(checked) => patch({ discord: checked })} icon={<span className="settings-discord-icon"><img src="/discord.svg" alt="" /></span>} />
+            <SettingsAccountSummary navigate={navigate} />
           </div>
         </SettingsSection>
 
-        <SettingsSection icon="history" title="Manutenção" description="Ferramentas para manter o app atualizado.">
+        <SettingsSection id="settings-maintenance" icon="history" title="Manutenção" description="Ferramentas para manter o app atualizado.">
           <div className="settings-tools">
-            <button type="button" className="settings-secondary" onClick={() => api.ClearCache().then(() => setToolStatus("Cache de metadados limpo.")).catch(report)}>Limpar cache de metadados</button>
-            <button type="button" className="settings-secondary" disabled={checkingUpdate} onClick={() => { setToolStatus(""); setUpdate(undefined); setCheckingUpdate(true); api.CheckUpdate(op()).then(setUpdate).catch(report).finally(() => setCheckingUpdate(false)); }}>{checkingUpdate ? "Verificando…" : "Verificar atualização"}</button>
+            <button type="button" className="settings-secondary" onClick={() => void runTool("Cache de metadados limpo.", () => api.ClearCache())}>Limpar cache de metadados</button>
+            <button type="button" className="settings-secondary" disabled={checkingUpdate} onClick={() => { setToolStatus(""); setToolError(false); setUpdate(undefined); setCheckingUpdate(true); api.CheckUpdate(op()).then((result) => { setUpdate(result); setToolStatus(result.available ? `Versão ${result.version} disponível.` : result.managed ? "As atualizações são gerenciadas pelo Flatpak." : "O app está atualizado."); }).catch((error) => { setToolError(true); setToolStatus(userMessage(message(error))); }).finally(() => setCheckingUpdate(false)); }}>{checkingUpdate ? "Verificando…" : "Verificar atualização"}</button>
             <button type="button" className="settings-secondary settings-link-button" onClick={() => navigate("logs")}>Abrir diagnóstico <NavIcon name="arrow" /></button>
           </div>
-          {toolStatus && <p className="settings-tool-status" role="status">{toolStatus}</p>}
+          {toolStatus && <p className={`settings-tool-status${toolError ? " is-error" : ""}`} role={toolError ? "alert" : "status"}>{toolStatus}</p>}
           {update && (
             <div className="settings-update" role="status">
               <strong>{update.managed ? "Atualize pelo Flatpak." : update.available ? `Versão ${update.version} disponível.` : "Você está na versão mais recente."}</strong>
               {update.notes && <pre>{update.notes}</pre>}
-              {update.available && !update.managed && <button type="button" className="settings-secondary" onClick={() => api.DownloadUpdate(op(), update).then(setPackage).catch(report)}>Baixar e verificar</button>}
-              {packagePath && <div className="settings-input-action"><small className="settings-package-path">Pacote verificado: {packagePath}</small><button type="button" className="settings-secondary" onClick={() => api.InstallUpdate(packagePath).catch(report)}>Instalar e reiniciar</button></div>}
+              {update.available && !update.managed && <button type="button" className="settings-secondary" onClick={() => void runTool("Atualização baixada e verificada.", async () => setPackage(await api.DownloadUpdate(op(), update)))}>Baixar e verificar</button>}
+              {packagePath && <div className="settings-input-action"><small className="settings-package-path">Pacote verificado: {packagePath}</small><button type="button" className="settings-secondary" onClick={() => void runTool("O instalador foi iniciado.", () => api.InstallUpdate(packagePath))}>Instalar e reiniciar</button></div>}
             </div>
           )}
         </SettingsSection>
       </div>
-
-      <footer className="settings-actions">
-        <span className="settings-save-hint">As alterações só entram em vigor depois de salvar.</span>
-        <button type="submit" disabled={saveState !== "dirty"}>
-          {saveState === "saving" ? "Salvando…" : saveState === "saved" ? "Salvo" : "Salvar alterações"}
-        </button>
-      </footer>
-    </form>
+    </div>
   );
 }
 
-function SettingsSection({ icon, title, description, className = "", children }: { icon: string; title: string; description: string; className?: string; children: ReactNode }) {
+function SettingsSection({ id, icon, title, description, children }: { id: string; icon: string; title: string; description: string; children: ReactNode }) {
   return (
-    <section className={`settings-section ${className}`} aria-labelledby={`settings-heading-${title.toLowerCase().replace(/\s+/g, "-")}`}>
+    <section className="settings-section" id={id} aria-labelledby={`settings-heading-${title.toLowerCase().replace(/\s+/g, "-")}`}>
       <header className="settings-section-heading">
         <span className="settings-section-icon"><NavIcon name={icon} /></span>
         <div><h4 id={`settings-heading-${title.toLowerCase().replace(/\s+/g, "-")}`}>{title}</h4><p>{description}</p></div>

@@ -1,19 +1,29 @@
 # Mapa do código
 
-Mapa conferido em 19/10/2026. Atualize junto com mudanças de responsabilidade, telas, métodos ou scripts. O conteúdo de `Legacy/` não entra no runtime Go.
+Mapa conferido em 20/10/2026. Atualize junto com mudanças de responsabilidade, telas, métodos ou scripts. O conteúdo de `Legacy/` não entra no runtime Go.
 
 ## Raiz e empacotamento
 
 | Caminho | Responsabilidade |
 |---|---|
 | `main.go` | Entry point Wails, embed do frontend/ícone, janela, geometria visível, diálogos, ciclo da bandeja Windows, single-instance e entrada do helper de atualização |
+| `instance_id_dev.go`, `instance_id_production.go` | Mutexes separados para instância Wails de desenvolvimento e aplicativo empacotado |
+| `instance_id_dev_test.go`, `instance_id_production_test.go` | Testes dos IDs de instância selecionados pelos build tags |
 | `go.mod`, `go.sum` | Versão do Go e dependências |
 | `wails.json` | Configuração do projeto Wails e comandos do frontend |
 | `cmd/animecaos/main.go` | CLI e navegação interativa com os mesmos serviços do app |
-| `cmd/package/main.go` | Criação do stage, compilação, cópia de dependências e manifestos SHA-256 |
-| `deploy/go/build-appimage.sh` | Geração de AppImage a partir do stage Linux |
+| `cmd/package/main.go` | Criação do stage; compilação do app via CLI Wails no Windows para incorporar ícone, manifesto e metadados PE; inclusão de MPV/FFmpeg/Firefox/GeckoDriver/WebView2, licenças e manifestos SHA-256 |
+| `deploy/go/download-browser-runtime.ps1`, `download-browser-runtime-linux.sh` | Baixar e conferir versões/hashes oficiais de Firefox e GeckoDriver usados na release |
+| `deploy/go/download-webview2-runtime.ps1` | Baixar o CAB oficial WebView2 fixo, conferir assinatura/versão e montar `bin/webview2` para o pacote Windows |
+| `deploy/go/build-appimage.sh` | Geração de AppImage com Firefox/GeckoDriver preservados sem RPATH reescrito, executáveis, licenças e bibliotecas GTK/WebKitGTK |
 | `deploy/go/com.animecaos.App.desktop` | Desktop entry Linux |
 | `deploy/go/windows.iss` | Definição Inno Setup |
+| `deploy/go/verify-windows-install.ps1` | Smoke test do portátil/instalador, verifica que o processo WebView2 vem do bundle, testa updater, reinício e preservação de dados |
+| `deploy/go/verify-appimage.sh` | Testa os MPV/FFmpeg/FFprobe/Firefox/GeckoDriver extraídos do AppImage, iframe JS, abertura, aplicação do update e preservação de `state.db` |
+| `deploy/go/bootstrap-appimage-tools.sh` | Obtém ferramentas AppImage com versões e SHA-256 fixados |
+| `scripts/write-release-manifest.ps1` | Gera inventário SHA-256 e tamanho dos arquivos do stage após assinatura |
+| `.github/workflows/ci.yml`, `.github/workflows/release.yml` | CI multiplataforma e pipeline de release assinado e com smoke tests |
+| `THIRD-PARTY-NOTICES.md`, `licenses/` | Avisos, textos de licença e fontes/metadados de dependências distribuídas |
 | `build/appicon.png`, `build/windows/icon.ico` | Recursos-fonte de ícone do Wails |
 | `build/windows/info.json` | Metadados de identidade usados pela integração Windows do Wails |
 | `build/windows/wails.exe.manifest` | Manifesto do executável Windows |
@@ -36,14 +46,15 @@ Mapa conferido em 19/10/2026. Atualize junto com mudanças de responsabilidade, 
 | `frontend/index.html` | Documento HTML de entrada do Vite/Wails |
 | `frontend/public/animecaos-icon.png` | Ícone quadrado usado na sidebar recolhida e na identidade web |
 | `frontend/public/animecaos-wordmark.png` | Lettering transparente da sidebar expandida e da tela de carregamento |
-| `frontend/public/anilist.ico`, `frontend/public/myanimelist.ico` | Favicons dos domínios oficiais usados para identificar as integrações de conta |
+| `frontend/public/anilist.ico`, `frontend/public/myanimelist.ico`, `frontend/public/discord.svg` | Ícones locais oficiais para identificar as integrações de conta e Rich Presence |
+| `frontend/public/mascots/` | Artes PNG transparentes da mascote: versão normal, mini superdeformed, miniatura 256 px, vistas em `poses/` e expressões em `reactions/`; ainda não conectadas aos cards de categorias |
 | `frontend/src/main.tsx` | Inicialização do React |
-| `frontend/src/App.tsx` | Navegação local, sidebar, cabeçalho, telas, cards com ano/episódios, prévia vinculada à identidade canônica, catálogo/capítulos/leitor de mangá, painel AniList/MAL e configurações com estado de salvamento |
-| `frontend/src/api.ts` | Proxy tipado para Wails, Desktop e eventos, incluindo AniList ID na prévia |
-| `frontend/src/types.ts` | Tipos dos DTOs compartilhados com Go, incluindo metadados de ano e formato |
+| `frontend/src/App.tsx` | Navegação local, sidebar, cabeçalho com busca contextual de anime/mangá, telas, cards com ano/episódios, CTA “Ver anime” na Home e prévia de sinopse nas prateleiras de mangá, prévia de anime vinculada à identidade canônica, descoberta de mangás com banner/categorias/prateleiras, busca compartilhada, retomada, capítulos/leitor, contas e Configurações com autosave |
+| `frontend/src/api.ts` | Proxy tipado para Wails, Desktop e eventos, incluindo descoberta MangaDex, filtro de categoria, AniList ID na prévia e operações de contas sem setters de credenciais MAL |
+| `frontend/src/types.ts` | Tipos dos DTOs compartilhados com Go, incluindo manga/categoria/prateleiras, metadados de ano/formato e ID externo das contas; configurações não contêm Client ID MAL editável |
 | `frontend/src/Image.tsx` | Imagens com carregamento via backend e fallback |
-| `frontend/src/style.css` | Temas, componentes, layout responsivo, carrosséis, previews, selo de qualidade da busca e grade responsiva de configurações |
-| `frontend/src/App.test.tsx` | Testes de regressão da interface, incluindo pesquisa, leitura MangaDex e conexão visual das contas AniList/MAL |
+| `frontend/src/style.css` | Temas, componentes, layout responsivo, carrosséis, previews, selo de qualidade, descoberta de mangás e Configurações com switches e autosave |
+| `frontend/src/App.test.tsx` | Testes DOM da interface; busca, CTA das capas na Home, prévia de sinopse MangaDex, leitor, integrações e configurações (autosave, debounce, serialização, retry, índice e navegação Contas) |
 
 As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atualmente, várias telas ainda vivem no mesmo `App.tsx`.
 
@@ -51,7 +62,7 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 
 | Arquivo | Conteúdo |
 |---|---|
-| `service.go` | Composição, casos de uso, cancelamento, busca com limites por fase, prévia de metadados ancorada opcionalmente no AniList ID, reprodução, consolidação do histórico de downloads offline, abertura segura da pasta de arquivos locais, ciclo de sessão do player, sincronização e eventos |
+| `service.go` | Composição, casos de uso, cancelamento, busca com limites por fase, prévia de metadados ancorada opcionalmente no AniList ID, descoberta MangaDex com cache, filtro por categoria, reprodução, consolidação do histórico de downloads offline, abertura segura da pasta de arquivos locais, ciclo de sessão do player, sincronização com Client ID MAL interno e eventos |
 | `updater.go` | Instalação de pacote já baixado/validado e saída para reinício |
 | `images.go` | Busca/cache de imagem e recuperação de capas |
 | `service_test.go` | Busca canônica, cancelamento, autoplay concorrente, limpeza da sessão do player, mídia offline e live opt-in; o teste de stream registra o título/episódio de entrada e a resolução real |
@@ -64,14 +75,14 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 
 | Caminho | Conteúdo |
 |---|---|
-| `internal/domain/models.go` | Modelos de anime, metadados canônicos de ano/formato/episódios, agrupamento provisório interno por consulta sazonal, títulos principais internos do AniList, episódio, stream, histórico, configurações, mangá/capítulo com crédito do grupo de tradução, downloads e `AnimeProvider` |
+| `internal/domain/models.go` | Modelos de anime, metadados canônicos de ano/formato/episódios, agrupamento provisório interno por consulta sazonal, títulos principais internos do AniList, episódio, stream, histórico, configurações sem credencial OAuth MAL editável, mangá/categoria/descoberta, capítulo com crédito do grupo de tradução, downloads e `AnimeProvider` |
 | `internal/providers/animefire.go` | Busca, detalhes e streams AnimeFire |
 | `internal/providers/onlinecc.go` | Busca HTML, episódios, temporadas, opções de áudio, resolução de páginas estáticas/dinâmicas e fallback do RPC Blogger para mídia renderizada |
 | `internal/providers/sushi.go` | Busca HTML, episódios, temporadas e players AJAX; aceita `data-embed`/`data-id` e usa o extrator filtrado de player embutido como fallback |
 | `internal/providers/otakulogia.go` | Busca GraphQL, detalhes, grupos de temporada, variantes de áudio e verificação de acesso antes de retornar streams |
 | `internal/providers/player_candidates.go` | Escopo ao contêiner de player, seleção conservadora de iframes, filtragem de anúncios conhecidos, política de Referer e detecção de intersticial |
 | `internal/providers/browser_ad_proxy.go` | Proxy HTTP loopback temporário para navegadores de scraping; bloqueia hosts de anúncios/rastreadores conhecidos e encaminha normalmente o restante |
-| `internal/providers/browser.go` | Extração de players após execução de JavaScript via Chromium ou delegação a Selenium; instala proxy temporário no navegador |
+| `internal/providers/browser.go` | Extração de players após execução de JavaScript; prefere Firefox/GeckoDriver empacotados e usa Chromium como fallback de desenvolvimento |
 | `internal/providers/selenium.go` | Sessão WebDriver local para ler iframes/vídeos/JWPlayer renderizados, encerrar a árvore do GeckoDriver com limite e bloquear pop-ups |
 | `internal/netx/advertising.go` | Lista de hosts conhecidos de anúncios/rastreadores e guarda contra redirecionamento HTTP a esses destinos |
 | `internal/media/hls.go`, `gateway.go` | Rejeição de redirects de anúncios em manifesto, validação de mídia e proxy local usado pelo MPV |
@@ -94,9 +105,9 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/providers/sushi_test.go` | Busca/detalhes, AJAX com `data-id`, URL HLS em `srcdoc` e fallback para player embutido sem opção AJAX |
 | `internal/providers/live_catalog_test.go` | Busca, detalhes, grupos de episódios e validação live opt-in de manifesto HLS/arquivo em amostras do início, meio e fim |
 | `internal/integrations/anilist.go` | GraphQL, descoberta, aliases, consultas de título em lote/cache AniList (incluindo ano, formato e episódios), coalescência e tradução |
-| `internal/integrations/accounts.go` | OAuth, perfil, logout e sync AniList/MAL |
-| `internal/integrations/accounts_test.go` | Fixtures HTTP para mutation AniList, OAuth/renovação MyAnimeList e atualização de progresso nas listas |
-| `internal/integrations/discord.go` | Rich Presence, conexão e heartbeat |
+| `internal/integrations/accounts.go` | OAuth AniList/MAL/Discord, perfil, logout e sync AniList/MAL; Discord usa PKCE e cofre seguro |
+| `internal/integrations/accounts_test.go` | Fixtures HTTP para AniList, OAuth/renovação MAL, OAuth Discord/PKCE, recusa/cancelamento e atualização de progresso |
+| `internal/integrations/discord.go` | Rich Presence baseada em estado do MPV, relógio/pausa/seek, conexão e heartbeat |
 | `internal/integrations/discord_windows.go`, `discord_unix.go` | IPC Discord por sistema operacional |
 | `internal/integrations/anilist_test.go` | Cache/coalescência, consulta de títulos em lote, parcialidade e aliases |
 | `internal/integrations/discord_test.go` | IPC simulado, atualização e reconexão |
@@ -106,10 +117,11 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | Caminho | Conteúdo |
 |---|---|
 | `internal/store/store.go` | SQLite, records, cache TTL e cópia de backup |
+| `internal/securestore/keyring.go` | Credenciais via cofre do SO: Windows Credential Manager e Linux Secret Service |
 | `internal/store/migrate.go` | Importação de JSON/cache da instalação antiga |
 | `internal/store/migrate_test.go` | Idempotência, cache legado, imagens e arquivos inválidos |
 | `internal/netx/client.go` | Cliente HTTP, JSON, streaming, erros e rate gate |
-| `internal/manga/service.go` | MangaDex: títulos, capítulos e grupo de tradução, fontes de página validadas e CBZ |
+| `internal/manga/service.go` | MangaDex: descoberta de prateleiras e tags, busca de títulos, capítulos/grupo de tradução, fontes de página validadas e CBZ |
 | `internal/manga/service_test.go` | CBZ, falha parcial, atribuição de grupo, páginas somente data-saver e live opt-in |
 | `internal/downloads/queue.go` | Fila de anime/mangá, slots, cancelamento e persistência |
 | `internal/downloads/library.go` | Biblioteca local, descoberta e exclusão de arquivo |
@@ -128,6 +140,7 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/platform/system.go` | Diretórios, busca de binário, abertura no sistema e segurança de caminhos; encaminha revelação de arquivo para o adaptador nativo |
 | `internal/platform/reveal_windows.go`, `reveal_other.go` | Abre ou reutiliza a pasta no gerenciador nativo; no Windows localiza e ativa a janela do Explorer |
 | `internal/platform/window_position*.go` | Valida posição salva contra as áreas de trabalho dos monitores no Windows; teste da interseção da barra de título |
+| `internal/platform/webview.go`, `webview_windows.go`, `webview_other.go`, `webview_runtime_windows_test.go` | Descoberta do WebView2 junto ao executável, configuração do Wails para usar o runtime empacotado, ACL AppContainer e validação pelo loader Wails no Windows |
 | `internal/platform/tray_windows.go`, `tray_other.go` | Menu de notificação Windows para abrir, minimizar, ocultar na bandeja e sair; implementação sem ação nas demais plataformas |
 | `internal/platform/process_windows.go`, `process_unix.go` | Opções de subprocesso por plataforma |
 | `internal/platform/publish.go` | Publicação de arquivo temporário |

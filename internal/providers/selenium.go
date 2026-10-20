@@ -265,6 +265,9 @@ func findFirefox() (string, error) {
 		}
 		return "", fmt.Errorf("Firefox configurado para Selenium não foi encontrado")
 	}
+	if path, err := findBundledFirefox(runtimeExecutableDir()); err == nil {
+		return path, nil
+	}
 	for _, name := range []string{"firefox", "firefox.exe"} {
 		if path, err := exec.LookPath(name); err == nil {
 			return path, nil
@@ -294,6 +297,27 @@ func firefoxLocations() []string {
 	default:
 		return []string{"/usr/bin/firefox", "/usr/bin/firefox-esr", "/snap/bin/firefox"}
 	}
+}
+
+func findBundledFirefox(executableDir string) (string, error) {
+	for _, path := range bundledFirefoxLocations(executableDir, runtime.GOOS) {
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return path, nil
+		}
+	}
+	return "", fmt.Errorf("Firefox empacotado não foi encontrado")
+}
+
+func bundledFirefoxLocations(executableDir, goos string) []string {
+	name := "firefox"
+	if goos == "windows" {
+		name += ".exe"
+	}
+	locations := []string{filepath.Join(executableDir, "bin", "firefox", name)}
+	if goos == "linux" {
+		locations = append(locations, filepath.Clean(filepath.Join(executableDir, "..", "lib", "firefox", name)))
+	}
+	return locations
 }
 
 func waitWebDriver(ctx context.Context, client *http.Client, base string) error {

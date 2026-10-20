@@ -21,7 +21,7 @@ O esquema atual é pequeno e flexível:
 | `records` | `bucket`, `key`, JSON `value`, `updated` | Preferências e registros duráveis, chaveados por grupo e identidade |
 | `cache` | `key`, JSON `value`, `soft`, `hard`, `accessed` | Cache com janela de validade suave e limite rígido |
 
-Buckets usados pelo código incluem `settings`, `watchlist`, `history`, `downloads`, `local`, `manga_history`, `accounts`, `auth`, `legacy_config`, `migration` e `verified_updates`. Não são tabelas SQL separadas; são valores da coluna `records.bucket`.
+Buckets usados pelo código incluem `settings`, `watchlist`, `history`, `downloads`, `local`, `manga_history`, `accounts`, `auth`, `legacy_config`, `migration` e `verified_updates`. Não são tabelas SQL separadas; são valores da coluna `records.bucket`. `auth` é somente origem legada de migração: tokens OAuth e Client Secret MAL novos ficam fora do SQLite, no cofre de credenciais do sistema.
 
 `CacheGet` informa se o item existe e se passou do TTL suave; itens após o TTL rígido são considerados ausentes. `Prune` remove vencidos e limita o cache aos 5.000 mais recentemente acessados.
 
@@ -41,10 +41,16 @@ O histórico antigo de reprodução offline é consolidado sob a chave canônica
 
 O token da sidebar fica em `localStorage`; preferências de tema também são refletidas nessa camada pelo frontend. A configuração de aplicação é persistida no bucket `settings` do SQLite.
 
+## Credenciais de contas
+
+`internal/securestore` usa o Credential Manager do Windows e o Secret Service no Linux. A primeira leitura de um token ou do Client Secret MAL legado segue esta ordem: ler o valor antigo, gravar no cofre, confirmar a gravação e só então removê-lo do bucket `auth`. A remoção ativa `PRAGMA secure_delete`, faz checkpoint/truncamento do WAL e `VACUUM` para limpar páginas livres do banco ativo. Se a gravação no cofre falhar, o valor antigo fica preservado para permitir nova tentativa; não há fallback silencioso para credenciais em texto.
+
+O frontend não recebe o Client Secret nem um indicador de que ele existe. Um segredo MAL que já tenha sido salvo permanece no cofre e pode ser usado internamente pelo backend; desconectar remove o token OAuth, mas preserva essa credencial legada. Backups anteriores, cópias de `state.db` e segredos já expostos fora desta instalação não podem ser revogados ou apagados pelo migrador. Linux precisa de um Secret Service ativo no usuário gráfico (por exemplo, GNOME Keyring ou KWallet); sem ele, conexão e atualização de perfil retornam erro.
+
 ## Arquivos baixados
 
 - Anime: organização em pastas de título sob o diretório configurado, nomes sanitizados e metadados locais. O arquivo final só é publicado após conclusão.
 - Mangá: `Manga/<título>/...cbz`, arquivo ZIP com páginas sequenciais.
-- Dados de conta e estado de biblioteca ficam no banco, não misturados com o executável.
+- Perfil/resumo de conta e estado de biblioteca ficam no banco, não misturados com o executável. Tokens e Client Secret ficam no cofre do sistema operacional.
 
 Use `platform.SafeName` para criar nomes e `platform.Within` para validar caminhos. Não apague manualmente dados do usuário para testar migração; use `ANIMECAOS_DATA_DIR` em testes isolados.

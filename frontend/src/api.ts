@@ -11,6 +11,7 @@ import type {
   Manga,
   Chapter,
   MangaProgress,
+  MangaDiscovery,
   Update,
 } from "./types";
 export interface API {
@@ -54,6 +55,8 @@ export interface API {
   OpenDownloads(): Promise<void>;
   OpenLocalFolder(path: string): Promise<void>;
   MangaSearch(id: string, q: string): Promise<Manga[]>;
+  MangaDiscover(id: string): Promise<MangaDiscovery>;
+  MangaByCategory(id: string, categoryID: string): Promise<Manga[]>;
   Chapters(id: string, mangaId: string): Promise<Chapter[]>;
   ChaptersLanguage(id: string, mangaId: string, language: string): Promise<Chapter[]>;
   Pages(id: string, chapterId: string): Promise<string[]>;
@@ -61,8 +64,6 @@ export interface API {
   SaveMangaProgress(p: MangaProgress): Promise<void>;
   DownloadManga(id: string, m: Manga, ch: Chapter[]): Promise<void>;
   Accounts(): Promise<Account[]>;
-  MALClientSecretConfigured(): Promise<boolean>;
-  SetMALClientSecret(secret: string): Promise<void>;
   Login(id: string, provider: string): Promise<void>;
   Logout(provider: string): Promise<void>;
   RefreshAccount(id: string, provider: string): Promise<Account>;

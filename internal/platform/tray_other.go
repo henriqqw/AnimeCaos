@@ -3,7 +3,7 @@
 package platform
 
 // RunTray currently adds a notification-area menu only on Windows.
-func RunTray(_ []byte, _, _, _, _ func()) {}
+func RunTray(_ []byte, _, _, _, _, _ func()) {}
 
 // QuitTray is a no-op on platforms without the Windows notification-area menu.
 func QuitTray() {}

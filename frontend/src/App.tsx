@@ -44,6 +44,12 @@ const names: Record<string, string> = {
 const time = (n: number) =>
   `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
 const HISTORY_PAGE_SIZE = 24;
+const STARTUP_SPLASH_TOTAL_MS = 3000;
+const STARTUP_SPLASH_FADE_IN_MS = 560;
+const STARTUP_SPLASH_EXIT_MS = 600;
+const STARTUP_SPLASH_EXIT_START_MS = STARTUP_SPLASH_TOTAL_MS - STARTUP_SPLASH_EXIT_MS;
+type StartupAsset = "mascot" | "wordmark";
+type StartupAssets = Record<StartupAsset, boolean>;
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const userMessage = (value: string) =>
   value
@@ -62,11 +68,127 @@ const navPaths: Record<string, string> = {
   history: "M3 12a9 9 0 1 0 2.6-6.4L3 8m0-5v5h5m4-1v5l3 2",
   downloads: "M12 3v12m-5-5 5 5 5-5M4 19v2h16v-2",
   manga: "M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 1 4 17.5v-13ZM4 16h16M8 6h8m-8 3h8",
-  settings: "M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.7 2.9-.2-.1a1.7 1.7 0 0 0-1.9.2l-.2.1h-3.4l-.1-.2a1.7 1.7 0 0 0-1.7-1l-.2.1-2.9-1.7.1-.2a1.7 1.7 0 0 0-.2-1.9l-.1-.2v-3.4l.2-.1a1.7 1.7 0 0 0 1-1.7l-.1-.2 1.7-2.9.2.1a1.7 1.7 0 0 0 1.9-.2l.2-.1h3.4l.1.2a1.7 1.7 0 0 0 1.7 1l.2-.1 2.9 1.7-.1.2a1.7 1.7 0 0 0 .2 1.9l.1.2v3.4l-.2.1",
+  settings: "M19.14 12.94c.04-.31.06-.62.06-.94s-.02-.63-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7.28 7.28 0 0 0-1.63-.95l-.36-2.54A.49.49 0 0 0 13.88 2h-3.84a.49.49 0 0 0-.49.42L9.19 4.96a7.28 7.28 0 0 0-1.63.95l-2.39-.96a.5.5 0 0 0-.61.22L2.64 8.49a.5.5 0 0 0 .12.64l2.03 1.58a7.49 7.49 0 0 0-.05.94c0 .32.02.63.07.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .61.22l2.39-.96c.5.39 1.04.71 1.63.95l.36 2.54c.04.24.25.42.49.42h3.84c.24 0 .45-.18.49-.42l.36-2.54c.59-.24 1.13-.56 1.63-.95l2.39.96c.23.09.49 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64z M12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z",
   arrow: "M5 12h14m-7-7 7 7-7 7",
+  bug: "M12 8a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0v-4a3 3 0 0 0-3-3ZM8 9 5.5 6.5M16 9l2.5-2.5M8 13H4m16 0h-4M8 17H5m14 0h-3M10 5 9 3m5 2 1-2M8 21l1.5-2M16 21l-1.5-2",
+  message: "M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z",
 };
+const mascotAssets = {
+  searchEmpty: "/mascots/reactions/animecaos-reaction-search-empty-v2.png",
+  listEmpty: "/mascots/reactions/animecaos-reaction-list-empty-v1.png",
+  unexpectedError: "/mascots/reactions/animecaos-reaction-bug-report-v1.png",
+  bugReport: "/mascots/reactions/animecaos-reaction-bug-report-v1.png",
+  mangaReading: "/mascots/reactions/animecaos-reaction-reading-focused-v3.png",
+  homeWink: "/mascots/reactions/animecaos-reaction-home-wink-v2.png",
+  startup: "/mascots/poses/animecaos-pose-startup-v2.png",
+} as const;
+type MascotAsset = keyof typeof mascotAssets;
+const externalLinks = {
+  github: "https://github.com/henriqqw/animecaos",
+  website: "https://www.animecaos.xyz/",
+  instagram: "https://www.instagram.com/getanimecaos/",
+  twitter: "https://x.com/getanimecaos",
+  issueReport: "https://github.com/henriqqw/AnimeCaos/issues/new/choose",
+  questions: "https://github.com/henriqqw/AnimeCaos/discussions/categories/q-a",
+} as const;
 function NavIcon({ name }: { name: string }) {
   return <svg className="nav-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d={navPaths[name] || navPaths.home} /></svg>;
+}
+function GitHubIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .75a11.25 11.25 0 0 0-3.56 21.92c.56.1.77-.24.77-.54v-2.1c-3.15.68-3.82-1.34-3.82-1.34-.51-1.3-1.25-1.64-1.25-1.64-1.03-.7.08-.69.08-.69 1.14.08 1.73 1.17 1.73 1.17 1.01 1.72 2.64 1.22 3.29.93.1-.73.39-1.22.71-1.5-2.52-.29-5.17-1.26-5.17-5.61 0-1.24.44-2.25 1.17-3.04-.12-.29-.51-1.43.11-2.98 0 0 .95-.3 3.1 1.16a10.8 10.8 0 0 1 5.64 0c2.15-1.46 3.1-1.16 3.1-1.16.62 1.55.23 2.69.11 2.98.73.79 1.17 1.8 1.17 3.04 0 4.36-2.65 5.32-5.18 5.6.4.35.76 1.04.76 2.1v3.08c0 .3.2.65.77.54A11.25 11.25 0 0 0 12 .75Z" /></svg>;
+}
+function WebsiteIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M3.5 12h17M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>;
+}
+function InstagramIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.5" r=".75" fill="currentColor" stroke="none" /></svg>;
+}
+function TwitterIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-6.78 7.75L23.2 22h-6.25l-4.9-7.7L5.3 22H2.15l7.25-8.3L1.8 2h6.4l4.43 7.04L18.9 2Zm-1.1 18h1.73L7.27 3.88H5.42L17.8 20Z" /></svg>;
+}
+function MascotArt({ asset, className, loading = "lazy" }: { asset: MascotAsset; className: string; loading?: "eager" | "lazy" }) {
+  return <img className={className} src={mascotAssets[asset]} alt="" aria-hidden="true" loading={loading} decoding="async" />;
+}
+function StartupSplash({
+  leaving,
+  backendReady,
+  assets,
+  onAssetLoaded,
+}: {
+  leaving: boolean;
+  backendReady: boolean;
+  assets: StartupAssets;
+  onAssetLoaded: (asset: StartupAsset) => void;
+}) {
+  const [mascotLoaded, setMascotLoaded] = useState(false);
+  const [wordmarkLoaded, setWordmarkLoaded] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  useEffect(() => {
+    const startedAt = performance.now();
+    let frame = 0;
+    const update = () => {
+      const progress = Math.min((performance.now() - startedAt) / STARTUP_SPLASH_EXIT_START_MS, 1);
+      setHoldProgress(progress);
+      if (progress < 1) frame = window.requestAnimationFrame(update);
+    };
+    frame = window.requestAnimationFrame(update);
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+  const assetsLoaded = Number(assets.mascot) + Number(assets.wordmark);
+  const progress = Math.min(100, assetsLoaded * 10 + (backendReady ? 60 : 0) + holdProgress * 18 + (leaving ? 2 : 0));
+  const percentage = Math.round(progress);
+  return (
+    <div
+      className={`startup-splash${leaving ? " startup-splash-leaving" : ""}`}
+      role="status"
+      aria-live="polite"
+      aria-label="Iniciando AnimeCaos"
+    >
+      <div className="startup-splash-stage">
+        <div className="startup-splash-mascot-wrap">
+          <img
+            src={mascotAssets.startup}
+            alt=""
+            aria-hidden="true"
+            className={`startup-splash-mascot startup-splash-art${mascotLoaded ? " startup-splash-art-loaded" : ""}`}
+            loading="eager"
+            decoding="sync"
+            onLoad={() => { setMascotLoaded(true); onAssetLoaded("mascot"); }}
+            onError={() => onAssetLoaded("mascot")}
+          />
+        </div>
+        <div className="startup-splash-brand">
+          <img
+            src="/animecaos-wordmark.png"
+            alt=""
+            aria-hidden="true"
+            className={`startup-splash-wordmark startup-splash-art${wordmarkLoaded ? " startup-splash-art-loaded" : ""}`}
+            loading="eager"
+            decoding="sync"
+            onLoad={() => { setWordmarkLoaded(true); onAssetLoaded("wordmark"); }}
+            onError={() => onAssetLoaded("wordmark")}
+          />
+          <span className="startup-splash-divider" aria-hidden="true" />
+          <span className="startup-splash-label" aria-hidden="true">INICIANDO</span>
+          <div
+            className="startup-splash-progress"
+            role="progressbar"
+            aria-label="Progresso da inicialização"
+            aria-live="off"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percentage}
+            aria-valuetext={`${percentage}%`}
+          >
+            <span className="startup-splash-progress-track" aria-hidden="true">
+              <span className="startup-splash-progress-fill" style={{ width: `${progress}%` }} />
+            </span>
+            <span className="startup-splash-progress-value" aria-hidden="true">{percentage}%</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 function SidebarToggle({ collapsed, mobile = false, onClick }: { collapsed: boolean; mobile?: boolean; onClick: () => void }) {
   const label = collapsed ? "Expandir menu" : "Recolher menu";
@@ -100,11 +222,51 @@ export default function App() {
     [queue, setQueue] = useState<Download[]>([]),
     [queueLoaded, setQueueLoaded] = useState(false),
     [panel, setPanel] = useState(false);
+  const [startupSplashHoldElapsed, setStartupSplashHoldElapsed] = useState(false);
+  const [startupSplashDismissed, setStartupSplashDismissed] = useState(false);
+  const [startupSplashToken, setStartupSplashToken] = useState<number | null>(null);
+  const [startupInitialReady, setStartupInitialReady] = useState(false);
+  const [startupAssets, setStartupAssets] = useState<StartupAssets>({ mascot: false, wordmark: false });
+  const [startupSplashArtEntranceComplete, setStartupSplashArtEntranceComplete] = useState(false);
+  const startupSplashCanDismiss =
+    startupSplashHoldElapsed && startupInitialReady && startupAssets.mascot &&
+    startupAssets.wordmark && startupSplashArtEntranceComplete;
+  const startupSplashVisible = !startupSplashDismissed;
   const [settingsSaveState, setSettingsSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const settingsRef = useRef<Settings | null>(null);
   const pendingSettingsRef = useRef<Settings | null>(null);
   const settingsSaveTimer = useRef<number | null>(null);
   const settingsSaveRunning = useRef(false);
+  const markStartupAssetLoaded = (asset: StartupAsset) => {
+    setStartupAssets((current) => current[asset] ? current : { ...current, [asset]: true });
+  };
+  useEffect(() => {
+    const timer = window.setTimeout(() => setStartupSplashHoldElapsed(true), STARTUP_SPLASH_EXIT_START_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (!startupAssets.mascot || !startupAssets.wordmark) return;
+    const timer = window.setTimeout(() => setStartupSplashArtEntranceComplete(true), STARTUP_SPLASH_FADE_IN_MS);
+    return () => window.clearTimeout(timer);
+  }, [startupAssets.mascot, startupAssets.wordmark]);
+  useEffect(() => {
+    if (!startupSplashCanDismiss) return;
+    const timer = window.setTimeout(() => setStartupSplashDismissed(true), STARTUP_SPLASH_EXIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [startupSplashCanDismiss]);
+  useEffect(() => {
+    if (startupSplashVisible || !window.go?.main?.Desktop?.StartupSplashFinished) return;
+    if (startupSplashToken === null) return;
+    void desktop().StartupSplashFinished(startupSplashToken).catch(() => {});
+  }, [startupSplashVisible, startupSplashToken]);
+  useEffect(() => {
+    if (!window.go?.main?.Desktop?.StartupSplashToken) return;
+    let active = true;
+    void desktop().StartupSplashToken().then((token) => {
+      if (active) setStartupSplashToken(token);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
   const report = (e: unknown) => {
     const m = message(e);
     if (/context canceled|operation was canceled/i.test(m)) return;
@@ -211,8 +373,9 @@ export default function App() {
         settingsRef.current = v.settings;
         setSettings(v.settings);
         setVersion(v.version);
+        setStartupInitialReady(true);
       })
-      .catch(report);
+      .catch((e) => { report(e); setStartupInitialReady(true); });
     refreshLibrary();
     api.Downloads().then((items) => { setQueue(items); setQueueLoaded(true); }).catch((e) => { report(e); setQueueLoaded(true); });
     const off = [
@@ -274,21 +437,27 @@ export default function App() {
   };
   if (!settings)
     return (
-      <main className="boot" data-theme={localStorage.getItem("animecaos-theme") || "system"} aria-busy="true">
-        <img src="/animecaos-wordmark.png" alt="AnimeCaos" className="boot-logo" />
-        <small>v{version}</small>
-        <p>{error || "Abrindo sua biblioteca…"}</p>
-      </main>
+      <>
+        <main className="boot" data-theme={localStorage.getItem("animecaos-theme") || "system"} aria-busy="true" aria-hidden={startupSplashVisible}>
+          <img src="/animecaos-wordmark.png" alt="AnimeCaos" className="boot-logo" />
+          <small>v{version}</small>
+          <p>{error || "Abrindo sua biblioteca…"}</p>
+        </main>
+        {startupSplashVisible && <StartupSplash leaving={startupSplashCanDismiss} backendReady={startupInitialReady} assets={startupAssets} onAssetLoaded={markStartupAssetLoaded} />}
+      </>
     );
   return (
-    <div
-      className={`app${sidebarCollapsed ? " sidebar-collapsed" : ""}`}
-      data-theme={settings.theme || "system"}
-      style={{ fontSize: `${settings.uiScale}rem` }}
-      onMouseUp={(e) => {
-        if (e.button === 3) back();
-      }}
-    >
+    <>
+      <div
+        className={`app${sidebarCollapsed ? " sidebar-collapsed" : ""}`}
+        data-theme={settings.theme || "system"}
+        style={{ fontSize: `${settings.uiScale}rem` }}
+        aria-hidden={startupSplashVisible}
+        inert={startupSplashVisible}
+        onMouseUp={(e) => {
+          if (e.button === 3) back();
+        }}
+      >
       <aside>
         <div className="brand">
           <img src="/animecaos-wordmark.png" alt="AnimeCaos" className="brand-wordmark" />
@@ -309,8 +478,14 @@ export default function App() {
             </button>
           ))}
         </nav>
+        <div className="sidebar-socials" role="group" aria-label="Links do AnimeCaos">
+          <button type="button" className="sidebar-social-link" aria-label="GitHub do AnimeCaos" title="GitHub" onClick={() => desktop().OpenLink(externalLinks.github)}><GitHubIcon /></button>
+          <button type="button" className="sidebar-social-link" aria-label="Site oficial do AnimeCaos" title="Site oficial" onClick={() => desktop().OpenLink(externalLinks.website)}><WebsiteIcon /></button>
+          <button type="button" className="sidebar-social-link" aria-label="Instagram do AnimeCaos" title="Instagram" onClick={() => desktop().OpenLink(externalLinks.instagram)}><InstagramIcon /></button>
+          <button type="button" className="sidebar-social-link" aria-label="Twitter / X do AnimeCaos" title="Twitter / X" onClick={() => desktop().OpenLink(externalLinks.twitter)}><TwitterIcon /></button>
+        </div>
       </aside>
-      <main>
+      <main className={route.name === "home" || route.name === "manga" ? "page-mascot-main" : undefined}>
         <header>
           <SidebarToggle collapsed={sidebarCollapsed} mobile onClick={toggleSidebar} />
           <button className="header-back" aria-label="Voltar" disabled={!trail.length} onClick={back}>
@@ -354,6 +529,7 @@ export default function App() {
         </header>
         {error && (
           <div role="alert" className="alert">
+            <MascotArt asset="unexpectedError" className="unexpected-error-mascot" />
             <span>{error}</span>
             <button aria-label="Fechar erro" onClick={() => setError("")}>
               ×
@@ -361,7 +537,7 @@ export default function App() {
           </div>
         )}
         <section
-          className="content"
+          className={`content${route.name === "home" || route.name === "manga" ? " page-mascot-content" : ""}`}
           key={
             route.name +
             (route.anime?.id || route.manga?.id || route.chapter?.id || route.query || "")
@@ -389,7 +565,7 @@ export default function App() {
                 open={(a) => navigate({ name: "detail", anime: a })}
               />
               {!library.length && (
-                <Empty>
+                <Empty mascot="listEmpty">
                   Adicione animes à Minha Lista na tela de detalhes.
                 </Empty>
               )}
@@ -546,22 +722,36 @@ export default function App() {
           </button>
         </footer>
       )}
-    </div>
+      </div>
+      {startupSplashVisible && <StartupSplash leaving={startupSplashCanDismiss} backendReady={startupInitialReady} assets={startupAssets} onAssetLoaded={markStartupAssetLoaded} />}
+    </>
   );
 }
-function Empty({ children }: { children: ReactNode }) {
+function Empty({ children, mascot }: { children: ReactNode; mascot?: "searchEmpty" | "listEmpty" }) {
   return (
-    <div className="empty">
+    <div className={`empty${mascot ? " empty-with-mascot" : ""}`}>
+      {mascot && <MascotArt asset={mascot} className="empty-mascot" />}
       {children}
-      <p>
+      <nav className="empty-links" aria-label="Links do AnimeCaos">
         <button
-          onClick={() =>
-            desktop().OpenLink("https://github.com/henriqqw/animecaos")
-          }
+          type="button"
+          className="empty-link-icon"
+          aria-label="GitHub do AnimeCaos"
+          title="GitHub"
+          onClick={() => desktop().OpenLink(externalLinks.github)}
         >
-          Projeto e comunidade
+          <GitHubIcon />
         </button>
-      </p>
+        <button
+          type="button"
+          className="empty-link-icon"
+          aria-label="Site oficial do AnimeCaos"
+          title="Site oficial"
+          onClick={() => desktop().OpenLink(externalLinks.website)}
+        >
+          <WebsiteIcon />
+        </button>
+      </nav>
     </div>
   );
 }
@@ -700,6 +890,8 @@ function Card({ a, open, subtitle, action, onImageFailure, showAvailability = fa
     if (window.innerWidth <= 760) return;
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
+      positionPreview();
+      setPreview(a);
       const id = op();
       request.current = id;
       api
@@ -707,11 +899,19 @@ function Card({ a, open, subtitle, action, onImageFailure, showAvailability = fa
         .then((v) => {
           if (request.current === id) {
             positionPreview();
-            setPreview(v);
+            const clean = (value: string) => value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+            setPreview({
+              ...a,
+              ...v,
+              title: v.title || a.title,
+              description: clean(v.description || "") || clean(a.description || ""),
+              score: v.score || a.score,
+              episodeCount: v.episodeCount || a.episodeCount,
+            });
           }
         })
         .catch(() => {});
-    }, 450);
+    }, 220);
   };
   return (
     <>
@@ -755,7 +955,7 @@ function Card({ a, open, subtitle, action, onImageFailure, showAvailability = fa
           <p className="preview-meta">
             <span className="rating-star" aria-hidden="true">★</span> {preview.score || "—"} · {preview.episodeCount || "?"} episódios
           </p>
-          {preview.description && <p className="preview-description">{preview.description.replace(/<[^>]*>/g, "")}</p>}
+          {preview.description && <p className="preview-description">{preview.description.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim()}</p>}
         </div>,
         document.body,
       )}
@@ -858,6 +1058,7 @@ function Home({
         <div className="shelf-heading"><h3>Temporada atual</h3></div>
         <Cards items={data.seasonal} open={open} layout="rail" label="Temporada atual" showOpenOverlay />
       </section>
+      <div className="page-mascot-anchor home-page-mascot"><MascotArt asset="homeWink" className="page-mascot-art" loading="eager" /></div>
     </>
   );
 }
@@ -939,7 +1140,7 @@ function Search({
         </div>
       )}
       {searched && !items.length && !busy && (
-        <Empty>Nenhum anime encontrado. Tente um título alternativo.</Empty>
+        <Empty mascot="searchEmpty">Nenhum anime encontrado. Tente um título alternativo.</Empty>
       )}
       {next && (
         <button disabled={busy} onClick={() => search(page + 1)}>
@@ -1679,10 +1880,12 @@ function MangaView({
     [discoveryBusy, setDiscoveryBusy] = useState(true),
     [discoveryError, setDiscoveryError] = useState(""),
     [activeCategory, setActiveCategory] = useState<MangaCategory>(),
+    [categoryColumns, setCategoryColumns] = useState(5),
+    [categoriesExpanded, setCategoriesExpanded] = useState(false),
     [spot, setSpot] = useState(0),
     [heroImageFailed, setHeroImageFailed] = useState(false),
     [heroCoverFallback, setHeroCoverFallback] = useState(false);
-  const id = useRef(""), discoveryID = useRef("");
+  const id = useRef(""), discoveryID = useRef(""), categoryGridRef = useRef<HTMLDivElement>(null);
   const loadDiscovery = async () => {
     if (discoveryID.current) void api.Cancel(discoveryID.current).catch(() => {});
     const requestID = op();
@@ -1714,6 +1917,19 @@ function MangaView({
       }
     };
   }, []);
+  useEffect(() => {
+    const element = categoryGridRef.current;
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const updateColumns = () => {
+      const gap = 12;
+      const next = Math.max(1, Math.floor((element.clientWidth + gap) / 252));
+      setCategoryColumns((current) => current === next ? current : next);
+    };
+    const observer = new ResizeObserver(updateColumns);
+    observer.observe(element);
+    updateColumns();
+    return () => observer.disconnect();
+  }, [searched]);
   const search = async (value = sharedQuery) => {
     const query = value.trim();
     if (id.current) void api.Cancel(id.current).catch(() => {});
@@ -1813,7 +2029,20 @@ function MangaView({
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
   }, [featured.length]);
+  const categories = discovery?.categories || [];
+  const categoryRowCount = Math.ceil(categories.length / categoryColumns);
+  const categoryBaseRowSize = categoryRowCount ? Math.floor(categories.length / categoryRowCount) : 0;
+  const categoryLongRows = categoryRowCount ? categories.length % categoryRowCount : 0;
+  const categoryRows: Array<Array<{ category: MangaCategory; index: number }>> = [];
+  let categoryOffset = 0;
+  for (let rowIndex = 0; rowIndex < categoryRowCount; rowIndex += 1) {
+    const rowSize = categoryBaseRowSize + (rowIndex < categoryLongRows ? 1 : 0);
+    categoryRows.push(categories.slice(categoryOffset, categoryOffset + rowSize).map((category, index) => ({ category, index: categoryOffset + index })));
+    categoryOffset += rowSize;
+  }
+  const visibleCategoryRows = categoriesExpanded ? categoryRows : categoryRows.slice(0, 2);
   return (
+    <>
     <section className="manga-library" aria-label="Biblioteca de mangás">
       <section className="spotlight manga-spotlight" aria-labelledby="manga-discovery-title">
         {spotlight && !heroImageFailed && (spotlight.banner || spotlight.cover) && <Image className="spotlight-image" src={heroCoverFallback ? spotlight.cover : spotlight.banner || spotlight.cover} alt="" onLoadFailure={() => {
@@ -1831,10 +2060,31 @@ function MangaView({
           {featured.map((manga, index) => <button type="button" key={manga.id} aria-label={`Destaque ${index + 1}: ${manga.title}`} aria-pressed={spot === index} onClick={() => setSpot(index)}><span /></button>)}
         </div>}
       </section>
+      {!searched && <section className="manga-category-section" aria-labelledby="manga-category-title">
+        <div className="manga-category-heading">
+          <div className="manga-category-heading-copy"><h3 id="manga-category-title">Categorias</h3></div>
+          {(discovery?.categories.length || 0) > 0 && <span className="manga-section-count">{discovery!.categories.length} gêneros</span>}
+        </div>
+        <div className="manga-category-list" id="manga-category-list" ref={categoryGridRef} role="group" aria-label="Filtrar mangás por categoria">
+          {visibleCategoryRows.map((row, rowIndex) => <div className="manga-category-row" key={`category-row-${rowIndex}`} style={{ gridTemplateColumns: `repeat(${row.length}, minmax(0, 1fr))` }}>
+            {row.map(({ category, index }) => <button type="button" className="manga-category-chip" aria-label={category.name} key={category.id} onClick={() => void browseCategory(category)}>
+              <span className="manga-category-topline">
+                <span className="manga-category-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                <span className="manga-category-action" aria-hidden="true"><NavIcon name="arrow" /></span>
+              </span>
+              <strong className="manga-category-name">{category.name}</strong>
+            </button>)}
+          </div>)}
+          {discoveryBusy && !discovery && <span className="manga-category-loading">Carregando categorias…</span>}
+        </div>
+        {categoryRows.length > 2 && <button type="button" className="manga-category-toggle" aria-expanded={categoriesExpanded} aria-controls="manga-category-list" onClick={() => setCategoriesExpanded((expanded) => !expanded)}>
+          <span aria-hidden="true">{categoriesExpanded ? "−" : "+"}</span>{categoriesExpanded ? "Ver menos" : "Ver mais"}
+        </button>}
+      </section>}
       {discovery?.warning && <p className="manga-discovery-warning" role="status">Algumas prateleiras não puderam ser atualizadas. {discovery.warning}</p>}
-      {discoveryError && !discovery && <div className="manga-inline-error" role="alert"><span>Não foi possível carregar o catálogo de descoberta.</span><button type="button" onClick={() => void loadDiscovery()}>Tentar novamente</button></div>}
+      {discoveryError && !discovery && <div className="manga-inline-error" role="alert"><MascotArt asset="unexpectedError" className="retry-mascot" /><span>Não foi possível carregar o catálogo de descoberta.</span><button type="button" onClick={() => void loadDiscovery()}>Tentar novamente</button></div>}
       {busy && <div className="manga-status" role="status" aria-live="polite"><span className="search-loading-spinner" />Buscando no catálogo…</div>}
-      {searchError && <div className="manga-inline-error" role="alert"><span>{searchError}</span>{activeCategory ? <button type="button" onClick={() => void browseCategory(activeCategory)}>Tentar novamente</button> : sharedQuery.trim() && <button type="button" onClick={() => void search()}>Tentar novamente</button>}</div>}
+      {searchError && <div className="manga-inline-error" role="alert"><MascotArt asset="unexpectedError" className="retry-mascot" /><span>{searchError}</span>{activeCategory ? <button type="button" onClick={() => void browseCategory(activeCategory)}>Tentar novamente</button> : sharedQuery.trim() && <button type="button" onClick={() => void search()}>Tentar novamente</button>}</div>}
       {!busy && searched && !searchError && items.length === 0 && <div className="manga-welcome manga-empty-results"><span className="manga-welcome-icon"><NavIcon name="search" /></span><strong>Nenhum mangá encontrado</strong><p>{activeCategory ? "Não há obras disponíveis nesta categoria agora." : `Não encontramos “${submittedQuery}”. Tente outro título ou uma forma alternativa de escrita.`}</p><button type="button" onClick={clearSearch}>Voltar ao catálogo</button></div>}
       {items.length > 0 && (
         <section className="manga-results-section" aria-label="Resultados de mangá">
@@ -1871,20 +2121,6 @@ function MangaView({
           </Rail>
         </section>
       )}
-      {!searched && <section className="manga-category-section" aria-labelledby="manga-category-title">
-        <div className="manga-category-heading">
-          <div className="manga-category-heading-copy"><span className="manga-eyebrow">CATÁLOGO</span><h3 id="manga-category-title">Categorias</h3></div>
-          {(discovery?.categories.length || 0) > 0 && <span className="manga-section-count">{discovery!.categories.length} gêneros</span>}
-        </div>
-        <div className="manga-category-list" role="group" aria-label="Filtrar mangás por categoria">
-          {(discovery?.categories || []).map((category, index) => <button type="button" className="manga-category-chip" aria-label={category.name} key={category.id} onClick={() => void browseCategory(category)}>
-            <span className="manga-category-number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-            <strong className="manga-category-name">{category.name}</strong>
-            <span className="manga-category-action" aria-hidden="true"><NavIcon name="arrow" /></span>
-          </button>)}
-          {discoveryBusy && !discovery && <span className="manga-category-loading">Carregando categorias…</span>}
-        </div>
-      </section>}
       {!searched && discoveryBusy && !discovery && <div className="manga-discovery-loading" role="status" aria-label="Carregando recomendações"><div className="skeleton-grid">{Array.from({ length: 6 }, (_, index) => <div className="skeleton-card" key={index}><div className="skeleton poster-skeleton" /><div className="skeleton line-skeleton" /><div className="skeleton short-skeleton" /></div>)}</div></div>}
       {!searched && discovery && <>
         {discovery.popular.length > 0 && <section className="home-shelf manga-shelf-section" aria-labelledby="manga-top-title"><div className="shelf-heading"><h3 id="manga-top-title">Top mangás</h3></div><MangaRail items={discovery.popular} label="Top mangás" open={open} /></section>}
@@ -1894,6 +2130,8 @@ function MangaView({
       {!searched && history.length === 0 && !busy && !discoveryBusy && discovery && discovery.popular.length === 0 && discovery.recentlyUpdated.length === 0 && discovery.publishing.length === 0 && <div className="manga-welcome manga-first-visit"><span className="manga-welcome-icon"><NavIcon name="manga" /></span><strong>Comece explorando o catálogo</strong><p>Busque pelo nome de uma obra ou escolha uma categoria para encontrar capítulos e abrir o leitor.</p></div>}
       <footer className="manga-credit">Catálogo e leitura fornecidos pelo <button type="button" onClick={() => desktop().OpenLink("https://mangadex.org")}>MangaDex</button>.</footer>
     </section>
+    <div className="page-mascot-anchor manga-page-mascot"><MascotArt asset="mangaReading" className="page-mascot-art" loading="eager" /></div>
+    </>
   );
 }
 function ChaptersView({
@@ -1960,7 +2198,7 @@ function ChaptersView({
           <button type="button" className="manga-download-selected" disabled={!selected.size || downloading} onClick={() => void download(ordered.filter((chapter) => selected.has(chapter.id)))}>{downloading ? "Enfileirando…" : `Baixar selecionados${selected.size ? ` (${selected.size})` : ""}`}</button>
         </div>
         {chapters === null && <Busy />}
-        {chapterError && <div className="manga-inline-error" role="alert"><span>Não foi possível carregar os capítulos: {chapterError}</span><button type="button" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</button></div>}
+        {chapterError && <div className="manga-inline-error" role="alert"><MascotArt asset="unexpectedError" className="retry-mascot" /><span>Não foi possível carregar os capítulos: {chapterError}</span><button type="button" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</button></div>}
         {chapters?.length === 0 && !chapterError && <Empty>Não há capítulos disponíveis neste idioma. Tente outra tradução.</Empty>}
         {ordered.length > 0 && <div className="manga-chapter-list">
           {ordered.map((chapter, index) => (
@@ -2323,7 +2561,7 @@ function SettingsView({
     if (!main) return;
     const updateActive = () => {
       const threshold = main.getBoundingClientRect().top + 150;
-      const sections = ["settings-appearance", "settings-playback", "settings-downloads", "settings-integrations", "settings-maintenance"];
+      const sections = ["settings-appearance", "settings-playback", "settings-downloads", "settings-integrations", "settings-maintenance", "settings-feedback"];
       let current = sections[0];
       for (const id of sections) {
         const element = document.getElementById(id);
@@ -2337,7 +2575,7 @@ function SettingsView({
     return () => { main.removeEventListener("scroll", updateActive); window.removeEventListener("resize", updateActive); };
   }, []);
   const sectionLinks = [
-    ["settings-appearance", "Aparência"], ["settings-playback", "Reprodução"], ["settings-downloads", "Downloads"], ["settings-integrations", "Integrações"], ["settings-maintenance", "Manutenção"],
+    ["settings-appearance", "Aparência"], ["settings-playback", "Reprodução"], ["settings-downloads", "Downloads"], ["settings-integrations", "Integrações"], ["settings-maintenance", "Manutenção"], ["settings-feedback", "Feedback"],
   ] as const;
   const scrollToSection = (id: string) => {
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -2465,6 +2703,21 @@ function SettingsView({
             </div>
           )}
         </SettingsSection>
+        <section className="settings-section settings-feedback-section" id="settings-feedback" aria-labelledby="settings-feedback-title">
+          <header className="settings-section-heading">
+            <div><h4 id="settings-feedback-title">Found a bug?</h4><p>Ajude a melhorar o AnimeCaos com seu feedback.</p></div>
+          </header>
+          <div className="settings-feedback-content">
+            <div className="settings-feedback-actions">
+              <p>Bug ou melhoria? Abra uma issue. Dúvidas? Pergunte à comunidade.</p>
+              <div className="settings-feedback-buttons">
+                <button type="button" className="settings-secondary" aria-label="Reportar bug ou melhoria no GitHub Issues" onClick={() => desktop().OpenLink(externalLinks.issueReport)}><NavIcon name="bug" />Bug ou melhoria</button>
+                <button type="button" className="settings-secondary" aria-label="Tirar dúvida no GitHub Discussions" onClick={() => desktop().OpenLink(externalLinks.questions)}><NavIcon name="message" />Tirar dúvida</button>
+              </div>
+            </div>
+            <MascotArt asset="bugReport" className="settings-feedback-mascot" />
+          </div>
+        </section>
       </div>
     </div>
   );

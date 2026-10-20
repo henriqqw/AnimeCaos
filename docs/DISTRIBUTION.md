@@ -36,6 +36,8 @@ Requer a versão do Go declarada em `go.mod` e Node.js/npm compatíveis com Vite
 go run ./cmd/package -version 3.0.0
 ```
 
+Sem `-skip-ui`, o empacotador executa `npm ci` e `npm run build` antes de compilar o executável. `main.go` incorpora `frontend/dist` no app, incluindo a tela e as imagens da splash; portanto, o pacote padrão apresenta a splash ao abrir. `-skip-ui` reutiliza o diretório compilado existente e só deve ser usado quando ele já contém a versão desejada da interface.
+
 O empacotador remove stages antigos da mesma plataforma antes de criar o novo
 e substitui o ZIP/instalador ou AppImage de mesmo nome e versão. Entradas
 anteriores desses nomes são removidas do manifesto SHA-256. Arquivos de outras

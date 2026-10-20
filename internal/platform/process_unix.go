@@ -5,3 +5,6 @@ package platform
 import "os/exec"
 
 func Hide(c *exec.Cmd) {}
+
+// WaitForProcessExit is only used by the Windows tray restart helper.
+func WaitForProcessExit(int) error { return nil }

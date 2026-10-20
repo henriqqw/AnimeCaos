@@ -81,6 +81,8 @@ declare global {
           ChooseDirectory(): Promise<string>;
           ChoosePlayer(): Promise<string>;
           OpenLink(url: string): Promise<void>;
+          StartupSplashToken(): Promise<number>;
+          StartupSplashFinished(token: number): Promise<void>;
         };
       };
     };

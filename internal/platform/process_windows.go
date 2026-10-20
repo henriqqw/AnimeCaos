@@ -3,10 +3,28 @@
 package platform
 
 import (
+	"errors"
 	"os/exec"
 	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 func Hide(c *exec.Cmd) {
 	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+}
+
+// WaitForProcessExit lets a restart helper wait until the current app releases
+// its single-instance mutex before starting the replacement process.
+func WaitForProcessExit(pid int) error {
+	process, err := windows.OpenProcess(windows.SYNCHRONIZE, false, uint32(pid))
+	if errors.Is(err, windows.ERROR_INVALID_PARAMETER) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer windows.CloseHandle(process)
+	_, err = windows.WaitForSingleObject(process, windows.INFINITE)
+	return err
 }

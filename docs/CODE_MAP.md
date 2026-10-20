@@ -6,7 +6,7 @@ Mapa conferido em 20/10/2026. Atualize junto com mudanças de responsabilidade, 
 
 | Caminho | Responsabilidade |
 |---|---|
-| `main.go` | Entry point Wails, embed do frontend/ícone, janela, geometria visível, diálogos, ciclo da bandeja Windows, single-instance e entrada do helper de atualização |
+| `main.go` | Entry point Wails, embed do frontend/ícone, janela com fundo inicial grafite, prioridade em primeiro plano sincronizada com a splash, reexibição da splash na segunda instância, geometria visível, diálogos, ciclo da bandeja Windows, single-instance e helpers de reinicialização/atualização |
 | `instance_id_dev.go`, `instance_id_production.go` | Mutexes separados para instância Wails de desenvolvimento e aplicativo empacotado |
 | `instance_id_dev_test.go`, `instance_id_production_test.go` | Testes dos IDs de instância selecionados pelos build tags |
 | `go.mod`, `go.sum` | Versão do Go e dependências |
@@ -47,13 +47,15 @@ Mapa conferido em 20/10/2026. Atualize junto com mudanças de responsabilidade, 
 | `frontend/public/animecaos-icon.png` | Ícone quadrado usado na sidebar recolhida e na identidade web |
 | `frontend/public/animecaos-wordmark.png` | Lettering transparente da sidebar expandida e da tela de carregamento |
 | `frontend/public/anilist.ico`, `frontend/public/myanimelist.ico`, `frontend/public/discord.svg` | Ícones locais oficiais para identificar as integrações de conta e Rich Presence |
-| `frontend/public/mascots/` | Artes PNG transparentes da mascote: versão normal, mini superdeformed, miniatura 256 px, vistas em `poses/` e expressões em `reactions/`; ainda não conectadas aos cards de categorias |
+| `frontend/public/mascots/` | Artes PNG transparentes da mascote: versão normal, mini superdeformed, miniatura 256 px, poses de abertura em `poses/` (a splash de produção usa a versão v2 de cabelo simplificado) e reações em `reactions/` para busca/lista vazias, erros recuperáveis, feedback, piscadela na Home e leitura no catálogo de mangás. Home e Mangás exibem suas reações no fim do conteúdo rolável |
 | `frontend/src/main.tsx` | Inicialização do React |
-| `frontend/src/App.tsx` | Navegação local, sidebar, cabeçalho com busca contextual de anime/mangá, telas, cards com ano/episódios, CTA “Ver anime” na Home e prévia de sinopse nas prateleiras de mangá, prévia de anime vinculada à identidade canônica, descoberta de mangás com banner/categorias/prateleiras, busca compartilhada, retomada, capítulos/leitor, contas e Configurações com autosave |
-| `frontend/src/api.ts` | Proxy tipado para Wails, Desktop e eventos, incluindo descoberta MangaDex, filtro de categoria, AniList ID na prévia e operações de contas sem setters de credenciais MAL |
+| `frontend/src/App.tsx` | Splash de inicialização com imagem estática da mascote, fades da mascote e wordmark, barra de progresso com percentual e duração mínima de 3 s; navegação local, sidebar com links sociais, cabeçalho com busca contextual de anime/mangá, telas, estados vazios com reações e atalhos externos por ícones, cards com ano/episódios e preview de sinopse local-first, CTA “Ver anime” na Home e mascotes no fim do conteúdo rolável, descoberta de mangás com banner/categorias/prateleiras, busca compartilhada, reações contextuais em erros, retomada, capítulos/leitor, contas e Configurações com autosave e feedback via GitHub |
+| `frontend/splash-preview.html`, `frontend/src/splash-preview.tsx`, `frontend/src/splash-preview.css` | Página Vite separada para revisar a animação da splash continuamente, com progresso simulado, ajustes de amplitude/velocidade e reinício do ciclo; não é usada pelo app |
+| `frontend/src/StartupMascot.tsx` | Componente local de preview com Three.js; cria uma camada base e recortes alinhados das mechas laterais a partir dos pixels da arte original, deformando as pontas sem mover rosto ou corpo |
+| `frontend/src/api.ts` | Proxy tipado para Wails, métodos Desktop e eventos, incluindo sinal de fim da splash, descoberta MangaDex, filtro de categoria, AniList ID na prévia e operações de contas sem setters de credenciais MAL |
 | `frontend/src/types.ts` | Tipos dos DTOs compartilhados com Go, incluindo manga/categoria/prateleiras, metadados de ano/formato e ID externo das contas; configurações não contêm Client ID MAL editável |
 | `frontend/src/Image.tsx` | Imagens com carregamento via backend e fallback |
-| `frontend/src/style.css` | Temas, componentes, layout responsivo, carrosséis, previews, selo de qualidade, descoberta de mangás e Configurações com switches e autosave |
+| `frontend/src/style.css` | Temas, splash responsiva com fade-in/fade-out na mascote e wordmark, barra de progresso espessa com percentual, componentes, layout responsivo, sidebar com atalhos sociais, carrosséis, previews, tiles monocromáticos responsivos de categorias, selo de qualidade, reações da mascote e atalhos iconográficos de links externos, descoberta de mangás e Configurações com switches, autosave e feedback |
 | `frontend/src/App.test.tsx` | Testes DOM da interface; busca, CTA das capas na Home, prévia de sinopse MangaDex, leitor, integrações e configurações (autosave, debounce, serialização, retry, índice e navegação Contas) |
 
 As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atualmente, várias telas ainda vivem no mesmo `App.tsx`.
@@ -141,8 +143,8 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/platform/reveal_windows.go`, `reveal_other.go` | Abre ou reutiliza a pasta no gerenciador nativo; no Windows localiza e ativa a janela do Explorer |
 | `internal/platform/window_position*.go` | Valida posição salva contra as áreas de trabalho dos monitores no Windows; teste da interseção da barra de título |
 | `internal/platform/webview.go`, `webview_windows.go`, `webview_other.go`, `webview_runtime_windows_test.go` | Descoberta do WebView2 junto ao executável, configuração do Wails para usar o runtime empacotado, ACL AppContainer e validação pelo loader Wails no Windows |
-| `internal/platform/tray_windows.go`, `tray_other.go` | Menu de notificação Windows para abrir, minimizar, ocultar na bandeja e sair; implementação sem ação nas demais plataformas |
-| `internal/platform/process_windows.go`, `process_unix.go` | Opções de subprocesso por plataforma |
+| `internal/platform/tray_windows.go`, `tray_other.go` | Menu de notificação Windows para abrir, minimizar, ocultar na bandeja, reiniciar e sair; implementação sem ação nas demais plataformas |
+| `internal/platform/process_windows.go`, `process_unix.go` | Opções de subprocesso e espera pelo processo anterior durante reinicialização |
 | `internal/platform/publish.go` | Publicação de arquivo temporário |
 | `internal/platform/publish_test.go` | Não sobrescrever arquivo já existente |
 | `internal/update/update.go` | Releases, checksum, staging e substituição |

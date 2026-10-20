@@ -6,8 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
+	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/henriqqw/animecaos/internal/app"
 	"github.com/henriqqw/animecaos/internal/platform"
@@ -27,10 +31,119 @@ var trayIcon []byte
 type Desktop struct{ ctx context.Context }
 
 var quitRequested atomic.Bool
+var restartRequested atomic.Bool
+var startupTopmostMu sync.Mutex
+var startupTopmostTimer *time.Timer
+var startupTopmostGeneration uint64
+
+const restartAfterExitArg = "--restart-after-exit"
+const startupTopmostFailsafe = 30 * time.Second
+
+func writeStartupError(err error) {
+	if err == nil {
+		return
+	}
+	_ = os.MkdirAll(platform.DataDir(), 0700)
+	_ = os.WriteFile(filepath.Join(platform.DataDir(), "startup-error.log"), []byte(err.Error()), 0600)
+	fmt.Fprintln(os.Stderr, err)
+}
+
+// runRestartHelper waits outside the Wails process so the previous instance can
+// release its single-instance mutex before the app is launched again.
+func runRestartHelper() bool {
+	if len(os.Args) < 2 || os.Args[1] != restartAfterExitArg {
+		return false
+	}
+	if len(os.Args) < 4 || os.Args[3] != "--" {
+		writeStartupError(fmt.Errorf("argumentos inválidos para reiniciar o AnimeCaos"))
+		return true
+	}
+	parentPID, err := strconv.Atoi(os.Args[2])
+	if err != nil {
+		writeStartupError(fmt.Errorf("PID inválido para reiniciar o AnimeCaos: %w", err))
+		return true
+	}
+	if parentPID <= 0 {
+		writeStartupError(fmt.Errorf("PID inválido para reiniciar o AnimeCaos: %q", os.Args[2]))
+		return true
+	}
+	if err := platform.WaitForProcessExit(parentPID); err != nil {
+		writeStartupError(fmt.Errorf("não foi possível aguardar o encerramento do AnimeCaos: %w", err))
+		return true
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		writeStartupError(fmt.Errorf("não foi possível localizar o AnimeCaos para reiniciar: %w", err))
+		return true
+	}
+	command := exec.Command(executable, os.Args[4:]...)
+	platform.Hide(command)
+	if err := command.Start(); err != nil {
+		writeStartupError(fmt.Errorf("não foi possível abrir o AnimeCaos novamente: %w", err))
+		return true
+	}
+	_ = command.Process.Release()
+	return true
+}
+
+func startRestartHelper() error {
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("não foi possível localizar o AnimeCaos para reiniciar: %w", err)
+	}
+	args := []string{restartAfterExitArg, strconv.Itoa(os.Getpid()), "--"}
+	args = append(args, os.Args[1:]...)
+	command := exec.Command(executable, args...)
+	platform.Hide(command)
+	if err := command.Start(); err != nil {
+		return fmt.Errorf("não foi possível preparar a reinicialização do AnimeCaos: %w", err)
+	}
+	_ = command.Process.Release()
+	return nil
+}
 
 func showMainWindow(ctx context.Context) {
 	wr.WindowShow(ctx)
 	wr.WindowUnminimise(ctx)
+}
+
+func prioritizeStartupWindow(ctx context.Context) {
+	wr.WindowSetAlwaysOnTop(ctx, true)
+	showMainWindow(ctx)
+	startupTopmostMu.Lock()
+	if startupTopmostTimer != nil {
+		startupTopmostTimer.Stop()
+	}
+	startupTopmostGeneration++
+	generation := startupTopmostGeneration
+	var timer *time.Timer
+	timer = time.AfterFunc(startupTopmostFailsafe, func() {
+		startupTopmostMu.Lock()
+		defer startupTopmostMu.Unlock()
+		if generation != startupTopmostGeneration || startupTopmostTimer != timer {
+			return
+		}
+		startupTopmostTimer = nil
+		if ctx.Err() == nil {
+			wr.WindowSetAlwaysOnTop(ctx, false)
+		}
+	})
+	startupTopmostTimer = timer
+	startupTopmostMu.Unlock()
+}
+
+func showMainWindowWithSplash(ctx context.Context) {
+	prioritizeStartupWindow(ctx)
+	wr.WindowReloadApp(ctx)
+}
+
+func stopStartupTopmostTimer() {
+	startupTopmostMu.Lock()
+	if startupTopmostTimer != nil {
+		startupTopmostTimer.Stop()
+		startupTopmostTimer = nil
+	}
+	startupTopmostMu.Unlock()
 }
 
 func saveWindowGeometry(ctx context.Context, service *app.Service) {
@@ -55,8 +168,33 @@ func (d *Desktop) ChoosePlayer() (string, error) {
 	return wr.OpenFileDialog(d.ctx, wr.OpenDialogOptions{Title: "Executável do player"})
 }
 func (d *Desktop) OpenLink(url string) error { wr.BrowserOpenURL(d.ctx, url); return nil }
+func (d *Desktop) StartupSplashToken() uint64 {
+	startupTopmostMu.Lock()
+	defer startupTopmostMu.Unlock()
+	return startupTopmostGeneration
+}
+
+func (d *Desktop) StartupSplashFinished(token uint64) {
+	if d.ctx == nil {
+		return
+	}
+	startupTopmostMu.Lock()
+	if token != startupTopmostGeneration {
+		startupTopmostMu.Unlock()
+		return
+	}
+	if startupTopmostTimer != nil {
+		startupTopmostTimer.Stop()
+		startupTopmostTimer = nil
+	}
+	wr.WindowSetAlwaysOnTop(d.ctx, false)
+	startupTopmostMu.Unlock()
+}
 
 func main() {
+	if runRestartHelper() {
+		return
+	}
 	if len(os.Args) > 1 && os.Args[1] == "--apply-update" {
 		f := flag.NewFlagSet("update", flag.ContinueOnError)
 		pkg := f.String("apply-update", "", "")
@@ -73,9 +211,7 @@ func main() {
 	var desktop Desktop
 	webviewOptions, e := platform.WebViewOptions()
 	if e != nil {
-		_ = os.MkdirAll(platform.DataDir(), 0700)
-		_ = os.WriteFile(filepath.Join(platform.DataDir(), "startup-error.log"), []byte(e.Error()), 0600)
-		fmt.Fprintln(os.Stderr, e)
+		writeStartupError(e)
 		return
 	}
 	service, e := app.New(context.Background(), platform.DataDir(), func(name string, data any) {
@@ -93,9 +229,14 @@ func main() {
 		fmt.Fprintln(os.Stderr, e)
 		return
 	}
-	defer service.Close()
+	defer func() {
+		service.Close()
+		if restartRequested.Load() {
+			writeStartupError(startRestartHelper())
+		}
+	}()
 	settings := service.Settings()
-	e = wails.Run(&options.App{Title: "AnimeCaos", Width: max(900, settings.Width), Height: max(600, settings.Height), MinWidth: 800, MinHeight: 560, BackgroundColour: options.NewRGB(18, 20, 28), AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{service, &desktop}, Windows: webviewOptions,
+	e = wails.Run(&options.App{Title: "AnimeCaos", Width: max(900, settings.Width), Height: max(600, settings.Height), MinWidth: 800, MinHeight: 560, BackgroundColour: options.NewRGB(21, 21, 21), AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{service, &desktop}, Windows: webviewOptions,
 		OnStartup: func(ctx context.Context) {
 			desktop.ctx = ctx
 			width, height := max(900, settings.Width), max(600, settings.Height)
@@ -104,7 +245,13 @@ func main() {
 			} else {
 				wr.WindowCenter(ctx)
 			}
+			prioritizeStartupWindow(ctx)
 			platform.RunTray(trayIcon, func() { showMainWindow(ctx) }, func() { wr.WindowMinimise(ctx) }, func() { wr.WindowHide(ctx) }, func() {
+				quitRequested.Store(true)
+				restartRequested.Store(true)
+				platform.QuitTray()
+				wr.Quit(ctx)
+			}, func() {
 				quitRequested.Store(true)
 				platform.QuitTray()
 				wr.Quit(ctx)
@@ -121,16 +268,17 @@ func main() {
 			wr.WindowHide(ctx)
 			return true
 		},
-		OnShutdown: func(context.Context) { platform.QuitTray() },
+		OnShutdown: func(context.Context) {
+			stopStartupTopmostTimer()
+			platform.QuitTray()
+		},
 		SingleInstanceLock: &options.SingleInstanceLock{UniqueId: appInstanceID, OnSecondInstanceLaunch: func(options.SecondInstanceData) {
 			if desktop.ctx != nil {
-				showMainWindow(desktop.ctx)
+				showMainWindowWithSplash(desktop.ctx)
 			}
 		}},
 	})
 	if e != nil {
-		os.MkdirAll(platform.DataDir(), 0700)
-		os.WriteFile(filepath.Join(platform.DataDir(), "startup-error.log"), []byte(e.Error()), 0600)
-		fmt.Fprintln(os.Stderr, e)
+		writeStartupError(e)
 	}
 }

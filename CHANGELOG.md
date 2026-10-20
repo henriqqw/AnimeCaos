@@ -14,6 +14,27 @@
 
 ## Em desenvolvimento — interface, janela e documentação
 
+- A splash de produção agora usa `animecaos-pose-startup-v2.png`, o novo avatar de cabelo mais simples e arredondado, com canal alfa transparente. A arte anterior foi preservada e a prévia local continua independente.
+- A página local `frontend/splash-preview.html` usa Three.js para separar, diretamente do PNG original, a camada base e duas mechas laterais sem alterar o rosto, a pose ou o enquadramento. Uma malha suave balança as pontas continuamente; amplitude e velocidade podem ser ajustadas, o ciclo de fade/progresso reinicia a cada 8 s e movimento reduzido mantém o balanço em menor amplitude. Essa deformação vale só para a página de prévia; a splash do app usa seu próprio PNG estático.
+- Na inicialização, a janela é trazida para frente e fica acima das demais até a splash terminar; um limite de segurança de 30 segundos evita mantê-la no topo caso a interface falhe. Abrir uma segunda instância do mesmo canal também traz a janela para frente e reapresenta a splash.
+- O menu da bandeja do Windows agora oferece “Reiniciar”: ele encerra a instância atual, aguarda a liberação do mutex e abre o app novamente para exibir a splash de inicialização.
+- A splash mantém apenas fade-in e fade-out na mascote e na wordmark; agora usa transições de opacidade que permanecem suaves com movimento reduzido e garante que o fade-in termine antes da saída. A barra acompanha o carregamento das imagens, a resposta de `Initial()` e o tempo mínimo de exibição, com preenchimento fluido, 10 px de altura e percentual à direita. A tela permanece por pelo menos 3 s e até as configurações iniciais carregarem ou ocorrer um erro.
+- A mascote de Mangás usa a arte chibi de leitura e a da Home usa a reação de piscadela; ambas têm fundo transparente e carregam imediatamente.
+- As mascotes ficam no fim do conteúdo das páginas de Home e Mangás, alinhadas à direita e com espaço próprio no fluxo. Não ficam fixas à janela e não cobrem os cards durante a rolagem.
+- O espaço final foi reduzido nas duas páginas para aproximar as mascotes das bordas inferior e direita, mantendo uma margem segura para não cortar a arte.
+- A raiz do documento ocupa a janela sem rolagem própria; a rolagem vertical do app fica em `main`.
+- A grade de gêneros aparece logo abaixo do banner e antes de “Continue lendo”, com tiles monocromáticos e relevo sutil; as linhas se equilibram para preencher a largura sem deixar um card isolado esticado. A sinopse dos cards da Home aparece com os dados locais enquanto a consulta complementar carrega.
+- A grade de categorias mostra duas fileiras por padrão; “+ Ver mais” revela as restantes e “− Ver menos” recolhe a lista.
+- Configurações agora tem uma seção “Found a bug?” com a mascote detetive: bugs e melhorias abrem GitHub Issues e dúvidas vão para Q&A em Discussions. Os links sociais continuam sozinhos no rodapé da sidebar.
+- A seção “Found a bug?” agrupa texto e ações à esquerda e posiciona a mascote à direita, inclusive no layout responsivo.
+- A mascote de feedback foi ampliada para ficar legível sem competir com as ações; o tamanho diminui em telas compactas.
+- O catálogo de mangás ganhou a mascote lendo no canto inferior direito, com cabelo simplificado e tamanho responsivo.
+- A mascote do catálogo agora é renderizada fora da área rolável para ficar fixa na janela durante a rolagem.
+- A arte fixa da Home foi atualizada para a reação de piscadela, com cabelo simplificado e caveira alinhada ao centro do torso.
+- Estados vazios agora oferecem acesso ao repositório GitHub e ao site oficial por ícones compactos, com tooltip e rótulos acessíveis.
+- As artes da mascote em busca sem resultados e erros inesperados agora usam as versões de cabelo simplificado: a reação de dúvida tem mechas agrupadas e arredondadas, e erros recuperáveis reutilizam a detetive com lupa.
+- A mascote aparece apenas em estados contextuais: busca sem resultados, lista vazia e erros inesperados/recuperáveis; a reação da busca e a arte com lupa usam as referências escolhidas.
+- A mascote dos estados vazios foi ampliada para até 180 px, mantendo a proporção e a centralização.
 - Na tela Downloads, “Abrir pasta” e “Atualizar biblioteca” agora aparecem como botões somente com ícones; nomes acessíveis e tooltips preservam a identificação das ações.
 - Campos MyAnimeList Client ID/Client Secret removidos da tela do usuário; o Client ID é definido internamente, o backend mantém compatibilidade com segredo legado no cofre, e o fluxo MAL sem segredo segue pendente de cliente público para desktop ou intermediário seguro.
 - Rich Presence do Discord agora usa um switch visual acessível estilo Apple; a configuração técnica do Developer Portal não aparece mais em Configurações.

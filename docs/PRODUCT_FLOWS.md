@@ -7,9 +7,16 @@ Estas regras descrevem o comportamento implementado. Para a hierarquia visual e 
 - Ao iniciar, o app restaura a posição salva somente se a barra de título continuar visível em pelo menos um monitor conectado. Posições inválidas ou gravadas pelo Windows ao minimizar (`-32000,-32000`) são descartadas e a janela é centralizada.
 - O botão X oculta a janela e mantém o processo ativo na bandeja. A ação `Sair` do menu encerra o processo e remove o ícone.
 - Se o Windows não conseguir inicializar o ícone da bandeja, o botão X encerra o app para evitar deixá-lo invisível.
-- O menu da bandeja oferece `Abrir AnimeCaos`, `Minimizar`, `Ocultar para bandeja` e `Sair`. Ao abrir, a janela é mostrada e desminimizada. Uma segunda instância do mesmo canal reativa a janela já existente; `wails dev` e a build instalada usam mutexes distintos para que um servidor Vite parado não capture a abertura da versão de produção.
+- O menu da bandeja oferece `Abrir AnimeCaos`, `Minimizar`, `Ocultar para bandeja`, `Reiniciar` e `Sair`. Ao abrir, a janela é mostrada e desminimizada. `Reiniciar` encerra o processo normalmente, espera a instância atual liberar o mutex e reabre o mesmo executável com os argumentos originais; assim a splash de inicialização aparece novamente. Uma segunda instância do mesmo canal reativa a janela já existente; `wails dev` e a build instalada usam mutexes distintos para que um servidor Vite parado não capture a abertura da versão de produção.
+- Na inicialização, a janela é trazida para frente e fica acima das demais enquanto a splash está visível; o frontend remove essa prioridade quando a animação termina. Um limite de segurança de 30 segundos evita manter a janela sempre no topo se a interface não conseguir concluir a splash. Abrir uma segunda instância do mesmo canal também traz a janela para frente e recarrega a interface para reapresentar a splash.
 - Minimizar pelo controle nativo da janela continua minimizando para a barra de tarefas; a ação do menu da bandeja tem o mesmo comportamento. `Ocultar para bandeja` remove a janela da barra de tarefas sem encerrar o app.
 - O menu de bandeja está implementado para Windows. Em Linux e macOS o app mantém o comportamento nativo de fechamento até existir um adaptador de bandeja específico para essas plataformas.
+
+## Splash de inicialização
+
+- A primeira tela combina a mascote à esquerda e a wordmark AnimeCaos à direita, sobre fundo grafite. Logo e avatar aparecem com transição de opacidade de 560 ms e desaparecem em 600 ms; o fade-in termina antes de começar a saída, inclusive se uma imagem carregar tarde. O rótulo “INICIANDO” permanece estático. Uma barra mais espessa mostra o progresso com percentual ao lado direito: considera o carregamento das imagens, a resposta de `Initial()` e o tempo mínimo da tela, avançando suavemente e chegando a 100% no fade-out. Não há escala, desfoque, faixas, zoom, respiração ou parallax. As transições continuam ativas mesmo quando o sistema pede movimento reduzido.
+- A abertura dura pelo menos 3 segundos no total, incluindo o fade-out de cerca de 600 ms. O fade-out só começa depois que as configurações carregam ou a inicialização apresenta erro; a interface abaixo permanece sem interação até o fim.
+- A janela nativa começa com o mesmo fundo da splash para evitar um flash de cor diferente.
 
 ## Descobrir, pesquisar e abrir um anime
 
@@ -67,7 +74,7 @@ Estas regras descrevem o comportamento implementado. Para a hierarquia visual e 
 
 ## Mangás
 
-  - A página de catálogo começa com um banner de destaque da lista mais acompanhada, prateleira “Top mangás”, categoria por gênero e trilhos para atividade recente e séries em publicação. O banner e os cartões abrem a página da obra; não iniciam a leitura até que uma pessoa escolha capítulo.
+  - A página de catálogo começa com um banner de destaque da lista mais acompanhada. A seção “Categorias” fica logo abaixo do banner e antes de “Continue lendo”; mostra duas fileiras por padrão e revela as demais por “+ Ver mais”. Depois vêm as prateleiras “Top mangás”, atividade recente e séries em publicação. O banner e os cartões abrem a página da obra; não iniciam a leitura até que uma pessoa escolha capítulo.
   - “Top mangás” segue `followedCount`, “Em alta” segue o capítulo enviado mais recentemente e “Em publicação” vem do status `ongoing` do MangaDex. O catálogo não declara temporada para mangás; a interface não reaproveita a temporada de anime como se fosse calendário de publicação de uma obra.
   - Categorias são gêneros provenientes das tags oficiais do MangaDex. Selecionar uma aplica o filtro por ID, apresenta as obras retornadas e permite voltar à descoberta.
   - A estante “Continue lendo” usa carrossel horizontal ordenado pelo progresso mais recente. Cada item mostra obra, capítulo, página e, quando há contagem de páginas, uma barra de progresso; a ação retoma o ponto salvo. Durante uma busca, os resultados ficam antes da estante para manter a resposta perto do campo.
@@ -88,7 +95,10 @@ Estas regras descrevem o comportamento implementado. Para a hierarquia visual e 
 - Prévia de anime é montada fora do carrossel para não ser cortada por overflow; no layout compacto fica oculta, pois depende de hover.
 - Capas podem falhar sem bloquear cards; mantém-se placeholder.
 - Tema aceita `system`, `light`, `dark`; escala de UI é validada entre 1 e 1,5.
-- Configurações apresenta Aparência, Reprodução, Downloads, Integrações e Manutenção em seções abertas numa coluna. Um índice navegável acompanha a seção visível; controles relacionados usam duas colunas quando cabe e empilham em larguras menores. Tema, escala, player, autoplay, downloads e Discord Rich Presence atualizam o estado da interface imediatamente.
+- Configurações apresenta Aparência, Reprodução, Downloads, Integrações, Manutenção e Feedback em seções abertas numa coluna. Um índice navegável acompanha a seção visível; controles relacionados usam duas colunas quando cabe e empilham em larguras menores. Tema, escala, player, autoplay, downloads e Discord Rich Presence atualizam o estado da interface imediatamente. O ícone de navegação da tela é uma engrenagem.
 - Uma fila central com debounce de 350 ms serializa `SaveSettings` e mantém apenas o snapshot mais recente pendente. Se uma gravação falhar, a escolha visual é preservada e há ação para tentar novamente. Limpeza de cache e operações de atualização têm feedback próprio e não passam pelo autosave.
 - Aparência oferece opções segmentadas Sistema/Claro/Escuro; autoplay, fechamento do painel e Rich Presence usam switches com semântica `role="switch"`, foco visível e movimento reduzido respeitado. O caminho customizado só aparece para player personalizado; o atraso do fechamento só aparece se a opção estiver ativa.
 - O botão da hero continua iniciando a pesquisa pelo anime destacado; texto/ícone apresentados são “Assistir” com play.
+- A seção “Found a bug?” em Configurações encaminha bugs e melhorias para o GitHub Issues e dúvidas para a categoria Q&A do Discussions. O painel mantém a mascote detetive à direita do texto e das ações.
+- Downloads usa somente ícones para “Abrir pasta” e “Atualizar biblioteca”; cada botão preserva `aria-label` e tooltip.
+- A base da sidebar exibe atalhos iconográficos para GitHub, site, Instagram e Twitter/X no desktop. Os estados vazios mantêm ícones para GitHub e site, sem chamada textual “Projeto e comunidade”. Os atalhos abrem no navegador do sistema.

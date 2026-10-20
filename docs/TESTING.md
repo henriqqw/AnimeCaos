@@ -1,5 +1,37 @@
 # Testes e validação
 
+## Prévia local da splash
+
+Para abrir a página de iteração contínua, execute `cd frontend; npm run dev` e
+acesse `http://127.0.0.1:5173/splash-preview.html` (ou a porta que o Vite
+informar se a padrão estiver ocupada). O ciclo de 8 s simula a barra, faz fade
+da mascote e da logo e recomeça sem chamar o backend Wails. “Ajustes da prévia”
+permite regular amplitude/velocidade e reiniciar o ciclo. Alterações em TSX/CSS
+entram via hot reload. A página serve para comparação visual no navegador; não
+substitui medição de desempenho nem inspeção Wails/WebView2.
+
+Em 20/10/2026, a renderização foi migrada para Three.js. A camada base e as
+duas mechas laterais são máscaras extraídas do PNG original em runtime; franja,
+rosto, chifres e corpo permanecem imóveis. A inspeção visual no navegador
+confirmou o enquadramento e a identidade da arte nessa prévia. O balanço é
+contínuo e reduz sua amplitude em `prefers-reduced-motion`; não foi feita uma
+medição de 60 fps nem uma inspeção no Wails/WebView2.
+
+Na validação dessa alteração, `cd frontend; npm exec -- tsc --noEmit` passou.
+As requisições `HEAD` locais para a página, os módulos TSX e as imagens usadas
+pela prévia retornaram HTTP 200. `cd frontend; npm test -- --run` terminou com
+27 falhas e 5 aprovações em 32 testes: as falhas não encontram os elementos da
+interface porque a árvore do app está `aria-hidden` e `inert` enquanto a splash
+de produção está ativa no JSDOM. A alteração ficou restrita ao preview e não
+foi executado build ou empacotamento.
+
+Na implementação da página em 20/10/2026, `npm exec -- tsc --noEmit` passou.
+As requisições locais para a página, os módulos TSX, a arte e a wordmark
+retornaram HTTP 200. `npm test -- --run` não passou: 27 de 32 testes em
+`App.test.tsx` não encontram os elementos porque a árvore principal permanece
+`aria-hidden`/`inert` sob a splash durante a execução no JSDOM; 5 testes passaram.
+Essa rodada não mediu 60 fps nem inspecionou a janela Wails.
+
 ## Preparação para publicação — 19/10/2026
 
 Esta seção registra a rodada de release sem confundir arquivos de automação com

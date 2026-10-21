@@ -222,6 +222,31 @@ contra os digests SHA-256 informados pela API do GitHub. O arquivo
 `SHA256SUMS.sigstore.json` assina o manifesto. Os executáveis Windows continuam
 sem Authenticode.
 
+## Release v3.0.4 publicada — 21/10/2026
+
+A [release v3.0.4](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.4)
+foi publicada pelo [workflow `39693016202`](https://github.com/henriqqw/AnimeCaos/actions/runs/39693016202)
+às 23:36 UTC. Testes Windows/Ubuntu, smoke AppImage, instalação/update/
+reinício/desinstalação Windows, preservação do banco, assinatura Sigstore e
+publicação passaram. `/releases/latest` aponta para `v3.0.4`.
+
+| Arquivo | Tamanho | SHA-256 |
+|---|---:|---|
+| `AnimeCaos-3.0.4-windows-amd64.zip` | 669.962.141 bytes | `059b436d5652639cfea325cdb41443e350a40acd485bde109eb6e301f69e9812` |
+| `AnimeCaos-3.0.4-windows-setup.exe` | 489.708.620 bytes | `014cad5b0ed7c3ad6add11835e02137571dfe35e0ecdc7982576772aa5eec43e` |
+| `AnimeCaos-3.0.4-x86_64.AppImage` | 342.972.920 bytes | `bf51130911e813695ac0fda1750655c76d3fa70105539d94d5120f8c49936e80` |
+
+As instalações Windows até a `v3.0.2` precisam executar o [setup Windows
+v3.0.4](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.4/AnimeCaos-3.0.4-windows-setup.exe)
+uma vez: o helper antigo não consegue substituir a pasta que está em uso.
+Depois, o auto-update volta a funcionar. A partir da v3.0.3, a atualização
+automática já usa o helper corrigido. Os executáveis Windows continuam sem
+Authenticode; `WINDOWS-AUTHENTICODE-STATUS.txt` registra isso, e `SHA256SUMS`
+tem assinatura Sigstore.
+
+Os hashes acima foram lidos do `SHA256SUMS` baixado da release e conferidos
+contra os digests SHA-256 dos assets informados pela API do GitHub.
+
 ## Validação manual ainda exigida
 
 O script Windows testa execução do portátil, confirmação de que o processo

@@ -378,6 +378,12 @@ jobs:
           - O `ffprobe.exe` e os demais subprocessos do app não abrem janelas de console no Windows; as janelas gráficas do MPV, do navegador e do Explorer continuam visíveis.
           - O aviso de fallback AniList/MyAnimeList na Home agora usa o mesmo estilo visual da mensagem 403, com a chibi do AnimeCaos.
           EOF
+            cat >> release/release-notes.md <<'EOF'
+
+          ### Aplicação da v3.0.4 em instalações antigas
+
+          Instalações Windows até a v3.0.2 precisam executar o setup da v3.0.4 uma vez. O helper dessas versões não consegue substituir a própria pasta instalada. Depois da instalação manual, as atualizações automáticas voltam a funcionar.
+          EOF
           fi
           gh release edit "$tag" --notes-file release/release-notes.md
           gh release edit "$tag" --draft=false

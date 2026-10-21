@@ -8,6 +8,8 @@
 | `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado. |
 | `npm exec -- tsc --noEmit` (em `frontend/`) | Passou, sem diagnósticos. |
 | `npm test -- --run` (em `frontend/`) | Passou: 1 arquivo e 35 testes. |
+| `gh run watch 39693016202 --exit-status --interval 15` | Release workflow passou: testes Windows/Ubuntu, smoke de instalação/update/desinstalação Windows, smoke AppImage, checksums Sigstore e publicação da v3.0.4. |
+| `gh release download v3.0.4 --pattern SHA256SUMS --dir .task-cache\release-meta-v304` | Passou; hashes do manifesto conferem com os digests SHA-256 dos três assets na API do GitHub. |
 
 ## Aviso de fallback do catálogo da Home — 21/10/2026
 
@@ -37,7 +39,7 @@ janelas gráficas.
 | `go test ./...` | Passou em todos os pacotes no Windows amd64. |
 | `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado. |
 | `git diff --check` | Passou; Git pode avisar sobre a normalização LF/CRLF no checkout Windows. |
-| Build/instalador de release | Não executado; a correção precisa entrar em uma próxima release para chegar ao app do seu amigo. |
+| Release v3.0.4 — workflow `39693016202` | O empacotamento Windows e AppImage, os smokes de atualização e instalação e a publicação passaram. A correção de `ffprobe.exe` está nos assets da release. |
 
 ## Fallback do catálogo da Home — 21/10/2026
 

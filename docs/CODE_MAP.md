@@ -7,8 +7,8 @@ Mapa conferido em 20/10/2026. Atualize junto com mudanças de responsabilidade, 
 | Caminho | Responsabilidade |
 |---|---|
 | `main.go` | Entry point Wails, embed do frontend/ícone, janela com fundo preto para evitar flash antes da splash, prioridade em primeiro plano sincronizada com a splash, reexibição da splash na segunda instância, geometria visível, diálogos, ciclo da bandeja Windows, reinício por reload no modo dev e relançamento no pacote, início do auto-update em builds instaladas, single-instance e helper de atualização |
-| `instance_id_dev.go`, `instance_id_production.go` | IDs de mutex e seleção do comportamento de reinício conforme os build tags dev/produção |
-| `instance_id_dev_test.go`, `instance_id_production_test.go` | Testes dos IDs de instância e da estratégia de reinício selecionados pelos build tags |
+| `build_identity_dev.go`, `build_identity_production.go` | IDs de mutex e seleção do comportamento de reinício conforme os build tags dev/produção |
+| `build_identity_dev_test.go`, `build_identity_production_test.go` | Testes dos IDs de instância e da estratégia de reinício selecionados pelos build tags |
 | `go.mod`, `go.sum` | Versão do Go e dependências |
 | `wails.json` | Configuração do projeto Wails e comandos do frontend |
 | `cmd/animecaos/main.go` | CLI e navegação interativa com os mesmos serviços do app |

@@ -193,6 +193,35 @@ por isso quem ficou com a janela oculta deve encerrar o grupo AnimeCaos e
 instalar o setup v3.0.2 manualmente. O smoke de update usa a própria versão
 numa instalação descartável e não substitui essa validação real N→N+1.
 
+## Release v3.0.3 publicada — 21/10/2026
+
+A [release v3.0.3](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.3)
+foi publicada pelo [workflow `39689059968`](https://github.com/henriqqw/AnimeCaos/actions/runs/39689059968)
+às 23:03 UTC. Os testes Windows/Ubuntu, o smoke AppImage, a instalação/update/
+reinício/desinstalação Windows, a preservação do banco, a assinatura Sigstore e
+a publicação passaram. `/releases/latest` aponta para `v3.0.3`.
+
+| Arquivo | Tamanho | SHA-256 |
+|---|---:|---|
+| `AnimeCaos-3.0.3-windows-amd64.zip` | 669.961.338 bytes | `251644bd8ff488b645b68ea70b32d07a52b8eeb3574f6f8ff0e515332c7fc5f0` |
+| `AnimeCaos-3.0.3-windows-setup.exe` | 489.817.595 bytes | `4279ffd6c54e4b99aecc554dc570e421aebce31c8002de030f472468df5aa8ef` |
+| `AnimeCaos-3.0.3-x86_64.AppImage` | 342.964.728 bytes | `3989275697541679bd1c4e7c40c53fde7c76bbfc877c5f834b01b6d73acd8c8f` |
+
+Instalações até a `v3.0.2` precisam rodar o [setup Windows v3.0.3](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.3/AnimeCaos-3.0.3-windows-setup.exe)
+uma vez, pois o helper antigo não contém a correção para substituir a pasta
+da instalação. O setup preserva os dados do usuário em `%APPDATA%`. Depois
+dessa instalação, o auto-update passa a usar o helper corrigido.
+
+Na instalação local `D:\AnimeCaosApp`, o manifesto e o registro do Windows
+continuaram em `3.0.0` depois que a splash mostrou 100% e “iniciando”. A
+migração pelo setup real segue pendente; essa evidência confirma que o progresso
+da splash, sozinho, não comprova que a instalação foi aplicada.
+
+Os hashes acima vieram de `SHA256SUMS`, baixado da release, e foram conferidos
+contra os digests SHA-256 informados pela API do GitHub. O arquivo
+`SHA256SUMS.sigstore.json` assina o manifesto. Os executáveis Windows continuam
+sem Authenticode.
+
 ## Validação manual ainda exigida
 
 O script Windows testa execução do portátil, confirmação de que o processo

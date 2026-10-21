@@ -106,13 +106,21 @@ O MPV ativo usava `--force-window=yes`, mas não tinha janela (`MainWindowHandle
 igual a zero). Como o processo Wails e o manifesto eram da `3.0.0`, ele não
 continha a correção de visibilidade do MPV da `3.0.1`.
 
-O código em preparação para a `3.0.3` inicia o helper com o diretório de
-trabalho na pasta pai do alvo e limpa o stage em falhas de extração/troca.
+O código publicado na `3.0.3` inicia o helper com o diretório de trabalho na
+pasta pai do alvo e limpa o stage em falhas de extração/troca.
 `TestApplyHelperRunsFromOutsideInstallDirectory` cobre o diretório do helper;
 `TestUpdateHelperCleansIncompleteStage` cobre a remoção do stage. Como as
 versões anteriores copiam o helper antigo, instalações até a `3.0.2` precisam
 rodar o setup da `3.0.3` uma vez para receber a correção; depois disso, o
 auto-update usa o helper corrigido.
+
+Após a splash mostrar 100% e “iniciando”, o usuário confirmou que a janela
+reabriu ainda em `3.0.0`. A verificação local confirmou o manifesto e a entrada
+de desinstalação em `D:\AnimeCaosApp` como `3.0.0`, e o processo aberto veio de
+`D:\AnimeCaosApp\AnimeCaos.exe`. O log de erro disponível continua sendo o de
+19:16:21; não há um registro novo que identifique a etapa exata da tentativa
+das 20:04. Portanto, o progresso completo da splash não confirmou a troca dos
+arquivos. A instalação real ainda precisa executar o setup publicado uma vez.
 
 | Comando | Resultado |
 |---|---|
@@ -122,9 +130,11 @@ auto-update usa o helper corrigido.
 | `go test ./...` | Passou em todos os pacotes no Windows amd64. |
 | `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado localmente. |
 
-O smoke Windows/AppImage da release ainda será executado pelos runners. Ele
-atualiza uma instalação descartável da própria release e não substitui uma
-observação manual de `3.0.0` → `3.0.3` nesta máquina.
+O workflow `39689059968` passou nos testes Windows/Ubuntu e nos smokes Windows
+e AppImage. O smoke atualiza uma instalação descartável da própria release e
+não substitui uma observação manual de `3.0.0` → `3.0.3` nesta máquina. Essa
+migração ainda não ocorreu; execute o [setup Windows v3.0.3](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.3/AnimeCaos-3.0.3-windows-setup.exe)
+com o AnimeCaos fechado e confira se a sidebar passa a mostrar `v3.0.3`.
 
 ## Release pública v3.0.2 — 21/10/2026
 

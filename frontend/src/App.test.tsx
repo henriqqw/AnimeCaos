@@ -119,8 +119,24 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
 afterEach(cleanup);
+async function renderReadyApp() {
+  const originalSetTimeout = window.setTimeout;
+  const expediteStartupTimers: typeof window.setTimeout = (handler, timeout, ...args) =>
+    originalSetTimeout(handler, Math.min(timeout ?? 0, 1), ...args);
+  window.setTimeout = expediteStartupTimers;
+  try {
+    const rendered = render(<App />);
+    rendered.container.querySelectorAll<HTMLImageElement>(".startup-splash img").forEach((image) => fireEvent.load(image));
+    await act(async () => {
+      await new Promise<void>((resolve) => originalSetTimeout(resolve, 20));
+    });
+    return rendered;
+  } finally {
+    window.setTimeout = originalSetTimeout;
+  }
+}
 async function searchScreen() {
-  render(<App />);
+  await renderReadyApp();
   const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
   fireEvent.click(within(navigation).getByRole("button", { name: "Pesquisar" }));
   return screen.getAllByRole("searchbox", { name: "Buscar animes" })[0];
@@ -140,7 +156,7 @@ describe("interface funcional", () => {
       updated: 10,
     } as MangaProgress]);
     vi.mocked(api.MangaByCategory).mockResolvedValue([result]);
-    const { container } = render(<App />);
+    const { container } = await renderReadyApp();
     const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
     fireEvent.click(within(navigation).getByRole("button", { name: "Mangás" }));
     expect(await screen.findByRole("heading", { name: "Top mangás" })).toBeTruthy();
@@ -148,7 +164,7 @@ describe("interface funcional", () => {
     expect(container.querySelector(".manga-library > .spotlight")).toBeTruthy();
     expect(screen.getAllByRole("searchbox", { name: "Buscar mangás" })).toHaveLength(1);
     expect(container.querySelector(".manga-category-list")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Ação" }).getAttribute("data-tone")).toBe("ember");
+    expect(screen.getByRole("button", { name: "Ação" }).classList.contains("manga-category-chip")).toBe(true);
     expect(container.querySelector(".manga-history-card.card .card-poster")).toBeTruthy();
     expect(screen.queryByText("As obras mais acompanhadas no catálogo.")).toBeNull();
     expect(screen.queryByText("Escolha um gênero e encontre sua próxima leitura.")).toBeNull();
@@ -171,7 +187,7 @@ describe("interface funcional", () => {
     vi.mocked(api.MangaSearch).mockResolvedValue([manga]);
     vi.mocked(api.Chapters).mockResolvedValue([chapter]);
     vi.mocked(api.Pages).mockResolvedValue(["http://127.0.0.1/page-1", "http://127.0.0.1/page-2"]);
-    render(<App />);
+    await renderReadyApp();
     const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
     fireEvent.click(within(navigation).getByRole("button", { name: "Mangás" }));
     expect(await screen.findByRole("heading", { name: "Sua próxima história começa aqui" })).toBeTruthy();
@@ -205,7 +221,7 @@ describe("interface funcional", () => {
     vi.mocked(api.MangaSearch).mockResolvedValue([manga]);
     vi.mocked(api.Chapters).mockResolvedValue([chapter]);
     vi.mocked(api.Pages).mockRejectedValueOnce(new Error("servidor de imagens indisponível")).mockResolvedValue(["http://127.0.0.1/recovered"]);
-    render(<App />);
+    await renderReadyApp();
     const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
     fireEvent.click(within(navigation).getByRole("button", { name: "Mangás" }));
     const searchbox = screen.getByRole("searchbox", { name: "Buscar mangás" });
@@ -221,7 +237,7 @@ describe("interface funcional", () => {
 
   it("continua pelo identificador salvo sem escolher episódio por posição", async () => {
     vi.mocked(api.History).mockResolvedValue([{anime:{id:"anime",provider:"animefire",title:"Continuar teste"},episode:{id:"episode",season:2,number:3},position:120,updated:1,needsResolve:false}] as History[]);
-    render(<App />);
+    await renderReadyApp();
     const shelfButton = await screen.findByRole("button",{name:"Continuar"});
     expect(shelfButton.querySelector("svg.nav-icon path")?.getAttribute("d")).toBe("m8 5 11 7-11 7V5Z");
     fireEvent.click(await screen.findByRole("button",{name:"Histórico"}));
@@ -232,7 +248,7 @@ describe("interface funcional", () => {
   });
   it("exige escolher o episódio quando o histórico antigo não tem identidade segura", async () => {
     vi.mocked(api.History).mockResolvedValue([{anime:{id:"old",provider:"legacy",title:"Legado"},episode:{},position:0,updated:0,needsResolve:true}] as History[]);
-    render(<App />);
+    await renderReadyApp();
     await screen.findByText("Histórico antigo");
     expect(screen.queryByRole("button",{name:"Escolher episódio"})).toBeNull();
     expect(screen.queryByRole("button",{name:"Continuar"})).toBeNull();
@@ -241,7 +257,7 @@ describe("interface funcional", () => {
   it("recupera a capa dos itens antigos do histórico", async () => {
     vi.mocked(api.History).mockResolvedValue([{anime:{id:"old-cover",provider:"legacy",title:"Bleach"},episode:{},position:0,updated:0,needsResolve:true}] as History[]);
     vi.mocked(api.Preview).mockResolvedValue({ cover: "https://images.example/bleach.jpg" } as Anime);
-    const { container } = render(<App />);
+    const { container } = await renderReadyApp();
     await waitFor(() => expect(api.Preview).toHaveBeenCalledWith(expect.any(String), "Bleach", 0));
     await waitFor(() => expect(container.querySelector(".continue-shelf .card img")).toBeTruthy());
     await waitFor(() => expect(api.SaveHistoryCover).toHaveBeenCalledWith("legacy:old-cover", "https://images.example/bleach.jpg"));
@@ -255,13 +271,13 @@ describe("interface funcional", () => {
       observe(target: Element) { this.callback([{ isIntersecting: true, target } as IntersectionObserverEntry], this as unknown as IntersectionObserver); }
       disconnect() {}
     } as unknown as typeof IntersectionObserver;
-    render(<App />);
+    await renderReadyApp();
     await waitFor(() => expect(api.Preview).toHaveBeenCalledWith(expect.any(String), "Anime legado", 0));
     await waitFor(() => expect(api.SaveHistoryCover).toHaveBeenCalledWith("legacy:stale-cover", "https://images.example/recovered.jpg"));
   });
   it("mostra o histórico como uma estante de capas com ações compactas", async () => {
     vi.mocked(api.History).mockResolvedValue([{anime:{id:"old-history",provider:"legacy",title:"Bleach: Temporada longa"},episode:{},position:0,updated:10,needsResolve:true}] as History[]);
-    render(<App />);
+    await renderReadyApp();
     fireEvent.click(await screen.findByRole("button", { name: "Histórico" }));
     expect(await screen.findByRole("region", { name: "Histórico de animes" })).toBeTruthy();
     expect(screen.getByText("Assistidos recentemente")).toBeTruthy();
@@ -279,7 +295,7 @@ describe("interface funcional", () => {
       needsResolve: true,
     })) as History[];
     vi.mocked(api.History).mockResolvedValue(history);
-    render(<App />);
+    await renderReadyApp();
     fireEvent.click(await screen.findByRole("button", { name: "Histórico" }));
     const cards = await screen.findAllByRole("button", { name: /^Abrir Anime/ });
     expect(cards).toHaveLength(24);
@@ -291,7 +307,7 @@ describe("interface funcional", () => {
     expect(screen.getAllByRole("button", { name: "Página anterior" }).every((button) => !button.hasAttribute("disabled"))).toBe(true);
   });
   it("recolhe a sidebar e mantém acessível a ação para expandi-la", async () => {
-    const { container } = render(<App />);
+    const { container } = await renderReadyApp();
     await screen.findAllByRole("button", { name: "Recolher menu" });
     const toggle = container.querySelector(".brand .sidebar-toggle") as HTMLButtonElement;
     fireEvent.click(toggle);
@@ -300,7 +316,7 @@ describe("interface funcional", () => {
     expect(localStorage.getItem("animecaos-sidebar-collapsed")).toBe("true");
   });
   it("leva a pesquisa da navegação e do atalho ao campo único da home", async () => {
-    render(<App />);
+    await renderReadyApp();
     const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
     fireEvent.click(within(navigation).getByRole("button", { name: "Pesquisar" }));
     expect(screen.getByRole("heading", { name: "Início" })).toBeTruthy();
@@ -312,7 +328,7 @@ describe("interface funcional", () => {
   it("envia a busca pelo campo compacto do cabeçalho", async () => {
     vi.mocked(api.Search).mockResolvedValue({ items: [], page: 1, hasNext: false, warnings: [] });
   vi.mocked(api.Preview).mockResolvedValue({} as Anime);
-    render(<App />);
+    await renderReadyApp();
     const input = await screen.findByRole("searchbox", { name: "Buscar animes" });
     fireEvent.change(input, { target: { value: "Frieren" } });
     fireEvent.submit(input.closest("form")!);
@@ -322,7 +338,7 @@ describe("interface funcional", () => {
     const featured = { id: "anilist:101", provider: "anilist", title: "Demon Slayer", anilistId: 101, titles: ["Kimetsu no Yaiba"] } as Anime;
     vi.mocked(api.Discover).mockResolvedValue({ trending: [featured], seasonal: [], warning: "" });
     vi.mocked(api.Search).mockResolvedValue({ items: [], page: 1, hasNext: false, warnings: [] });
-    render(<App />);
+    await renderReadyApp();
     fireEvent.click(await screen.findByRole("button", { name: "Assistir" }));
     await waitFor(() => expect(api.Search).toHaveBeenCalledWith(expect.any(String), "Demon Slayer", 1, featured));
   });
@@ -338,7 +354,7 @@ describe("interface funcional", () => {
       needsResolve: false,
     } as History]);
     vi.mocked(api.Search).mockResolvedValue({ items: [], page: 1, hasNext: false, warnings: [] });
-    render(<App />);
+    await renderReadyApp();
 
     await waitFor(() => expect(screen.getAllByText("Ver anime", { exact: true })).toHaveLength(3));
     const labels = screen.getAllByText("Ver anime", { exact: true });
@@ -349,7 +365,7 @@ describe("interface funcional", () => {
     const first = { id: "a", provider: "anilist", title: "Anime A" } as Anime;
     const second = { id: "b", provider: "anilist", title: "Anime B" } as Anime;
     vi.mocked(api.Discover).mockResolvedValue({ trending: [first, second], seasonal: [], warning: "" });
-    render(<App />);
+    await renderReadyApp();
     const hero = await screen.findByRole("button", { name: "Assistir" });
     fireEvent.keyDown(hero, { key: "ArrowRight" });
     expect(screen.getByRole("button", { name: "Destaque 2: Anime B" }).getAttribute("aria-pressed")).toBe("true");
@@ -358,7 +374,7 @@ describe("interface funcional", () => {
     const featured = { id: "anime-1", provider: "anilist", title: "Frieren" } as Anime;
     vi.mocked(api.Discover).mockResolvedValue({ trending: [featured], seasonal: [], warning: "" });
     vi.mocked(api.Preview).mockResolvedValue({ title: "Frieren", description: "Resumo" } as Anime);
-    render(<App />);
+    await renderReadyApp();
     await screen.findByText("Frieren", { selector: ".card-title" });
     const card = document.querySelector(".card > button") as HTMLButtonElement;
     fireEvent.mouseEnter(card.closest("article")!);
@@ -374,7 +390,7 @@ describe("interface funcional", () => {
       episode: { id: "ep-1", season: 2, number: 4, title: "A jornada", audio: "Dublado" },
       status: "downloading", percent: 42, speed: "2 MB/s", eta: "00:30", error: "", path: "", kind: "anime",
     }] as Download[]);
-    render(<App />);
+    await renderReadyApp();
     fireEvent.click(await screen.findByRole("button", { name: "Downloads, 1 ativos" }));
     expect(await screen.findByText("Frieren")).toBeTruthy();
     expect(screen.getByText("Temporada 2 · Episódio 4 · Dublado")).toBeTruthy();
@@ -385,7 +401,7 @@ describe("interface funcional", () => {
   it("mostra ações de ícone acessíveis para arquivos offline e abre a pasta do arquivo", async () => {
     const file = { path: "D:\\Downloads\\Frieren\\Frieren - S01E1-JP.mkv", title: "Frieren", episode: 1, size: 1024, cover: "", kind: "anime" } as LocalFile;
     vi.mocked(api.LocalFiles).mockResolvedValue([file]);
-    render(<App />);
+    await renderReadyApp();
     const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });
     fireEvent.click(within(navigation).getByRole("button", { name: "Downloads" }));
     expect(await screen.findByRole("heading", { name: "Disponíveis offline" })).toBeTruthy();
@@ -418,7 +434,6 @@ describe("interface funcional", () => {
       season: 0,
     } satisfies Anime;
     vi.mocked(api.Search).mockResolvedValue({ items: [result], page: 1, hasNext: false, warnings: [] });
-    render(<App />);
     const input = await searchScreen();
     fireEvent.change(input, { target: { value: "Resultado" } });
     fireEvent.submit(input.closest("form")!);
@@ -463,7 +478,6 @@ describe("interface funcional", () => {
     } satisfies Anime;
     let finishSearch!: (result: SearchResult) => void;
     vi.mocked(api.Search).mockImplementation(() => new Promise((resolve) => { finishSearch = resolve; }));
-    render(<App />);
     const input = await searchScreen();
     fireEvent.change(input, { target: { value: "Verificado" } });
     fireEvent.submit(input.closest("form")!);
@@ -482,7 +496,6 @@ describe("interface funcional", () => {
     } satisfies Anime;
     vi.mocked(api.Search).mockResolvedValue({ items: [anime], page: 1, hasNext: false, warnings: [] });
     vi.mocked(api.Preview).mockResolvedValue({ title: anime.title, score: 8.9, episodeCount: 148 } as Anime);
-    render(<App />);
     const input = await searchScreen();
     fireEvent.change(input, { target: { value: "hunter" } });
     fireEvent.submit(input.closest("form")!);
@@ -492,7 +505,7 @@ describe("interface funcional", () => {
     expect((await screen.findByRole("tooltip")).textContent).toContain("148 episódios");
   });
   it("mostra índice, aplica o tema imediatamente e salva preferências automaticamente", async () => {
-    render(<App />);
+    await renderReadyApp();
     await screen.findByRole("navigation", { name: "Navegação principal" });
     const main = await screen.findByRole("main");
     expect(main.closest(".app")?.getAttribute("data-theme")).toBe("system");
@@ -511,7 +524,7 @@ describe("interface funcional", () => {
     expect((await screen.findByText("Salvo")).textContent).toBe("Salvo");
   });
   it("coalesce mudanças rápidas em um salvamento com o estado mais recente", async () => {
-    render(<App />);
+    await renderReadyApp();
     fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
     fireEvent.click(screen.getByRole("button", { name: "Escuro" }));
     fireEvent.change(screen.getByLabelText("Escala da interface"), { target: { value: "1.25" } });
@@ -522,7 +535,7 @@ describe("interface funcional", () => {
   it("serializa gravações enquanto uma chamada anterior ainda está em andamento", async () => {
     let finishFirst!: () => void;
     vi.mocked(api.SaveSettings).mockImplementationOnce(() => new Promise<void>((resolve) => { finishFirst = resolve; })).mockResolvedValue();
-    render(<App />);
+    await renderReadyApp();
     fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
     fireEvent.click(screen.getByRole("button", { name: "Escuro" }));
     await waitFor(() => expect(api.SaveSettings).toHaveBeenCalledTimes(1));
@@ -535,7 +548,7 @@ describe("interface funcional", () => {
   });
   it("preserva uma preferência após falha e permite tentar salvar novamente", async () => {
     vi.mocked(api.SaveSettings).mockRejectedValueOnce(new Error("falha temporária")).mockResolvedValueOnce();
-    render(<App />);
+    await renderReadyApp();
     fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
     fireEvent.click(screen.getByRole("button", { name: "Escuro" }));
     expect(await screen.findByText("Não foi possível salvar.")).toBeTruthy();
@@ -556,7 +569,7 @@ describe("interface funcional", () => {
       disconnected[2],
     ] satisfies Account[];
     vi.mocked(api.Accounts).mockResolvedValueOnce(disconnected).mockResolvedValueOnce(disconnected).mockResolvedValueOnce(connected);
-    render(<App />);
+    await renderReadyApp();
     fireEvent.click(await screen.findByRole("button", { name: "Configurações" }));
 
     await screen.findByText("AniList");
@@ -638,7 +651,7 @@ describe("interface funcional", () => {
     expect(api.Cancel).toHaveBeenCalled();
   });
   it("mantém o painel fechado enquanto o download avança", async () => {
-    const { container } = render(<App />);
+    const { container } = await renderReadyApp();
     await screen.findByTitle("Downloads");
     const toggle = container.querySelector<HTMLButtonElement>(".download-toggle")!;
     fireEvent.click(toggle);

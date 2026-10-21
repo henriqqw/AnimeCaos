@@ -2,6 +2,7 @@
 
 ## Preparação para publicação
 
+- Em 20/10/2026, foram recompilados localmente o ZIP e instalador Windows x64 e o AppImage Ubuntu 24.04 x86_64 da versão 3.0.0. Go, TypeScript, Vitest, runtimes de navegador/mídia, inicialização portátil Windows e smoke de update AppImage passaram. Os hashes estão em `release/SHA256SUMS`; os pacotes ainda não foram publicados e continuam pendentes de assinatura Windows, testes em máquinas limpas e resolução do fluxo MAL.
 - Wails `dev` e o pacote instalado usam identificadores de instância separados. Abrir a build instalada não redireciona mais para uma janela `AnimeCaos-dev.exe` presa a um servidor Vite parado.
 - Tokens OAuth AniList/MAL e Client Secret MAL passaram a usar Credential Manager no Windows e Secret Service no Linux. Instalações antigas migram credenciais do SQLite para o cofre e apagam a cópia ativa com secure delete/checkpoint/VACUUM; indisponibilidade do cofre aparece como erro, sem fallback em texto.
 - Pacotes agora usam `3.0.0` como versão padrão; adicionados avisos de terceiros, textos de licença, inventário SHA-256 e coleta de proveniência/licenças dos pacotes MPV/FFmpeg.

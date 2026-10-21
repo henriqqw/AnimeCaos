@@ -1,5 +1,42 @@
 # Testes e validação
 
+## Pacotes locais de release — 20/10/2026
+
+Os pacotes `3.0.0` para Windows x64 e Ubuntu 24.04 x86_64 foram recompilados
+localmente. Esta rodada não publicou uma release.
+
+| Verificação | Resultado em 20/10/2026 |
+|---|---|
+| `go test ./... -count=1` no Windows e em Ubuntu 24.04/WSL | Passou. |
+| `go test -race ./... -count=1` em Ubuntu 24.04/WSL | Passou. |
+| `cd frontend; npm exec -- tsc --noEmit` | Passou. |
+| `cd frontend; npm test -- --run --reporter=default` | Passou: 32/32. O harness agora espera a splash inicial carregar antes de testar a interface; uma expectativa de categoria foi alinhada à classe atual do componente. |
+| `cd frontend; npm run build` e build disparado pelo empacotador Windows | Passaram; Vite gerou os assets de produção. `npm audit` informou 0 vulnerabilidades. |
+| ZIP portátil Windows | Gerado como `AnimeCaos-3.0.0-windows-amd64.zip` (656.458.709 bytes); `zipfile.testzip()` leu todos os arquivos e aprovou CRC. |
+| Smoke do executável Windows no stage | Passou: iniciou, criou `state.db` em diretório descartável e usou o WebView2 155.0.4283.62 embarcado. Firefox/GeckoDriver, identificação do WebView2 e MPV com seek também passaram nos testes de runtime. |
+| Instalador Inno Setup 6.7.1 | Compilação passou; `AnimeCaos-3.0.0-windows-setup.exe` tem 476.601.378 bytes. Authenticode está `NotSigned`. O teste de instalar/atualizar/desinstalar não foi executado porque já existe uma entrada de desinstalação com o mesmo AppId neste perfil; o script de CI substituiria esse registro. Validar em VM limpa. |
+| Firefox/GeckoDriver e MPV no stage Linux | Passaram: fixture de iframe JavaScript; reprodução sintética H.264/AAC, seek e EOF. |
+| AppImage | `verify-appimage.sh` passou no Ubuntu 24.04/WSL: inicialização, atualização, testes Firefox/MPV e preservação de `state.db`. A VM/instalação Linux limpa ainda não foi testada. |
+| Checksums externos | `sha256sum -c SHA256SUMS` passou para os três pacotes. |
+
+| Arquivo | SHA-256 |
+|---|---|
+| `AnimeCaos-3.0.0-windows-amd64.zip` | `361bcca5948dad1d220415ce02e75cf99a32601f293827d1f9082f48b1a95f97` |
+| `AnimeCaos-3.0.0-windows-setup.exe` | `cb63eae618bae704dbb516a58a9778179d5ac9ea717ee9fdb10f7213760c6a58` |
+| `AnimeCaos-3.0.0-x86_64.AppImage` | `67f5eb5dc2fdafc47dd20acd59745560092f1d00ca71c448e3196aefb0300fb0` |
+
+Os relatórios de licenças Go/npm foram regenerados; o inventário npm agora
+inclui Three.js. `go-licenses` avisou que não analisa dependências dentro de
+alguns arquivos C/assembly, então os relatórios refletem os módulos e avisos
+das bibliotecas, mas não substituem uma auditoria manual de código nativo.
+
+Estes são candidatos locais, não pacotes aprovados para publicação pública:
+falta assinar os binários Windows, fazer a validação do instalador e dos dois
+formatos em máquinas limpas, executar os workflows remotos e resolver o fluxo
+OAuth do MyAnimeList/rotacionar o segredo exposto, conforme
+[`DISTRIBUTION.md`](DISTRIBUTION.md). Portanto, os testes desta rodada não
+garantem ausência absoluta de falhas em todo hardware ou distribuição Linux.
+
 ## Prévia local da splash
 
 Para abrir a página de iteração contínua, execute `cd frontend; npm run dev` e

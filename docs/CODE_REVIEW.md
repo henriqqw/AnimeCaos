@@ -1,6 +1,6 @@
 # Revisão técnica — AnimeCaos
 
-Data: 19/10/2026. O escopo desta revisão também inclui os pacotes locais Windows/Linux com Firefox/GeckoDriver, MPV/FFmpeg/FFprobe e WebView2, CI, instaladores, update e material de licenças. O portátil, instalador e AppImage foram gerados; os smoke tests locais do AppImage passaram. Esta revisão não publicou artefatos. A árvore Python antiga está preservada em `../Legacy/`.
+Data: 20/10/2026. O escopo desta revisão também inclui os pacotes locais Windows/Linux com Firefox/GeckoDriver, MPV/FFmpeg/FFprobe e WebView2, CI, instaladores, update e material de licenças. O ZIP e instalador Windows e o AppImage foram recompilados; o smoke portátil Windows, o smoke completo do AppImage e os runtimes de mídia/navegador passaram localmente. O instalador não foi executado no perfil de desenvolvimento porque o mesmo AppId já tem uma entrada registrada. Esta revisão não publicou artefatos. A árvore Python antiga está preservada em `../Legacy/`.
 
 ### [P1] Pacotes não incluíam todos os runtimes que o app usa — corrigido no stage
 

@@ -3,6 +3,17 @@
 ![Banner do AnimeCaos](assets/readme-banner.png)
 
 <p align="center">
+  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.0"><img src="https://img.shields.io/badge/release-v3.0.0-d63b3b?style=flat-square" alt="Release v3.0.0"></a>
+  <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go 1.26"></a>
+  <a href="https://wails.io/"><img src="https://img.shields.io/badge/Wails-2.16-DF0000?style=flat-square" alt="Wails 2.16"></a>
+  <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white" alt="React 19"></a>
+  <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.8"></a>
+  <a href="https://github.com/henriqqw/AnimeCaos/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/henriqqw/AnimeCaos/ci.yml?branch=main&style=flat-square&label=CI" alt="Status do CI"></a>
+  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.0"><img src="https://img.shields.io/badge/Windows%20x64%20%7C%20Linux%20x86_64-desktop-4b5563?style=flat-square" alt="Windows x64 e Linux x86_64"></a>
+  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.0"><img src="https://img.shields.io/badge/SHA256-Sigstore%20signed-2ea44f?style=flat-square" alt="Manifesto SHA256 assinado com Sigstore"></a>
+  <a href="docs/README.md"><img src="https://img.shields.io/badge/docs-available-3572A5?style=flat-square" alt="Documentação disponível"></a>
+</p>
+<p align="center">
   <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.0">⬇️ Baixar v3.0.0</a>
   · <a href="https://www.animecaos.xyz/">🌐 Site oficial</a>
   · <a href="CHANGELOG.md">📋 Changelog</a>

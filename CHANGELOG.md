@@ -25,6 +25,7 @@
 
 - O banner do README ganhou slogan pixelado e efeitos de retícula/linhas controlados; foi criada também uma capa de perfil para X em 1500 × 500 px, com a zona da foto de perfil preservada.
 - O README foi reorganizado com o banner de marca fornecido, galeria de capturas do app, instruções de instalação e uso, requisitos, opções, arquitetura, fluxos, stack, API, integrações, FAQ e links para a documentação detalhada.
+- O cabeçalho do README agora resume release, stack Go/Wails/React/TypeScript, CI, plataformas, checksums Sigstore e documentação em badges clicáveis.
 - Adicionado um banner horizontal da identidade AnimeCaos para perfil social.
 - A splash de produção usa somente o loop local `frontend/public/avatar_loop.webm` para a mascote; não carrega PNG de poster nem fallback estático. A página antecipa o download do vídeo, espera o primeiro quadro decodificado e sincroniza o fade-in de 560 ms com a wordmark. Se houver erro, tenta recarregar uma vez e oferece nova tentativa sem revelar a logo sozinha. O fundo preto acompanha o vídeo opaco.
 - A página local `frontend/splash-preview.html` usa Three.js para separar, diretamente do PNG original, a camada base e duas mechas laterais sem alterar o rosto, a pose ou o enquadramento. Uma malha suave balança as pontas continuamente; amplitude e velocidade podem ser ajustadas, o ciclo de fade/progresso reinicia a cada 8 s e movimento reduzido mantém o balanço em menor amplitude. Essa deformação vale só para a página de prévia; a splash de produção toca o arquivo WebM local.

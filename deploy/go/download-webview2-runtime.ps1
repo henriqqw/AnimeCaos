@@ -42,8 +42,8 @@ try {
     Where-Object { $_.Extension -in '.exe', '.dll' }
   foreach ($binary in $signedBinaries) {
     $binarySignature = Get-AuthenticodeSignature -LiteralPath $binary.FullName
-    if ($binarySignature.Status -ne 'Valid' -or $binarySignature.SignerCertificate.Subject -notmatch 'Microsoft') {
-      throw "A assinatura Microsoft do componente WebView2 não foi validada: $($binary.Name)"
+    if ($binarySignature.Status -ne 'Valid' -or -not $binarySignature.SignerCertificate) {
+      throw "A assinatura Authenticode do componente WebView2 não foi validada: $($binary.Name)"
     }
   }
   foreach ($required in @('msedge.dll', 'msedgewebview2.exe', 'resources.pak', 'icudtl.dat', "$version.manifest")) {

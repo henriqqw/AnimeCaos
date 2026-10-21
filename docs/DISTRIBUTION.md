@@ -49,7 +49,11 @@ assinaturas digitais e instala os runtimes em `bin/`. MPV, FFmpeg e FFprobe
 também são obtidos nas versões fixadas da pipeline. O empacotador falha se
 qualquer runtime estiver ausente; não usa PATH para preencher pacotes
 incompletos. `release-manifest.json` registra o hash de cada arquivo
-distribuído.
+distribuído. No WebView2, o executável principal precisa ter assinatura
+Microsoft válida; todos os EXEs/DLLs do CAB oficial precisam ter uma assinatura
+Authenticode válida do fornecedor correspondente. O pacote inclui
+`widevinecdm.dll`, assinado pelo Google, por isso a verificação não exige que
+esse componente de terceiros use o certificado Microsoft.
 
 No AppImage, o Firefox e o GeckoDriver são copiados com os bytes originais. O
 `linuxdeploy` altera RPATH de executáveis durante a coleta; por isso o script

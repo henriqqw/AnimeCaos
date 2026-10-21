@@ -1,5 +1,9 @@
 # Changelog
 
+## Próxima versão
+
+- Ocultadas as janelas de console de todos os subprocessos do app no Windows. A inspeção de mídia chamava `ffprobe.exe` sem `CREATE_NO_WINDOW`, fazendo o CMD aparecer durante a Home e a validação para reprodução.
+
 ## Release Go/Wails v3.0.3
 
 - Publicada em 21/10/2026 pelo workflow `39689059968`; os testes Windows/Ubuntu, os smokes Windows/AppImage, a assinatura Sigstore e a publicação passaram.

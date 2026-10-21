@@ -390,14 +390,14 @@ func (q *Queue) hls(ctx context.Context, id, u, path string) error {
 	if probe, err := platform.Binary("ffprobe"); err == nil {
 		pc, done := context.WithTimeout(ctx, 20*time.Second)
 		command := exec.CommandContext(pc, probe, "-v", "error", "-allowed_extensions", "ALL", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", u)
-		platform.Hide(command)
+		platform.HideConsole(command)
 		if b, err := command.Output(); err == nil {
 			duration, _ = strconv.ParseFloat(strings.TrimSpace(string(b)), 64)
 		}
 		done()
 	}
 	cmd := exec.CommandContext(ctx, bin, "-nostdin", "-hide_banner", "-loglevel", "error", "-xerror", "-allowed_extensions", "ALL", "-i", u, "-map", "0:v:0?", "-map", "0:a:0?", "-c", "copy", "-progress", "pipe:1", "-n", path)
-	platform.Hide(cmd)
+	platform.HideConsole(cmd)
 	out, e := cmd.StdoutPipe()
 	if e != nil {
 		return e

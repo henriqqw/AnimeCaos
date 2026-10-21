@@ -16,7 +16,7 @@ func revealFileNative(target string) error {
 	} else {
 		command = exec.Command("xdg-open", filepath.Dir(target))
 	}
-	Hide(command)
+	HideConsole(command)
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("não foi possível abrir a pasta do arquivo: %w", err)
 	}

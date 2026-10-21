@@ -10,10 +10,6 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func Hide(c *exec.Cmd) {
-	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
-}
-
 // HideConsole prevents console-subsystem tools from opening a console while
 // leaving GUI windows created by the child process visible. HideWindow also
 // sets STARTF_USESHOWWINDOW/SW_HIDE and can hide a GUI child's initial window.

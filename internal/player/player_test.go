@@ -25,7 +25,7 @@ func TestMPVIntegration(t *testing.T) {
 	}
 	fixture := filepath.Join(t.TempDir(), "audio-video.mp4")
 	cmd := exec.Command(ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=24", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100", "-t", "3", "-c:v", "libx264", "-c:a", "aac", "-y", fixture)
-	platform.Hide(cmd)
+	platform.HideConsole(cmd)
 	if b, e := cmd.CombinedOutput(); e != nil {
 		t.Fatalf("fixture: %s %v", b, e)
 	}

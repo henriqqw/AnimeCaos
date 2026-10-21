@@ -94,7 +94,7 @@ func startRestartHelper() error {
 	args := []string{restartAfterExitArg, strconv.Itoa(os.Getpid()), "--"}
 	args = append(args, os.Args[1:]...)
 	command := exec.Command(executable, args...)
-	platform.Hide(command)
+	platform.HideConsole(command)
 	if err := command.Start(); err != nil {
 		return fmt.Errorf("não foi possível preparar a reinicialização do AnimeCaos: %w", err)
 	}

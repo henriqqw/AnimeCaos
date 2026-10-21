@@ -69,7 +69,7 @@ func startSeleniumSession(parent context.Context, pageURL, driverPath string, pr
 	port := listener.Addr().(*net.TCPAddr).Port
 	_ = listener.Close()
 	cmd := exec.CommandContext(ctx, driverPath, "--host", "127.0.0.1", "--port", strconv.Itoa(port))
-	platform.Hide(cmd)
+	platform.HideConsole(cmd)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("não foi possível iniciar o GeckoDriver: %w", err)
 	}
@@ -242,12 +242,14 @@ func stopWebDriverProcessTree(pid int) error {
 		killCtx, cancel := context.WithTimeout(context.Background(), webDriverTreeKillTimeout)
 		defer cancel()
 		stop := exec.CommandContext(killCtx, "taskkill", "/T", "/F", "/PID", strconv.Itoa(pid))
-		platform.Hide(stop)
+		platform.HideConsole(stop)
 		stop.Stdout = io.Discard
 		stop.Stderr = io.Discard
 		return stop.Run()
 	}
-	return exec.Command("kill", "-KILL", strconv.Itoa(pid)).Run()
+	stop := exec.Command("kill", "-KILL", strconv.Itoa(pid))
+	platform.HideConsole(stop)
+	return stop.Run()
 }
 
 func seleniumFirefoxArgs() []string {

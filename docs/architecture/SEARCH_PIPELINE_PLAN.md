@@ -49,7 +49,7 @@ Proposta inicial de limites: seis verificações globais, duas por provedor e no
 
 - Usar HTTP e parser de manifesto como caminho rápido; reconhecer HLS pela resposta, mesmo quando a extensão engana.
 - Tentar Selenium/Firefox somente quando o HTML não expuser o player. Limitar o navegador ao contexto e ao prazo da fonte; falha de challenge conta como indisponibilidade.
-- Confirmar resposta de mídia e variante HLS. Para arquivo direto, usar FFprobe quando instalado; ausência de metadados não deve ser apresentada como resolução confirmada.
+- Confirmar resposta de mídia e variante HLS. Para arquivo direto, usar FFprobe quando instalado; ausência de metadados não deve ser apresentada como resolução confirmada. No Windows, o processo do FFprobe usa `CREATE_NO_WINDOW`, assim como os demais subprocessos do app.
 - Não abrir um processo MPV para cada card. MPV continua reservado à reprodução escolhida; testes E2E por provedor cobrem codecs, avanço e seek.
 - Para provar disponibilidade, parar de procurar fontes assim que uma fonte válida for encontrada. A qualidade pode ser refinada por verificações restantes dentro do mesmo orçamento, sem atrasar a entrada do card no lote.
 

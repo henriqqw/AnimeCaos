@@ -34,6 +34,7 @@ func revealFileNative(target string) error {
 	_, _, _ = allowSetForegroundWindow.Call(^uintptr(0))
 
 	command := exec.Command("explorer.exe", folder)
+	HideConsole(command)
 	if err := command.Start(); err != nil {
 		return fmt.Errorf("não foi possível abrir a pasta do arquivo: %w", err)
 	}

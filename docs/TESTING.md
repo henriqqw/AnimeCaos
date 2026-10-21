@@ -1,5 +1,24 @@
 # Testes e validação
 
+## Janelas de console dos subprocessos — 21/10/2026
+
+A inspeção localizou `media.Inspect`, chamada pelo preflight da busca e pela
+seleção de stream antes da reprodução. Ela iniciava `ffprobe.exe` sem
+`CREATE_NO_WINDOW`, causando a janela de CMD relatada. A chamada agora usa
+`platform.HideConsole`. A auditoria dos pontos `exec.Command`/`CommandContext`
+também padronizou a ocultação dos processos auxiliares do app; operações de
+interface como abrir o navegador, o Explorer e o MPV continuam exibindo suas
+janelas gráficas.
+
+| Comando/inspeção | Resultado |
+|---|---|
+| Busca de todos os pontos de criação de processos Go (`exec.Command`, `exec.CommandContext`, `SysProcAttr`) | Chamadas do runtime revisadas; o comando Unix `kill` só é usado fora do Windows. O utilitário de empacotamento mantém saída redirecionada ao terminal principal. |
+| `gofmt -w` nos arquivos Go modificados | Passou. |
+| `go test ./...` | Passou em todos os pacotes no Windows amd64. |
+| `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado. |
+| `git diff --check` | Passou; Git pode avisar sobre a normalização LF/CRLF no checkout Windows. |
+| Build/instalador de release | Não executado; a correção precisa entrar em uma próxima release para chegar ao app do seu amigo. |
+
 ## Fallback do catálogo da Home — 21/10/2026
 
 - `POST https://graphql.anilist.co` com uma consulta GraphQL de descoberta — HTTP 403; a resposta informa que a API está temporariamente desativada por problemas de estabilidade.

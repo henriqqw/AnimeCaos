@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 
 	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
@@ -28,7 +27,7 @@ func WebViewOptions() (*windows.Options, error) {
 		cmd := exec.Command("icacls.exe", path,
 			"/grant", "*S-1-15-2-2:(OI)(CI)(RX)", "*S-1-15-2-1:(OI)(CI)(RX)",
 			"/T", "/C")
-		cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
+		HideConsole(cmd)
 		if output, runErr := cmd.CombinedOutput(); runErr != nil {
 			return nil, fmt.Errorf("configurar acesso do WebView2 empacotado: %w (%s)", runErr, string(output))
 		}

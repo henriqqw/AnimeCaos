@@ -94,6 +94,7 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/providers/selenium.go` | Sessão WebDriver local para ler iframes/vídeos/JWPlayer renderizados, encerrar a árvore do GeckoDriver com limite e bloquear pop-ups |
 | `internal/netx/advertising.go` | Lista de hosts conhecidos de anúncios/rastreadores e guarda contra redirecionamento HTTP a esses destinos |
 | `internal/media/hls.go`, `gateway.go` | Rejeição de redirects de anúncios em manifesto, validação de mídia e proxy local usado pelo MPV |
+| `internal/media/probe.go` | Inspeção opcional de codecs, faixa de áudio e dimensões com FFprobe; execução sem janela de console no Windows |
 | `internal/providers/selenium_test.go` | Preferências do Firefox, envelope WebDriver e inspeção de players renderizados |
 | `internal/providers/blogger.go` | Parser RPC e renditions Blogger |
 | `internal/providers/catalog.go` | Busca paralela, cache curto de páginas por consulta/provedor, aliases, expansão de temporada/ano com filtro de identidade, metadados visuais aplicados apenas a IDs canônicos exatos, correspondência por sequência de palavras, ranking, deduplicação, variantes e correspondência segura de episódios entre fontes |
@@ -147,7 +148,7 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/player/player_test.go` | EOF natural, sessão, regra de 80% para episódio assistido e integração audiovisual opt-in |
 | `internal/player/offline_test.go` | Reprodução offline |
 | `internal/platform/system.go` | Diretórios, busca de binário, abertura no sistema e segurança de caminhos; encaminha revelação de arquivo para o adaptador nativo |
-| `internal/platform/process_windows.go`, `process_unix.go` | Inicialização de processos sem console; player, atualizador e helper de reinício preservam a visibilidade das janelas gráficas no Windows |
+| `internal/platform/process_windows.go`, `process_unix.go` | Configuração unificada `HideConsole` para subprocessos sem janela de console; janelas gráficas filhas permanecem visíveis no Windows |
 | `internal/platform/process_windows_test.go` | Confirma que `HideConsole` não passa estado `SW_HIDE` ao processo gráfico |
 | `internal/platform/reveal_windows.go`, `reveal_other.go` | Abre ou reutiliza a pasta no gerenciador nativo; no Windows localiza e ativa a janela do Explorer |
 | `internal/platform/window_position*.go` | Valida posição salva contra as áreas de trabalho dos monitores no Windows; teste da interseção da barra de título |

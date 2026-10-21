@@ -233,7 +233,7 @@ func newApplyCommand(helper, packagePath, target string, pid int) *exec.Cmd {
 	// Windows that directory is the install directory, and keeping it as the
 	// helper's current directory prevents renaming the directory during update.
 	cmd.Dir = filepath.Dir(filepath.Clean(target))
-	platform.Hide(cmd)
+	platform.HideConsole(cmd)
 	return cmd
 }
 func RunHelper(packagePath, target string, pid int) error {

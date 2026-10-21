@@ -50,7 +50,7 @@ func Open(target string) error {
 	default:
 		c = exec.Command("xdg-open", target)
 	}
-	Hide(c)
+	HideConsole(c)
 	if e := c.Start(); e != nil {
 		return e
 	}

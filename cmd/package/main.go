@@ -17,6 +17,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/henriqqw/animecaos/internal/platform"
 )
 
 type fileRecord struct {
@@ -33,6 +35,7 @@ func main() {
 }
 func command(dir, name string, args ...string) error {
 	cmd := exec.Command(name, args...)
+	platform.HideConsole(cmd)
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -217,7 +220,9 @@ func replaceReleaseFile(releaseDir, filename string) error {
 }
 
 func runtimeVersion(path string, args ...string) (string, error) {
-	output, err := exec.Command(path, args...).CombinedOutput()
+	cmd := exec.Command(path, args...)
+	platform.HideConsole(cmd)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("consultar versão de %s: %w (%s)", path, err, strings.TrimSpace(string(output)))
 	}

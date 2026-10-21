@@ -25,6 +25,13 @@ Revisão base de 20/10/2026; atualização em 21/10/2026 após as releases `v3.0
 
 ## Achados corrigidos nesta etapa
 
+### [P2] FFprobe abria console durante busca e validação de reprodução — corrigido no código; release pendente
+
+- **Evidência:** `internal/media/probe.go` iniciava FFprobe sem `CREATE_NO_WINDOW`. `media.Inspect` é chamado pelo preflight em `internal/app/availability.go` e pela resolução de stream em `internal/app/service.go`; o usuário confirmou que a janela mostrava `ffprobe.exe`.
+- **Impacto:** uma janela CMD aparecia brevemente durante a Home e ao validar episódios.
+- **Correção:** `media.Inspect` agora aplica `platform.HideConsole`. Os demais subprocessos do app também foram auditados e padronizados para essa configuração, preservando as janelas gráficas intencionais.
+- **Cobertura/limite:** `go test ./...` passou no Windows amd64. A configuração oculta o console no processo; a correção só chega às instalações existentes após uma próxima release.
+
 ### [P1] Janela de vídeo do MPV podia iniciar oculta no Windows — correção publicada na v3.0.1; validação visual pendente
 
 - **Evidência:** `internal/player/player.go` iniciava o MPV com `platform.Hide`. No Windows, esse helper define `HideWindow`, que configura a primeira janela gráfica do processo para `SW_HIDE`; o player ainda pode decodificar áudio e responder pelo IPC sem exibir o vídeo.

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/henriqqw/animecaos/internal/domain"
+	"github.com/henriqqw/animecaos/internal/platform"
 )
 
 type Info struct {
@@ -60,7 +61,9 @@ func Inspect(ctx context.Context, stream domain.Stream) (Info, error) {
 		}
 		args = append(args[:len(args)-2], append([]string{"-headers", headers.String()}, args[len(args)-2:]...)...)
 	}
-	output, err := exec.CommandContext(ctx, path, args...).CombinedOutput()
+	command := exec.CommandContext(ctx, path, args...)
+	platform.HideConsole(command)
+	output, err := command.CombinedOutput()
 	if err != nil {
 		return Info{}, fmt.Errorf("ffprobe: %w", err)
 	}

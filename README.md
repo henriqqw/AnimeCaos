@@ -2,8 +2,6 @@
 
 ![Banner do AnimeCaos](assets/readme-banner.png)
 
-Capa de perfil para X: [baixar PNG 1500 × 500](assets/x-profile-banner.png).
-
 <p align="center">
   <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.0">⬇️ Baixar v3.0.0</a>
   · <a href="https://www.animecaos.xyz/">🌐 Site oficial</a>

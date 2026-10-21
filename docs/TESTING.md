@@ -1,5 +1,13 @@
 # Testes e validação
 
+## Banners do GitHub e do X — 21/10/2026
+
+- Revisão visual direta de `assets/readme-banner.png` e `assets/x-profile-banner.png` — concluída.
+- Dimensões da capa X — conferidas: 1500 × 500 px.
+- `git diff --check` — passou; os avisos de conversão CRLF existentes não indicaram erros de whitespace.
+
+O X recomenda 1500 × 500 px para cabeçalhos e informa que até 60 px das bordas superior e inferior podem ser cortados em alguns casos. A capa mantém lettering e texto fora do canto inferior esquerdo, ocupado pela sobreposição da foto de perfil. A guia dimensional foi consultada em [Ajuda oficial do X](https://help.x.com/en/managing-your-account/common-issues-when-uploading-profile-photo.html).
+
 ## Splash animada e reinício em desenvolvimento — 20/10/2026
 
 O PNG de poster foi removido da splash. O HTML antecipa o carregamento do WebM;

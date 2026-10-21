@@ -29,9 +29,13 @@ Mapa conferido em 20/10/2026. Atualize junto com mudanças de responsabilidade, 
 | `build/windows/wails.exe.manifest` | Manifesto do executável Windows |
 | `assets/icons/icon.png`, `assets/icons/icon.ico` | Fonte do ícone quadrado da janela e dos pacotes |
 | `assets/icons/wordmark.png` | Lettering AnimeCaos recortado com fundo transparente |
+| `assets/readme-banner.png` | Banner de marca do README com slogan em lettering pixelado e retículas/linhas de mangá discretas |
+| `assets/x-profile-banner.png` | Capa de perfil do AnimeCaos no X, exportada em 1500 × 500 px com área inferior esquerda reservada para a foto de perfil |
+| `assets/readme/` | Capturas da Home, busca, detalhes, lista, histórico, downloads e catálogo/leitor de mangás exibidas no README |
+| `assets/x-profile-banner.png` | Banner horizontal da identidade AnimeCaos para perfil social |
 | `public/icon.png`, `public/icon.ico` | Ícones copiados para pacotes |
 | `assets/screenshots/` | Capturas usadas como material visual do projeto; não são telas do runtime |
-| `README.md`, `CHANGELOG.md` | Apresentação, comandos de entrada e histórico da aplicação Go |
+| `README.md`, `CHANGELOG.md` | Apresentação do app, galeria de telas, instalação, uso, arquitetura e histórico da aplicação Go |
 | `AGENTS.md` | Regras de trabalho e atualização da documentação para futuras sessões |
 | `docs/architecture/SEARCH_PIPELINE_PLAN.md` | Arquitetura, comportamento implementado e próximos alvos para busca em lote, latência, identidade e preflight |
 | `docs/architecture/CATALOG_EXPANSION.md` | Contrato, registro, fluxo e critérios para integrar novos provedores de anime |

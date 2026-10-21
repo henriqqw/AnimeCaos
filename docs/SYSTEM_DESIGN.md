@@ -26,7 +26,9 @@ Status: a especificação orienta o visual e vários padrões já estão present
 
 Usar a marca AnimeCaos em `assets/icons/icon.png` e `assets/icons/wordmark.png`. O ícone quadrado preserva a arte enviada; o lettering é creme sobre transparência e aparece na sidebar expandida e na tela de carregamento. A cópia web fica em `frontend/public/`. Os antigos `public/zinnes_logo.webp` e `assets/zinnes_logo.webp` foram arquivados em `Legacy/` porque pertencem à Zinnes e não são a identidade do aplicativo.
 
-Preservar o desenho e a proporção das letras. A versão da interface remove o fundo vermelho e mantém os vazios internos das letras transparentes; no tema claro, o lettering é invertido para manter contraste. O ícone quadrado usa o arquivo original como fundo da janela/taskbar. Não deformar o lettering nem acrescentar efeitos.
+Preservar o desenho e a proporção das letras. A versão da interface remove o fundo vermelho e mantém os vazios internos das letras transparentes; no tema claro, o lettering é invertido para manter contraste. O ícone quadrado usa o arquivo original como fundo da janela/taskbar. Nas aplicações do lettering na interface, não deformar a marca nem acrescentar efeitos.
+
+Os banners de divulgação podem usar lettering pixelado no slogan e efeitos gráficos de mangá com baixa densidade, sem alterar a marca do aplicativo. `assets/readme-banner.png` usa as três ações “Descubra. Organize. Assista.”; `assets/x-profile-banner.png` mantém os elementos importantes na faixa central e deixa o canto inferior esquerdo livre para a sobreposição da foto de perfil. O cabeçalho do X usa 1500 × 500 px; o serviço informa que até 60 px do topo ou da base podem ser cortados em algumas exibições ([ajuda oficial do X](https://help.x.com/en/managing-your-account/common-issues-when-uploading-profile-photo.html)).
 
 ### Tokens
 

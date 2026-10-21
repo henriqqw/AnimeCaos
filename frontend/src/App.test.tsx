@@ -180,6 +180,17 @@ async function searchScreen() {
   return screen.getAllByRole("searchbox", { name: "Buscar animes" })[0];
 }
 describe("interface funcional", () => {
+  it("mostra o fallback do catálogo da Home com o estilo de aviso e a chibi", async () => {
+    const warning = "AniList indisponível; exibindo catálogo do MyAnimeList.";
+    vi.mocked(api.Discover).mockResolvedValue({ trending: [], seasonal: [], warning });
+
+    const { container } = await renderReadyApp();
+    const notice = await screen.findByText(warning);
+
+    expect(notice.closest('[role="status"]')?.classList.contains("alert")).toBe(true);
+    expect(container.querySelector(".home-catalog-warning .unexpected-error-mascot")).toBeTruthy();
+  });
+
   it("mostra descoberta de mangás no padrão da Home e filtra uma categoria", async () => {
     const popular = { id: "popular-1", title: "One Piece", description: "Aventura no mar", cover: "", banner: "", status: "ongoing", languages: ["pt-br"] } as Manga;
     const result = { id: "genre-1", title: "Dandadan", description: "Mistério e ação", cover: "", status: "ongoing", languages: ["pt-br"] } as Manga;

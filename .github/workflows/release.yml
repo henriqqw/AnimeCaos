@@ -370,5 +370,14 @@ jobs:
           Instalações até a v3.0.2 carregam o helper antigo e precisam executar o setup da v3.0.3 uma vez. Depois disso, as atualizações automáticas usam o helper corrigido.
           EOF
           fi
+          if [ "$tag" = "v3.0.4" ]; then
+            cat >> release/release-notes.md <<'EOF'
+
+          ### Correções da v3.0.4
+
+          - O `ffprobe.exe` e os demais subprocessos do app não abrem janelas de console no Windows; as janelas gráficas do MPV, do navegador e do Explorer continuam visíveis.
+          - O aviso de fallback AniList/MyAnimeList na Home agora usa o mesmo estilo visual da mensagem 403, com a chibi do AnimeCaos.
+          EOF
+          fi
           gh release edit "$tag" --notes-file release/release-notes.md
           gh release edit "$tag" --draft=false

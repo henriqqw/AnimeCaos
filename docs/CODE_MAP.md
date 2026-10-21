@@ -22,7 +22,7 @@ Mapa conferido em 21/10/2026. Atualize junto com mudanças de responsabilidade, 
 | `deploy/go/verify-appimage.sh` | Testa os MPV/FFmpeg/FFprobe/Firefox/GeckoDriver extraídos do AppImage, iframe JS, abertura, aplicação do update e preservação de `state.db` |
 | `deploy/go/bootstrap-appimage-tools.sh` | Obtém ferramentas AppImage com versões e SHA-256 fixados |
 | `scripts/write-release-manifest.ps1` | Gera inventário SHA-256 e tamanho dos arquivos do stage após assinatura |
-| `.github/workflows/ci.yml`, `.github/workflows/release.yml` | CI multiplataforma, builds de release com smoke tests, checksums assinados com Sigstore e Authenticode Windows quando os secrets de certificado existem; a release registra explicitamente quando Windows não tem assinatura Authenticode |
+| `.github/workflows/ci.yml`, `.github/workflows/release.yml` | CI multiplataforma, builds de release com smoke tests, notas específicas por versão, checksums assinados com Sigstore e Authenticode Windows quando os secrets de certificado existem; a release registra explicitamente quando Windows não tem assinatura Authenticode |
 | `THIRD-PARTY-NOTICES.md`, `licenses/` | Avisos, textos de licença e fontes/metadados de dependências distribuídas |
 | `build/appicon.png`, `build/windows/icon.ico` | Recursos-fonte de ícone do Wails |
 | `build/windows/info.json` | Metadados de identidade usados pela integração Windows do Wails |

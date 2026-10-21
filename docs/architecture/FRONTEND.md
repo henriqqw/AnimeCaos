@@ -23,7 +23,7 @@ Não há roteador de URL no frontend. `App.tsx` mantém o estado `Route` e o his
 | `settings` | Configurações | Seções abertas com índice contextual, switches acessíveis, resumo das contas e salvamento automático | `SaveSettings`, diálogos nativos, cache e atualização |
 | `logs` | Diagnóstico | Dependências e logs técnicos | `Diagnose`, estado de logs recebido pela UI |
 
-Quando a AniList está indisponível, a Home pode receber as prateleiras do catálogo público do MyAnimeList. Um aviso identifica a fonte alternativa; os cards continuam levando à busca local por título.
+Quando a AniList está indisponível, a Home pode receber as prateleiras do catálogo público do MyAnimeList. O aviso usa o mesmo visual do alerta de erro 403, com a chibi `unexpectedError` e a barra de destaque, mas mantém `role="status"` por informar um fallback já disponível; os cards continuam levando à busca local por título.
 
 Contas e Diagnóstico não aparecem como item primário da navegação; Configurações resume o estado das integrações e abre a rota Contas para gerenciá-las. O ícone de Configurações é uma engrenagem. Configurações é uma coluna contínua com índice que navega por Aparência, Reprodução, Downloads, Integrações, Manutenção e Feedback. Os grupos mantêm controles relacionados em duas colunas quando há largura suficiente e empilham em janelas compactas. O índice indica a seção visível durante a rolagem; links quebram linha sem cortar rótulos. Rotas são estado interno, não caminhos HTTP.
 

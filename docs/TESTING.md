@@ -1,5 +1,25 @@
 # Testes e validação
 
+## Validação local da v3.0.4 — 21/10/2026
+
+| Comando | Resultado |
+|---|---|
+| `go test ./...` com `GOCACHE=D:\AnimeCaos\.task-cache\release-go-cache-v304` e `TEMP/TMP=D:\AnimeCaos\.task-cache\release-go-temp-v304` | Passou em todos os pacotes no Windows amd64. A primeira tentativa usando o temporário padrão falhou porque `C:` estava sem espaço livre; a repetição direcionou os artefatos temporários para `D:`. |
+| `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado. |
+| `npm exec -- tsc --noEmit` (em `frontend/`) | Passou, sem diagnósticos. |
+| `npm test -- --run` (em `frontend/`) | Passou: 1 arquivo e 35 testes. |
+
+## Aviso de fallback do catálogo da Home — 21/10/2026
+
+O aviso “AniList indisponível; exibindo catálogo do MyAnimeList.” agora reutiliza
+o visual da mensagem 403, com a chibi `unexpectedError`, mantendo `role="status"`.
+O teste DOM verifica o texto, o estilo compartilhado e a arte da mascote.
+
+| Comando | Resultado |
+|---|---|
+| `cd frontend; npm exec -- tsc --noEmit` | Passou, sem diagnósticos. |
+| `cd frontend; npm test -- --run` | Passou: 1 arquivo e 35 testes. |
+
 ## Janelas de console dos subprocessos — 21/10/2026
 
 A inspeção localizou `media.Inspect`, chamada pelo preflight da busca e pela

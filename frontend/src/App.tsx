@@ -1078,7 +1078,7 @@ function Home({
   const a = featured[spot % Math.max(1, featured.length)];
   return (
     <>
-      {data.warning && <p role="status">{data.warning}</p>}
+      {data.warning && <div role="status" className="alert home-catalog-warning"><MascotArt asset="unexpectedError" className="unexpected-error-mascot" /><span>{data.warning}</span></div>}
       {a && (
         <section
           className="spotlight"

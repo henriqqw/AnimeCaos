@@ -49,7 +49,7 @@ A tela Diagnóstico pode mostrar caminhos locais e disponibilidade de ferramenta
 `cmd/package` prepara o stage portátil. `deploy/go/build-appimage.sh` monta AppImage Linux e `deploy/go/windows.iss` descreve o instalador Windows. Consulte [DISTRIBUTION.md](DISTRIBUTION.md) para dependências, limitações e formatos.
 
 ```powershell
-go run ./cmd/package -version 3.0.2
+go run ./cmd/package -version 3.0.4
 ```
 
 Esse comando executa build por padrão e exige dependências de mídia; `-skip-ui` só serve quando existe frontend compilado compatível. O script AppImage exige o stage e ferramentas nativas no host Linux. Testes unitários não são prova de instalação limpa ou de release pronta.

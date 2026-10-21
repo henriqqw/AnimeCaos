@@ -1,7 +1,8 @@
 # Changelog
 
-## Próxima versão
+## Release Go/Wails v3.0.4
 
+- O aviso de fallback da Home agora usa o visual do alerta 403, com a chibi de erro e a barra lateral; continua anunciado como status informativo.
 - Ocultadas as janelas de console de todos os subprocessos do app no Windows. A inspeção de mídia chamava `ffprobe.exe` sem `CREATE_NO_WINDOW`, fazendo o CMD aparecer durante a Home e a validação para reprodução.
 
 ## Release Go/Wails v3.0.3

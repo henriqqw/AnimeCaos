@@ -33,7 +33,7 @@ uma vez em `state.db`. Use `ANIMECAOS_DATA_DIR` para uma instalação isolada.
 Requer a versão do Go declarada em `go.mod` e Node.js/npm compatíveis com Vite/TypeScript travados no lockfile. No Windows, o empacotador executa a CLI Wails na mesma versão fixada em `go.mod`; isso gera os recursos PE de ícone, manifesto e versão antes de montar o ZIP e o instalador. O `go run` baixa a CLI se necessário. Na raiz:
 
 ```
-go run ./cmd/package -version 3.0.2
+go run ./cmd/package -version 3.0.4
 ```
 
 Sem `-skip-ui`, o empacotador executa `npm ci` e `npm run build` antes de compilar o executável. `main.go` incorpora `frontend/dist` no app, incluindo a tela e as imagens da splash; portanto, o pacote padrão apresenta a splash ao abrir. `-skip-ui` reutiliza o diretório compilado existente e só deve ser usado quando ele já contém a versão desejada da interface.
@@ -101,7 +101,7 @@ de mídia estão em [`licenses/SOURCE-OFFERS.md`](../licenses/SOURCE-OFFERS.md).
   ela não substitui o certificado Authenticode nem elimina o aviso de editor
   desconhecido do Windows.
 - A versão da tag deve coincidir com `wails.json` e com o `-version` do pacote.
-  A versão padrão atual é `3.0.3`. O atualizador verifica a release no começo
+  A versão padrão atual é `3.0.4`. O atualizador verifica a release no começo
   da splash, usa um limite de 8 s para a consulta, baixa o pacote com limite de
   30 min, confere `SHA256SUMS` e aplica ZIP Windows/AppImage antes de liberar a
   interface. O fluxo não vale para `wails dev` ou Flatpak.

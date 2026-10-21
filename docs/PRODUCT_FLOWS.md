@@ -24,6 +24,7 @@ Estas regras descrevem o comportamento implementado. Para a hierarquia visual e 
 - Quando encontra uma versão mais nova, baixa o ZIP Windows ou AppImage correspondente, valida seu SHA-256 usando `SHA256SUMS` e aplica o pacote antes de liberar a interface. A barra da splash mostra o progresso do download. O helper substitui os arquivos e abre a nova versão; falha de verificação ou instalação libera a versão atual.
 - Flatpak continua gerenciado pelo sistema. `wails dev` não busca nem instala releases. O fluxo manual de Configurações continua disponível.
 - A release Windows `v2.0.0` antecede a aplicação Go/Wails, mas o atualizador Python legado consulta a mesma API e seleciona o ZIP Windows. Na primeira release 3.x, ele pede confirmação e copia o ZIP para a pasta existente; depois disso, o atualizador Go/Wails instala automaticamente as próximas versões 3.x. O atualizador legado não valida SHA-256; o atualizador Go/Wails valida o pacote antes da instalação. A edição Flatpak antiga não consegue instalar AppImage e precisa migrar manualmente.
+- Ao retomar um vídeo baixado pelo histórico no Windows, caminhos longos e aliases 8.3 são reconhecidos pelo arquivo real (`os.SameFile`), para preservar o ponto de reprodução após a deduplicação do histórico local.
 
 ## Descobrir, pesquisar e abrir um anime
 

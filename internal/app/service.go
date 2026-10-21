@@ -1090,11 +1090,26 @@ func (s *Service) completedDownload(path string) (domain.Download, bool) {
 		if item.Kind != "anime" || item.Status != "done" || item.Path == "" {
 			continue
 		}
-		if normalizedLocalPath(item.Path) == path && item.Anime.Key() != ":" {
+		if sameLocalFile(item.Path, path) && item.Anime.Key() != ":" {
 			return item, true
 		}
 	}
 	return domain.Download{}, false
+}
+
+func sameLocalFile(left, right string) bool {
+	if normalizedLocalPath(left) == normalizedLocalPath(right) {
+		return true
+	}
+	leftInfo, err := os.Stat(left)
+	if err != nil {
+		return false
+	}
+	rightInfo, err := os.Stat(right)
+	if err != nil {
+		return false
+	}
+	return os.SameFile(leftInfo, rightInfo)
 }
 
 func localEpisode(download domain.Download, path string) domain.Episode {

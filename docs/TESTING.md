@@ -42,7 +42,7 @@ Go/Wails valida o pacote e passa a operar após a migração.
 | `cd frontend; npm exec -- tsc --noEmit` | Passou. |
 | `cd frontend; npm test -- --run` | Passou: 34/34. |
 | Parser YAML do Python (`yaml.safe_load`) nos dois workflows | Passou depois de corrigir a indentação das notas da release. |
-| CI remoto após corrigir a ordem de build do frontend | Ainda não executado nesta revisão; requer commit/push. |
+| CI `39529315094` no GitHub | Ubuntu passou em Go, `-race`, TypeScript e Vitest. Windows passou instalação/build frontend e falhou em `TestHistoryMergesDownloadedPlaybackAndResumesOffline`: alias 8.3 `RUNNER~1` e caminho longo identificavam o mesmo arquivo, mas a associação do download comparava apenas texto. Corrigido com `os.SameFile`; CI será repetido no próximo commit. |
 | Workflow de release e smoke de instalação em Windows/Linux | Ainda não executados nesta revisão; requer a tag `v3.0.0`. |
 
 Antes da pausa do build, o empacotador Windows já havia escrito um ZIP

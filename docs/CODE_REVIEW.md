@@ -25,6 +25,13 @@ Data: 20/10/2026. O escopo desta revisão também inclui os pacotes locais Windo
 
 ## Achados corrigidos nesta etapa
 
+### [P1] Janela de vídeo do MPV podia iniciar oculta no Windows — correção preparada, release pendente
+
+- **Evidência:** `internal/player/player.go` iniciava o MPV com `platform.Hide`. No Windows, esse helper define `HideWindow`, que configura a primeira janela gráfica do processo para `SW_HIDE`; o player ainda pode decodificar áudio e responder pelo IPC sem exibir o vídeo.
+- **Impacto:** a interface do AnimeCaos continua mostrando o episódio e o progresso, mas o usuário só ouve o áudio e não vê a janela separada do MPV.
+- **Correção:** o player agora usa `HideConsole`, que mantém `CREATE_NO_WINDOW` para não abrir console e não altera o estado inicial das janelas gráficas. O MPV/DLLs já são incluídos pelos pacotes de distribuição.
+- **Limite:** a alteração ainda precisa de validação manual numa execução Windows empacotada e publicação de nova release. A `v3.0.0` instalada continua com o comportamento anterior até receber uma versão posterior.
+
 ### [P2] Encerramento curto podia marcar episódio como assistido na sincronização — corrigido
 
 - **Evidência:** `internal/player/player.go` definia `Watched` depois de 30 s de processo ativo, sem considerar duração ou posição do vídeo. `syncWatched` então gravava o número inteiro do episódio no AniList/MAL.

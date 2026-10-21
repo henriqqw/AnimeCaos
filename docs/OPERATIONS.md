@@ -9,6 +9,8 @@
 
 O localizador de executáveis procura primeiro no diretório do pacote e em `bin/`, depois no `PATH`. A documentação não pressupõe que esses programas estejam instalados na máquina.
 
+No Windows, o MPV é iniciado sem console, mas sem ocultar a primeira janela gráfica do processo. A opção `HideWindow` de `SysProcAttr` também define a exibição inicial como `SW_HIDE` e pode deixar o áudio/IPC do MPV funcionando sem mostrar o vídeo.
+
 ## Abrir o aplicativo em desenvolvimento
 
 ```powershell
@@ -47,7 +49,7 @@ A tela Diagnóstico pode mostrar caminhos locais e disponibilidade de ferramenta
 `cmd/package` prepara o stage portátil. `deploy/go/build-appimage.sh` monta AppImage Linux e `deploy/go/windows.iss` descreve o instalador Windows. Consulte [DISTRIBUTION.md](DISTRIBUTION.md) para dependências, limitações e formatos.
 
 ```powershell
-go run ./cmd/package -version 3.0.0
+go run ./cmd/package -version 3.0.1
 ```
 
 Esse comando executa build por padrão e exige dependências de mídia; `-skip-ui` só serve quando existe frontend compilado compatível. O script AppImage exige o stage e ferramentas nativas no host Linux. Testes unitários não são prova de instalação limpa ou de release pronta.

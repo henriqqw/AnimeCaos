@@ -1,6 +1,6 @@
 # Mapa do código
 
-Mapa conferido em 20/10/2026. Atualize junto com mudanças de responsabilidade, telas, métodos ou scripts. O conteúdo de `Legacy/` não entra no runtime Go.
+Mapa conferido em 21/10/2026. Atualize junto com mudanças de responsabilidade, telas, métodos ou scripts. O conteúdo de `Legacy/` não entra no runtime Go.
 
 ## Raiz e empacotamento
 
@@ -113,6 +113,7 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/providers/sushi_test.go` | Busca/detalhes, AJAX com `data-id`, URL HLS em `srcdoc` e fallback para player embutido sem opção AJAX |
 | `internal/providers/live_catalog_test.go` | Busca, detalhes, grupos de episódios e validação live opt-in de manifesto HLS/arquivo em amostras do início, meio e fim |
 | `internal/integrations/anilist.go` | GraphQL, descoberta, aliases, consultas de título em lote/cache AniList (incluindo ano, formato e episódios), coalescência e tradução |
+| `internal/integrations/mal_catalog.go` | Descoberta pública MyAnimeList para ranking e temporada, conversão de metadados, cache e rate gate |
 | `internal/integrations/accounts.go` | OAuth AniList/MAL/Discord, perfil, logout e sync AniList/MAL; Discord usa PKCE e cofre seguro |
 | `internal/integrations/accounts_test.go` | Fixtures HTTP para AniList, OAuth/renovação MAL, OAuth Discord/PKCE, recusa/cancelamento e atualização de progresso |
 | `internal/integrations/discord.go` | Rich Presence baseada em estado do MPV, relógio/pausa/seek, conexão e heartbeat |
@@ -146,6 +147,7 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/player/player_test.go` | EOF natural, sessão, regra de 80% para episódio assistido e integração audiovisual opt-in |
 | `internal/player/offline_test.go` | Reprodução offline |
 | `internal/platform/system.go` | Diretórios, busca de binário, abertura no sistema e segurança de caminhos; encaminha revelação de arquivo para o adaptador nativo |
+| `internal/platform/process_windows.go`, `process_unix.go` | Inicialização de processos sem console; o player preserva a visibilidade das janelas gráficas no Windows |
 | `internal/platform/reveal_windows.go`, `reveal_other.go` | Abre ou reutiliza a pasta no gerenciador nativo; no Windows localiza e ativa a janela do Explorer |
 | `internal/platform/window_position*.go` | Valida posição salva contra as áreas de trabalho dos monitores no Windows; teste da interseção da barra de título |
 | `internal/platform/webview.go`, `webview_windows.go`, `webview_other.go`, `webview_runtime_windows_test.go` | Descoberta do WebView2 junto ao executável, configuração do Wails para usar o runtime empacotado, ACL AppContainer e validação pelo loader Wails no Windows |

@@ -267,7 +267,7 @@ func buildDesktopExecutable(root, output, tags, ldflags string) error {
 }
 
 func run() error {
-	version := flag.String("version", "3.0.0", "version")
+	version := flag.String("version", "3.0.1", "version")
 	skipUI := flag.Bool("skip-ui", false, "reuse compiled frontend")
 	flag.Parse()
 	root, e := os.Getwd()

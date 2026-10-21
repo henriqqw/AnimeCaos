@@ -2,7 +2,7 @@
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 stage="$(realpath "${1:?Informe o stage Linux gerado por go run ./cmd/package}")"
-version="${2:-3.0.0}"
+version="${2:-3.0.1}"
 tool="${LINUXDEPLOY:-$root/build/tools/linuxdeploy-x86_64.AppImage}"
 [[ "$stage" == "$root/release/stage-linux-"* && -f "$stage/AnimeCaos" ]] || { echo 'Stage Linux inválido' >&2; exit 1; }
 [[ "$version" =~ ^[0-9A-Za-z._-]+$ ]] || { echo 'Versão inválida' >&2; exit 1; }

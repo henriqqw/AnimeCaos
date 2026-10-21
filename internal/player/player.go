@@ -127,7 +127,7 @@ func (c *Controller) start(parent context.Context, url, mode, path string, start
 		args = append(args, testMPVArgs...)
 	}
 	cmd := exec.CommandContext(ctx, path, args...)
-	platform.Hide(cmd)
+	platform.HideConsole(cmd)
 	if e := cmd.Start(); e != nil {
 		cancel()
 		return e

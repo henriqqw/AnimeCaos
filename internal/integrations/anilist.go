@@ -24,6 +24,7 @@ type Metadata struct {
 	Store     *store.Store
 	URL       string
 	Gate      *netx.Gate
+	MAL       *MALCatalog
 	mu        sync.Mutex
 	pending   map[string][]lookupCall
 	scheduled bool
@@ -36,7 +37,8 @@ type Metadata struct {
 
 func NewMetadata(c *netx.Client, s *store.Store) *Metadata {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &Metadata{Client: c, Store: s, URL: "https://graphql.anilist.co", Gate: &netx.Gate{Interval: 2100 * time.Millisecond}, ctx: ctx, cancel: cancel, pending: map[string][]lookupCall{}, slots: make(chan struct{}, 3)}
+	mal := NewMALCatalog(c, s)
+	return &Metadata{Client: c, Store: s, URL: "https://graphql.anilist.co", Gate: &netx.Gate{Interval: 2100 * time.Millisecond}, MAL: mal, ctx: ctx, cancel: cancel, pending: map[string][]lookupCall{}, slots: make(chan struct{}, 3)}
 }
 func (m *Metadata) Query(ctx context.Context, q string, vars any, token string, out any) error {
 	if e := m.Gate.Wait(ctx); e != nil {
@@ -245,11 +247,41 @@ type Discovery struct {
 }
 
 func (m *Metadata) Discover(ctx context.Context) (Discovery, error) {
+	current, anilistErr := m.discoverAniList(ctx)
+	if anilistErr == nil && current.Warning == "" {
+		return current, nil
+	}
+	if ctx.Err() != nil {
+		return current, ctx.Err()
+	}
+
+	if m.MAL != nil {
+		fallback, malErr := m.MAL.Discover(ctx, time.Now())
+		if malErr == nil {
+			fallback.Warning = appendDiscoveryWarning(fallback.Warning, "AniList indisponível; exibindo catálogo do MyAnimeList.")
+			return fallback, nil
+		}
+		if anilistErr != nil {
+			return Discovery{}, fmt.Errorf("AniList e MyAnimeList indisponíveis: %w", errors.Join(anilistErr, malErr))
+		}
+		current.Warning = "AniList indisponível; exibindo cache local. MyAnimeList também não respondeu."
+		return current, nil
+	}
+	if anilistErr != nil {
+		return current, anilistErr
+	}
+	return current, nil
+}
+
+func (m *Metadata) discoverAniList(ctx context.Context) (Discovery, error) {
 	out := Discovery{Trending: []domain.Anime{}, Seasonal: []domain.Anime{}}
 	now := time.Now()
 	season := []string{"WINTER", "SPRING", "SUMMER", "FALL"}[(int(now.Month())-1)/3]
 	key := fmt.Sprintf("discover:%d:%s", now.Year(), season)
-	ok, stale := m.Store.CacheGet(key, &out)
+	ok, stale := false, false
+	if m.Store != nil {
+		ok, stale = m.Store.CacheGet(key, &out)
+	}
 	if ok && !stale {
 		return out, nil
 	}
@@ -278,8 +310,17 @@ func (m *Metadata) Discover(ctx context.Context) (Discovery, error) {
 		out.Seasonal = append(out.Seasonal, a.model())
 	}
 	out.Warning = ""
-	m.Store.CachePut(key, out, 4*time.Hour, 7*24*time.Hour)
+	if m.Store != nil {
+		_ = m.Store.CachePut(key, out, 4*time.Hour, 7*24*time.Hour)
+	}
 	return out, nil
+}
+
+func appendDiscoveryWarning(current, next string) string {
+	if current == "" {
+		return next
+	}
+	return current + " " + next
 }
 func (m *Metadata) Batch(ctx context.Context, titles []string) (map[string]domain.Anime, error) {
 	out := map[string]domain.Anime{}

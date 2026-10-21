@@ -352,6 +352,11 @@ jobs:
           fi
           cat >> release/release-notes.md <<'EOF'
 
+          ### Correções e catálogo
+
+          - No Windows, o MPV deixa de iniciar com a primeira janela gráfica escondida. Isso corrige o caso em que o áudio e o progresso avançavam sem mostrar o vídeo.
+          - A Home usa o catálogo público do MyAnimeList como fallback quando a AniList está indisponível e informa a fonte exibida.
+
           ### MyAnimeList
 
           O login de primeira conexão com MyAnimeList ainda não foi validado em uma conta real; a troca de token sem Client Secret retornou `invalid_client`. Segredos legados já salvos podem ser usados pelo aplicativo. A sincronização AniList não é afetada.

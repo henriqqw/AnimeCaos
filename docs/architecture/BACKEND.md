@@ -17,7 +17,7 @@
 | `internal/player` | Processo MPV, IPC e estado de playback |
 | `internal/netx` | Cliente HTTP, limites, timeout e erros de rede |
 | `internal/store` | SQLite, cache TTL, buckets e importação do legado |
-| `internal/platform` | Caminhos, processos e operações do sistema operacional, incluindo revelar arquivos no gerenciador nativo |
+| `internal/platform` | Caminhos e operações do sistema operacional; separa o ocultamento de console de processos auxiliares da visibilidade de janelas gráficas |
 | `internal/update` | Verificação, download validado, staging e helper de substituição |
 
 O detalhe por arquivo está em [CODE_MAP.md](../CODE_MAP.md).

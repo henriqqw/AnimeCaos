@@ -11,7 +11,7 @@ As assinaturas exatas de tipos estão em `frontend/src/api.ts`; os DTOs e tags J
 | Grupo | Métodos expostos |
 |---|---|
 | Inicialização e operação | `Initial() → {settings, version, accounts}`, `Settings() → Settings`, `SaveSettings(Settings)`, `Diagnose() → Diagnosis`, `Cancel(operationID)`, `ClearCache()` |
-| Catálogo | `Search(operationID, query, page, preferred?) → SearchResult`, `Discover(operationID) → Discovery`, `Details(operationID, Anime) → Detail`, `Preview(operationID, title, preferredAniListID) → Anime`, `Image(source) → data URL`, `SaveHistoryCover(key, cover)` |
+| Catálogo | `Search(operationID, query, page, preferred?) → SearchResult`, `Discover(operationID) → Discovery` (prateleiras e aviso quando usa fallback), `Details(operationID, Anime) → Detail`, `Preview(operationID, title, preferredAniListID) → Anime`, `Image(source) → data URL`, `SaveHistoryCover(key, cover)` |
 | Biblioteca e histórico | `Library() → Anime[]`, `Favorite(Anime, enabled)`, `History() → History[]`, `RemoveHistory(key)`, `Resume(operationID, key)` |
 | Reprodução | `Play(operationID, Anime, Episode[], index, resume)`, `PlayerCommand(command, value)`, `Adjacent(delta)`, `PlayLocal(path)`, `OfflinePages(path) → string[]` |
 | Downloads e arquivos | `Enqueue(Anime, Episode[]) → Download[]`, `Downloads() → Download[]`, `CancelDownload(id)`, `LocalFiles() → LocalFile[]`, `DeleteFile(path)`, `OpenDownloads()`, `OpenLocalFolder(path)` (abre a pasta do arquivo após validar que ele está dentro da biblioteca) |

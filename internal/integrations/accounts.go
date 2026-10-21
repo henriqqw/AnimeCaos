@@ -79,7 +79,11 @@ func NewAccounts(s *store.Store, m *Metadata) *Accounts {
 
 // NewAccountsWithCredentials allows tests to use an isolated in-memory vault.
 func NewAccountsWithCredentials(s *store.Store, m *Metadata, credentials securestore.Store) *Accounts {
-	return &Accounts{Store: s, Meta: m, Client: m.Client, MALGate: &netx.Gate{Interval: time.Second}, Credentials: credentials, MALOAuthBase: defaultMALOAuthBase, MALAPIBase: defaultMALAPIBase, DiscordOAuthBase: defaultDiscordOAuthBase, DiscordAuthorizeURL: defaultDiscordAuthorizeURL, DiscordAPIBase: defaultDiscordAPIBase, DiscordListenAddr: defaultDiscordListenAddr, DiscordRedirectURI: defaultDiscordRedirectURI, Open: platform.Open}
+	malGate := &netx.Gate{Interval: time.Second}
+	if m != nil && m.MAL != nil && m.MAL.Gate != nil {
+		malGate = m.MAL.Gate
+	}
+	return &Accounts{Store: s, Meta: m, Client: m.Client, MALGate: malGate, Credentials: credentials, MALOAuthBase: defaultMALOAuthBase, MALAPIBase: defaultMALAPIBase, DiscordOAuthBase: defaultDiscordOAuthBase, DiscordAuthorizeURL: defaultDiscordAuthorizeURL, DiscordAPIBase: defaultDiscordAPIBase, DiscordListenAddr: defaultDiscordListenAddr, DiscordRedirectURI: defaultDiscordRedirectURI, Open: platform.Open}
 }
 
 func (a *Accounts) clearLegacyCredential(key string) error {

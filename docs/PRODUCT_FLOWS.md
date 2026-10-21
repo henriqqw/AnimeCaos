@@ -28,7 +28,7 @@ Estas regras descrevem o comportamento implementado. Para a hierarquia visual e 
 
 ## Descobrir, pesquisar e abrir um anime
 
-1. A home combina descoberta do AniList com histórico local. Cards de catálogo consultam resumo detalhado sob demanda.
+1. A Home combina descoberta da AniList com histórico local. Se a consulta de descoberta falhar, busca o ranking por popularidade e a temporada atual no catálogo público do MyAnimeList e informa a fonte no aviso. Quando as duas APIs falham, mantém o cache local ainda válido de uma delas. Cards de catálogo consultam resumo detalhado sob demanda.
 2. Selecionar um destaque ou anime da home leva à pesquisa pelo título, conservando a referência canônica quando disponível.
 3. O catálogo pesquisa aliases relevantes nas fontes registradas. Para consultas que terminam em uma temporada explícita, também tenta o título base. O preflight deve validar E1 daquela temporada antes de associar a variante ao resultado; um título base que só tenha E1 de outra temporada continua oculto.
 4. A identidade canônica prefere títulos principais do AniList. Sinônimos só ajudam quando nenhum título principal corresponde e o sinônimo é único; um sinônimo ambíguo nunca transforma outro anime em resultado. Correspondências fuzzy fortes podem ser exibidas, mas não fundem identidades.

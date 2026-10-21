@@ -1,7 +1,11 @@
 # Changelog
 
-## Release Go/Wails v3.0.0
+## Release Go/Wails v3.0.1
 
+- No Windows, iniciar o MPV sem ocultar sua primeira janela gráfica; a configuração anterior permitia áudio e IPC com a janela de vídeo invisível.
+- A Home usa o catálogo público do MyAnimeList como fallback quando a AniList falha; um aviso informa a fonte, e o cache local ainda válido fica disponível se as duas APIs falharem.
+
+## Release Go/Wails v3.0.0
 - Builds instaladas Windows e AppImage Linux verificam releases ao abrir. A versão nova é baixada e validada por SHA-256 durante a splash e aplicada antes de liberar a interface; falhas de rede ou pacote deixam o app atual iniciar. `wails dev` e Flatpak não são atualizados por esse fluxo. Na migração da release v2.0.0 para Windows, o atualizador Python legado encontra o ZIP 3.x e pede confirmação; depois dessa atualização, a linha Go/Wails aplica as próximas versões durante a inicialização. Instalações Flatpak antigas devem migrar manualmente para o AppImage, pois o atualizador legado não sabe aplicar esse formato.
 - Retomada de downloads reconhece aliases de caminho do Windows pelo arquivo de destino, preservando a posição salva quando o runner ou o sistema usa caminhos 8.3.
 - Corrigido o CI que executava Go tests antes de criar `frontend/dist`; agora os runners instalam e compilam o frontend antes dos testes Go que incorporam seus assets.

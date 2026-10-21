@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-var Version = "3.0.0"
+var Version = "3.0.1"
 
 type Info struct {
 	Version     string `json:"version"`

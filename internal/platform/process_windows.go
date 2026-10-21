@@ -14,6 +14,13 @@ func Hide(c *exec.Cmd) {
 	c.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}
 }
 
+// HideConsole prevents console-subsystem tools from opening a console while
+// leaving GUI windows created by the child process visible. HideWindow also
+// sets STARTF_USESHOWWINDOW/SW_HIDE, which can hide MPV's first video window.
+func HideConsole(c *exec.Cmd) {
+	c.SysProcAttr = &syscall.SysProcAttr{CreationFlags: 0x08000000}
+}
+
 // WaitForProcessExit lets a restart helper wait until the current app releases
 // its single-instance mutex before starting the replacement process.
 func WaitForProcessExit(pid int) error {

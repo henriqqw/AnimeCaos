@@ -1,5 +1,14 @@
 # Testes e validação
 
+## Fallback do catálogo da Home — 21/10/2026
+
+- `POST https://graphql.anilist.co` com uma consulta GraphQL de descoberta — HTTP 403; a resposta informa que a API está temporariamente desativada por problemas de estabilidade.
+- `GET https://api.myanimelist.net/v2/anime/ranking?ranking_type=bypopularity&limit=2&fields=id,title,main_picture,alternative_titles,media_type,num_episodes,mean,start_date,synopsis` e `GET https://api.myanimelist.net/v2/anime/season/2026/fall?sort=anime_num_list_users&limit=2&fields=id,title,main_picture,alternative_titles,media_type,num_episodes,mean,start_date,synopsis`, via PowerShell `Invoke-RestMethod` com `X-MAL-CLIENT-ID` — ambas responderam HTTP 200 e duas entradas na amostra.
+- `gofmt -w internal/integrations/anilist.go internal/integrations/accounts.go internal/integrations/mal_catalog.go` — passou.
+- `cd frontend; npm exec -- tsc --noEmit` — a primeira execução apontou mocks sem o campo `source`, removido do contrato; a repetição passou sem diagnósticos.
+- `git diff --check` — passou; Git avisou sobre normalização LF/CRLF em arquivos alterados.
+- As sondagens confirmam disponibilidade e formato das APIs, não a execução do fallback dentro do AnimeCaos. Nenhuma suíte Go, frontend ou DOM foi executada nesta alteração; o fallback ainda não tem fixture dedicada.
+
 ## Banners do GitHub e do X — 21/10/2026
 
 - Revisão visual direta de `assets/readme-banner.png` e `assets/x-profile-banner.png` — concluída.
@@ -58,6 +67,19 @@ Go/Wails valida o pacote e passa a operar após a migração.
 | Workflow de release `39535484688` | Os testes Go/race/TypeScript/Vitest e o smoke do AppImage passaram; o ZIP Windows também foi construído. O smoke Windows falhou ao conferir o processo depois do update. O script agora espera o encerramento do app/WebView2 antes da troca, aguarda o relançamento e imprime `updater-error.log`/`startup-error.log` em caso de falha. Reexecução após essa correção ainda pendente. |
 | Workflow de release `39537337764` | Testes de release passaram nos dois sistemas e o AppImage passou pelo smoke test. O runner Windows recebeu HTTP 504 do feed do Chocolatey ao instalar `mpvio.install`, antes de empacotar. A etapa agora repete a instalação dos pacotes fixados até três vezes com espera progressiva; nova execução pendente. |
 | Workflow de release `39538571500` | Passou em `windows-latest` e `ubuntu-24.04`: Go/race/TypeScript/Vitest; empacotamento Windows e AppImage; smoke de instalação, atualização, reinício, desinstalação e preservação do banco no Windows; smoke do AppImage; checksums Sigstore; publicação da release `v3.0.0`. |
+
+## Validação local antes da tag v3.0.1 — 21/10/2026
+
+| Comando | Resultado |
+|---|---|
+| `go test ./...` | Passou em todos os pacotes Go. |
+| `cd frontend; npm exec -- tsc --noEmit` | Passou sem diagnósticos. |
+| `cd frontend; npm test -- --run` | Passou: 34 testes. |
+
+Esses comandos validam a árvore antes da tag. O workflow da release ainda deve
+repetir a validação em Windows e Ubuntu e construir os pacotes. O teste de
+integração do MPV usa saída de vídeo nula para medir decodificação/seek; a
+visibilidade da janela deve ser confirmada numa execução Windows com interface.
 
 ## Release pública v3.0.0 — 21/10/2026
 

@@ -86,8 +86,34 @@ flag de console oculto continua configurada e que `HideWindow` permanece falso.
 | Consulta a `AnimeCaos.exe` ativos e aos logs `startup-error.log`/`updater-error.log` locais | Não havia processo ativo nem logs no momento da investigação; a execução mostrada nas capturas não pôde ser inspecionada diretamente. |
 
 O teste confirma os atributos de inicialização, mas não substitui a inspeção da
-janela numa instalação empacotada. O workflow da próxima release repetirá os
-testes Windows/Ubuntu e os smokes dos pacotes.
+janela numa instalação empacotada. A pipeline v3.0.2 repetiu testes Windows e
+Ubuntu e os smokes dos pacotes; a atualização real de v3.0.1 para v3.0.2 não
+foi simulada pelos runners.
+
+## Release pública v3.0.2 — 21/10/2026
+
+A [release `v3.0.2`](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.2)
+foi publicada pelo [workflow `39685413215`](https://github.com/henriqqw/AnimeCaos/actions/runs/39685413215)
+às 22:35 UTC. Testes Windows/Ubuntu, smoke do AppImage, smoke Windows de
+instalação/update/reinício/desinstalação e preservação do banco, assinatura
+Sigstore e publicação passaram. `/releases/latest` retorna `v3.0.2`.
+
+| Arquivo | Tamanho | SHA-256 reportado pela API do GitHub |
+|---|---:|---|
+| `AnimeCaos-3.0.2-windows-amd64.zip` | 669.960.399 bytes | `8a3e948378343501d2a6f3cf23cfdbd402d6e63c827c34f19f7c949b1482bc48` |
+| `AnimeCaos-3.0.2-windows-setup.exe` | 489.772.650 bytes | `82196f34be01004d2d630fdba92d84f83672eb78afae32214bdbc29f9f724ad2` |
+| `AnimeCaos-3.0.2-x86_64.AppImage` | 342.968.824 bytes | `9f66f1f99525f2197e440c2add1ce2911d56ea9f18d86dcae1d652caaa382b0e` |
+
+O smoke de update dos runners usa o artefato desta própria release numa
+instalação descartável; não simula o salto de uma instalação v3.0.1 para
+v3.0.2. Usuários afetados pela janela oculta na v3.0.1 devem encerrar o grupo
+AnimeCaos no Gerenciador de Tarefas e instalar a v3.0.2 manualmente uma vez.
+
+`gh api repos/henriqqw/AnimeCaos/releases/latest --jq .tag_name` retornou
+`v3.0.2`. `Invoke-RestMethod -Uri
+'https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.2/SHA256SUMS'`
+retornou os três hashes acima, iguais aos digests SHA-256 dos assets reportados
+por `gh release view v3.0.2 --repo henriqqw/AnimeCaos --json url,isDraft,tagName,publishedAt,assets,body`.
 
 ## Validação local antes da tag v3.0.1 — 21/10/2026
 

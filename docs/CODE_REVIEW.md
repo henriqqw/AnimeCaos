@@ -1,6 +1,6 @@
 # Revisão técnica — AnimeCaos
 
-Revisão base de 20/10/2026; atualização em 21/10/2026 após a publicação da `v3.0.1`. O escopo inclui os pacotes Windows/Linux com Firefox/GeckoDriver, MPV/FFmpeg/FFprobe e WebView2, CI, instaladores, update e licenças. A revisão original recompilou ZIP, instalador e AppImage; o smoke local passou, mas o instalador não foi executado no perfil de desenvolvimento por já haver uma entrada com o mesmo AppId. A release `v3.0.1` e seus resultados estão registrados em [Distribuição](DISTRIBUTION.md) e [Testes](TESTING.md). A árvore Python antiga está preservada em `../Legacy/`.
+Revisão base de 20/10/2026; atualização em 21/10/2026 após as releases `v3.0.1` e `v3.0.2`. O escopo inclui os pacotes Windows/Linux com Firefox/GeckoDriver, MPV/FFmpeg/FFprobe e WebView2, CI, instaladores, update e licenças. A revisão original recompilou ZIP, instalador e AppImage; o smoke local passou, mas o instalador não foi executado no perfil de desenvolvimento por já haver uma entrada com o mesmo AppId. Os resultados das releases estão em [Distribuição](DISTRIBUTION.md) e [Testes](TESTING.md). A árvore Python antiga está preservada em `../Legacy/`.
 
 ### [P2] Windows sem Authenticode quando não há certificado configurado — risco conhecido
 

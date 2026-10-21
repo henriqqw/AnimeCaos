@@ -153,7 +153,8 @@ foi publicada pelo
 [workflow `39681768142`](https://github.com/henriqqw/AnimeCaos/actions/runs/39681768142)
 às 22:05 UTC. Os testes Windows/Ubuntu, o smoke do AppImage e a jornada
 Windows de instalação, atualização, reinício, desinstalação e preservação do
-banco passaram. `/releases/latest` agora aponta para `v3.0.1`.
+banco passaram. Naquela publicação, `/releases/latest` passou a apontar para
+`v3.0.1`.
 
 | Arquivo | Tamanho | SHA-256 |
 |---|---:|---|
@@ -170,6 +171,27 @@ O smoke de atualização aplica o pacote da própria release numa instalação
 descartável. A atualização de uma instalação real `v3.0.0` para `v3.0.1` e a
 visibilidade gráfica da janela MPV numa sessão interativa empacotada ainda
 precisam de validação manual.
+
+## Release v3.0.2 publicada — 21/10/2026
+
+A [release v3.0.2](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.2)
+foi publicada pelo [workflow `39685413215`](https://github.com/henriqqw/AnimeCaos/actions/runs/39685413215)
+às 22:35 UTC. A pipeline concluiu os testes Windows/Ubuntu, smoke do AppImage,
+instalação/update/reinício/desinstalação Windows, preservação do banco,
+checksums SHA-256 e assinatura Sigstore. `/releases/latest` aponta para
+`v3.0.2`.
+
+| Arquivo | Tamanho | SHA-256 |
+|---|---:|---|
+| `AnimeCaos-3.0.2-windows-amd64.zip` | 669.960.399 bytes | `8a3e948378343501d2a6f3cf23cfdbd402d6e63c827c34f19f7c949b1482bc48` |
+| `AnimeCaos-3.0.2-windows-setup.exe` | 489.772.650 bytes | `82196f34be01004d2d630fdba92d84f83672eb78afae32214bdbc29f9f724ad2` |
+| `AnimeCaos-3.0.2-x86_64.AppImage` | 342.968.824 bytes | `9f66f1f99525f2197e440c2add1ce2911d56ea9f18d86dcae1d652caaa382b0e` |
+
+Os binários Windows continuam sem Authenticode; `SHA256SUMS` tem assinatura
+Sigstore. O helper antigo da v3.0.1 é o que realiza o primeiro relançamento,
+por isso quem ficou com a janela oculta deve encerrar o grupo AnimeCaos e
+instalar o setup v3.0.2 manualmente. O smoke de update usa a própria versão
+numa instalação descartável e não substitui essa validação real N→N+1.
 
 ## Validação manual ainda exigida
 

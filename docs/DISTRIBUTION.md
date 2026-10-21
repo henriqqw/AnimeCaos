@@ -114,24 +114,57 @@ de mídia estão em [`licenses/SOURCE-OFFERS.md`](../licenses/SOURCE-OFFERS.md).
   arquivos. A antiga edição Flatpak não sabe instalar o AppImage e exige
   migração manual para esse formato.
 
+## Release v3.0.0 publicada — 21/10/2026
+
+A release [v3.0.0](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.0)
+foi publicada pelo workflow
+[39538571500](https://github.com/henriqqw/AnimeCaos/actions/runs/39538571500),
+com os testes Windows e Ubuntu, o smoke do AppImage e a jornada Windows de
+instalação, update, reinício, desinstalação e preservação do banco aprovados.
+O workflow criou `SHA256SUMS` e a assinatura Sigstore keyless; o manifesto e
+seu bundle estão anexados à release. O endpoint `/releases/latest` retorna
+`v3.0.0`, que passa a ser a versão consultada pelo atualizador.
+
+Os três arquivos de distribuição e seus hashes publicados são:
+
+| Arquivo | Tamanho | SHA-256 |
+|---|---:|---|
+| `AnimeCaos-3.0.0-windows-amd64.zip` | 669.956.620 bytes | `ffe5763dc1ff627b69dd5953741db1f19f2c2100547ccda64723ed38823a4f0b` |
+| `AnimeCaos-3.0.0-windows-setup.exe` | 489.729.270 bytes | `0ff74ab5b19b6698a52b813a5121975af31d48a01e25cb3fbf613e50224a15dc` |
+| `AnimeCaos-3.0.0-x86_64.AppImage` | 342.960.632 bytes | `a73c2ed323eaf1c0cd0396c0e16ed1054cb8973a92053ea545540e0ca42450da` |
+
+Os hashes do manifesto correspondem aos digests SHA-256 dos três assets no
+GitHub. A publicação também contém `SHA256SUMS.sigstore.json` e
+`WINDOWS-AUTHENTICODE-STATUS.txt`. Sem os secrets de certificado, o ZIP e o
+instalador Windows não têm Authenticode; o Windows pode exibir aviso de editor
+desconhecido. A assinatura Sigstore comprova a origem/integridade do manifesto,
+mas não substitui Authenticode.
+
+O smoke da release foi executado em runners GitHub, não em VMs limpas. A
+checagem e a aplicação do update foram exercitadas com os pacotes da própria
+versão `3.0.0`; uma atualização real de uma instalação `3.0.0` para uma futura
+`3.0.1` ainda precisa ser observada quando houver essa release. O fluxo de
+primeira conexão MAL também permanece sem validação com conta real.
+
 ## Validação manual ainda exigida
 
 O script Windows testa execução do portátil, confirmação de que o processo
 WebView2 veio de dentro do pacote, GeckoDriver/Firefox empacotados, MPV, banco
 de dados, update, reinício, desinstalação e preservação de dados. A validação
 em VM limpa do instalador Windows ainda é necessária para confirmar a jornada
-offline numa instalação sem WebView2 prévio. Antes de publicar, validar também
-atualização de versão N para N+1, recuperação depois de download corrompido e
-dados antigos reais em cópia descartável.
+offline numa instalação sem WebView2 prévio. Em uma futura versão, validar
+atualização de N para N+1, recuperação depois de download corrompido e dados
+antigos reais em cópia descartável.
 
-O alvo Linux da release é Ubuntu 24.04 LTS x86_64. A validação automatizada do
-AppImage precisa passar em runner 24.04 e ser repetida numa instalação limpa de
-Ubuntu 24.04; compatibilidade com outras distribuições ainda não é declarada.
+O alvo Linux da release é Ubuntu 24.04 LTS x86_64. O AppImage passou no runner
+24.04; deve ser repetido numa instalação limpa de Ubuntu 24.04. Compatibilidade
+com outras distribuições ainda não é declarada.
 
 ## Contas
 
 MyAnimeList usa o Client ID interno da aplicação e PKCE, sem pedir credenciais de desenvolvedor ao usuário nem embutir Client Secret no pacote. O fluxo real ainda não foi confirmado sem segredo: a troca de token retornou `invalid_client`. Antes da publicação, use um cadastro público compatível com desktop ou um serviço intermediário que proteja eventual segredo.
-Callback cadastrado: `http://localhost:9743/`.
+Antes de outra release, resolva a validação do login real. Callback cadastrado:
+`http://localhost:9743/`.
 AniList usa o fluxo implícito para cliente público, callback
 `http://localhost:9742`. Tokens e segredos ficam no cofre de credenciais do
 sistema operacional; as instalações antigas migram os valores do SQLite para

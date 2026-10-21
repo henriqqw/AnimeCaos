@@ -49,14 +49,54 @@ Go/Wails valida o pacote e passa a operar após a migração.
 | Workflow de release `39533700847` | Testes de código, pacotes Windows/Linux e smoke de instalar/atualizar/desinstalar passaram. A publicação falhou porque o job não fazia checkout do repositório antes de gerar notas com `gh release create`; corrigido no commit `b46e5d3`. |
 | Workflow de release `39535484688` | Os testes Go/race/TypeScript/Vitest e o smoke do AppImage passaram; o ZIP Windows também foi construído. O smoke Windows falhou ao conferir o processo depois do update. O script agora espera o encerramento do app/WebView2 antes da troca, aguarda o relançamento e imprime `updater-error.log`/`startup-error.log` em caso de falha. Reexecução após essa correção ainda pendente. |
 | Workflow de release `39537337764` | Testes de release passaram nos dois sistemas e o AppImage passou pelo smoke test. O runner Windows recebeu HTTP 504 do feed do Chocolatey ao instalar `mpvio.install`, antes de empacotar. A etapa agora repete a instalação dos pacotes fixados até três vezes com espera progressiva; nova execução pendente. |
+| Workflow de release `39538571500` | Passou em `windows-latest` e `ubuntu-24.04`: Go/race/TypeScript/Vitest; empacotamento Windows e AppImage; smoke de instalação, atualização, reinício, desinstalação e preservação do banco no Windows; smoke do AppImage; checksums Sigstore; publicação da release `v3.0.0`. |
 
-Antes da pausa do build, o empacotador Windows já havia escrito um ZIP
+## Release pública v3.0.0 — 21/10/2026
+
+A [release `v3.0.0`](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.0)
+foi publicada às 03:43 UTC pelo
+[workflow `39538571500`](https://github.com/henriqqw/AnimeCaos/actions/runs/39538571500).
+O GitHub `/releases/latest` retorna `v3.0.0`. A pipeline publicou os três
+pacotes, `SHA256SUMS`, `SHA256SUMS.sigstore.json` (8.377 bytes) e
+`WINDOWS-AUTHENTICODE-STATUS.txt`. O arquivo de hashes foi baixado da release;
+seus três valores correspondem aos digests SHA-256 dos assets reportados pela
+API do GitHub. O job que executou `cosign sign-blob` passou.
+
+| Asset | Tamanho | SHA-256 |
+|---|---:|---|
+| `AnimeCaos-3.0.0-windows-amd64.zip` | 669.956.620 bytes | `ffe5763dc1ff627b69dd5953741db1f19f2c2100547ccda64723ed38823a4f0b` |
+| `AnimeCaos-3.0.0-windows-setup.exe` | 489.729.270 bytes | `0ff74ab5b19b6698a52b813a5121975af31d48a01e25cb3fbf613e50224a15dc` |
+| `AnimeCaos-3.0.0-x86_64.AppImage` | 342.960.632 bytes | `a73c2ed323eaf1c0cd0396c0e16ed1054cb8973a92053ea545540e0ca42450da` |
+
+O ZIP e o instalador Windows não têm Authenticode: os secrets de certificado
+não estavam configurados. Essa condição está nas notas da release e em
+`WINDOWS-AUTHENTICODE-STATUS.txt`; o Windows pode mostrar aviso de editor
+desconhecido. A assinatura Sigstore de `SHA256SUMS` foi criada no workflow,
+mas não substitui Authenticode.
+
+Os smoke tests foram feitos nos runners GitHub, não em VMs limpas. A aplicação
+do update foi exercitada com os artefatos da própria versão `3.0.0`; uma
+atualização real de uma instalação `3.0.0` para uma futura `3.0.1` ainda não
+foi testada porque essa versão ainda não existe. Também falta validação em VM
+limpa e o login MAL continua sem teste com conta real.
+
+Comandos usados para conferir o estado remoto:
+
+```powershell
+gh run view 39538571500 --repo henriqqw/AnimeCaos --json conclusion,url,headSha,createdAt
+gh release view v3.0.0 --repo henriqqw/AnimeCaos --json url,isDraft,tagName,publishedAt,assets,body
+$verifyDir = Join-Path $env:TEMP 'animecaos-release-verify-20261021'
+gh release download v3.0.0 --repo henriqqw/AnimeCaos --pattern SHA256SUMS --pattern SHA256SUMS.sigstore.json --pattern WINDOWS-AUTHENTICODE-STATUS.txt --dir $verifyDir
+gh api repos/henriqqw/AnimeCaos/releases/latest --jq .tag_name
+```
+
+Na rodada local interrompida de 20/10/2026, o empacotador Windows já havia escrito um ZIP
 `AnimeCaos-3.0.0-windows-amd64.zip` de 673.047.323 bytes. O compilador Inno
 escreveu um arquivo `AnimeCaos-3.0.0-windows-setup.exe` de 235.083.780 bytes,
 mas a execução foi interrompida e o código de saída não foi registrado. Esses
 dois arquivos foram gerados antes da correção atual do fade sincronizado e do
 reinício dev; não são builds finais nem foram verificados para distribuição.
-O AppImage em `release/` é da rodada anterior. Nenhuma release foi publicada.
+O AppImage citado nesta validação local era da rodada anterior. Naquele momento, nenhuma release tinha sido publicada; a v3.0.0 foi publicada em 21/10/2026 conforme a seção acima.
 
 ## Pacotes locais de release — 20/10/2026
 

@@ -77,7 +77,7 @@ func runRestartHelper() bool {
 		return true
 	}
 	command := exec.Command(executable, os.Args[4:]...)
-	platform.Hide(command)
+	platform.HideConsole(command)
 	if err := command.Start(); err != nil {
 		writeStartupError(fmt.Errorf("não foi possível abrir o AnimeCaos novamente: %w", err))
 		return true

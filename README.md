@@ -3,24 +3,24 @@
 ![Banner do AnimeCaos](assets/readme-banner.png)
 
 <p align="center">
-  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.1"><img src="https://img.shields.io/badge/release-v3.0.1-d63b3b?style=flat-square" alt="Release v3.0.1"></a>
+  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.2"><img src="https://img.shields.io/badge/release-v3.0.2-d63b3b?style=flat-square" alt="Release v3.0.2"></a>
   <a href="https://go.dev/"><img src="https://img.shields.io/badge/Go-1.26-00ADD8?style=flat-square&logo=go&logoColor=white" alt="Go 1.26"></a>
   <a href="https://wails.io/"><img src="https://img.shields.io/badge/Wails-2.16-DF0000?style=flat-square" alt="Wails 2.16"></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-149ECA?style=flat-square&logo=react&logoColor=white" alt="React 19"></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript 5.8"></a>
   <a href="https://github.com/henriqqw/AnimeCaos/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/henriqqw/AnimeCaos/ci.yml?branch=main&style=flat-square&label=CI" alt="Status do CI"></a>
-  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.1"><img src="https://img.shields.io/badge/Windows%20x64%20%7C%20Linux%20x86_64-desktop-4b5563?style=flat-square" alt="Windows x64 e Linux x86_64"></a>
-  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.1"><img src="https://img.shields.io/badge/SHA256-Sigstore%20signed-2ea44f?style=flat-square" alt="Manifesto SHA256 assinado com Sigstore"></a>
+  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.2"><img src="https://img.shields.io/badge/Windows%20x64%20%7C%20Linux%20x86_64-desktop-4b5563?style=flat-square" alt="Windows x64 e Linux x86_64"></a>
+  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.2"><img src="https://img.shields.io/badge/SHA256-Sigstore%20signed-2ea44f?style=flat-square" alt="Manifesto SHA256 assinado com Sigstore"></a>
   <a href="docs/README.md"><img src="https://img.shields.io/badge/docs-available-3572A5?style=flat-square" alt="Documentação disponível"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.1">⬇️ Baixar v3.0.1</a>
+  <a href="https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.2">⬇️ Baixar v3.0.2</a>
   · <a href="https://www.animecaos.xyz/">🌐 Site oficial</a>
   · <a href="CHANGELOG.md">📋 Changelog</a>
   · <a href="https://github.com/henriqqw/AnimeCaos/issues">🐛 Reportar problema</a>
 </p>
 
-Aplicativo desktop para descobrir e assistir animes, organizar sua lista e seu histórico e ler mangás. A versão **3.0.1** corrige a abertura da janela do MPV no Windows e usa o MyAnimeList como catálogo alternativo na Home quando a AniList está indisponível. A primeira release pública após a refatoração de Python para **Go e Wails** foi a 3.0.0. O código Python anterior foi preservado em `Legacy/` e não faz parte do runtime distribuído.
+Aplicativo desktop para descobrir e assistir animes, organizar sua lista e seu histórico e ler mangás. A versão **3.0.2** corrige a reabertura da janela após uma atualização no Windows; também inclui a correção da janela MPV e o fallback da Home pelo MyAnimeList quando a AniList está indisponível. A primeira release pública após a refatoração de Python para **Go e Wails** foi a 3.0.0. O código Python anterior foi preservado em `Legacy/` e não faz parte do runtime distribuído.
 
 ## Veja o AnimeCaos
 
@@ -59,19 +59,19 @@ Catálogos e streams dependem dos serviços externos e podem mudar ou ficar temp
 
 ## Baixar e instalar
 
-A versão estável disponível é **v3.0.1**. Os pacotes ficam na [página da release](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.1).
+A versão estável disponível é **v3.0.2**. Os pacotes ficam na [página da release](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.2).
 
 | Sistema | Pacote | Tamanho aproximado | Instalação |
 |---|---|---:|---|
-| Windows x64 | [Instalador](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.1/AnimeCaos-3.0.1-windows-setup.exe) | 490 MB | Baixe e execute o instalador. |
-| Windows x64 | [ZIP portátil](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.1/AnimeCaos-3.0.1-windows-amd64.zip) | 670 MB | Extraia o ZIP e abra `AnimeCaos.exe`. |
-| Linux x86_64 | [AppImage](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.1/AnimeCaos-3.0.1-x86_64.AppImage) | 343 MB | Torne executável e abra o arquivo. |
+| Windows x64 | [Instalador](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.2/AnimeCaos-3.0.2-windows-setup.exe) | 490 MB | Baixe e execute o instalador. |
+| Windows x64 | [ZIP portátil](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.2/AnimeCaos-3.0.2-windows-amd64.zip) | 670 MB | Extraia o ZIP e abra `AnimeCaos.exe`. |
+| Linux x86_64 | [AppImage](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.2/AnimeCaos-3.0.2-x86_64.AppImage) | 343 MB | Torne executável e abra o arquivo. |
 
 No Linux, pelo terminal:
 
 ```bash
-chmod +x AnimeCaos-3.0.1-x86_64.AppImage
-./AnimeCaos-3.0.1-x86_64.AppImage
+chmod +x AnimeCaos-3.0.2-x86_64.AppImage
+./AnimeCaos-3.0.2-x86_64.AppImage
 ```
 
 ### Requisitos
@@ -82,7 +82,7 @@ chmod +x AnimeCaos-3.0.1-x86_64.AppImage
 | Linux | AppImage x86_64. Ubuntu 24.04 LTS é o alvo validado; outras distribuições não têm compatibilidade confirmada. O sistema ainda precisa atender às dependências de kernel, gráficos e glibc do AppImage. |
 | Rede | Internet para catálogo, metadados, streams, login externo e consulta de atualizações. Arquivos já baixados permanecem acessíveis localmente. |
 
-O estado da assinatura Authenticode dos binários Windows da v3.0.1 está registrado nas notas e no arquivo `WINDOWS-AUTHENTICODE-STATUS.txt` da release. O manifesto `SHA256SUMS` recebe assinatura Sigstore para conferir sua origem e integridade; isso não substitui Authenticode. Consulte [Distribuição](docs/DISTRIBUTION.md).
+O estado da assinatura Authenticode dos binários Windows da v3.0.2 está registrado nas notas e no arquivo `WINDOWS-AUTHENTICODE-STATUS.txt` da release. O manifesto `SHA256SUMS` recebe assinatura Sigstore para conferir sua origem e integridade; isso não substitui Authenticode. Consulte [Distribuição](docs/DISTRIBUTION.md).
 
 ## Como usar
 

@@ -247,7 +247,7 @@ export default function App() {
     [settings, setSettings] = useState<Settings>(),
     [headerQuery, setHeaderQuery] = useState(""),
     [sidebarCollapsed, setSidebarCollapsed] = useState(() => localStorage.getItem("animecaos-sidebar-collapsed") === "true"),
-    [version, setVersion] = useState("3.0.1-dev"),
+    [version, setVersion] = useState("3.0.2-dev"),
     [error, setError] = useState(""),
     [logs, setLogs] = useState<string[]>([]),
     [library, setLibrary] = useState<Anime[]>([]),

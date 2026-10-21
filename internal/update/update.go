@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-var Version = "3.0.1"
+var Version = "3.0.2"
 
 type Info struct {
 	Version     string `json:"version"`
@@ -233,7 +233,7 @@ func RunHelper(packagePath, target string, pid int) error {
 
 func launchUpdatedApp(path string) error {
 	cmd := exec.Command(path)
-	platform.Hide(cmd)
+	platform.HideConsole(cmd)
 	if err := cmd.Start(); err != nil {
 		return err
 	}

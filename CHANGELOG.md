@@ -1,5 +1,9 @@
 # Changelog
 
+## Release Go/Wails v3.0.2
+
+- No Windows, o helper de atualização e o reinício pela bandeja iniciam o AnimeCaos sem a flag que oculta a janela gráfica, que podia deixar o processo ativo sem mostrar a interface.
+
 ## Release Go/Wails v3.0.1
 
 - Publicada em 21/10/2026 pelo workflow `39681768142`; os testes Windows/Ubuntu, smokes dos pacotes, checksum Sigstore e publicação passaram.

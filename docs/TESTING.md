@@ -69,6 +69,26 @@ Go/Wails valida o pacote e passa a operar após a migração.
 | Workflow de release `39538571500` | Passou em `windows-latest` e `ubuntu-24.04`: Go/race/TypeScript/Vitest; empacotamento Windows e AppImage; smoke de instalação, atualização, reinício, desinstalação e preservação do banco no Windows; smoke do AppImage; checksums Sigstore; publicação da release `v3.0.0`. |
 | Workflow de release `39681768142` | Passou em `windows-latest` e `ubuntu-24.04`: Go/race/TypeScript/Vitest; ZIP e instalador Windows; AppImage com smoke; atualização, reinício, desinstalação e preservação do banco; publicação da release `v3.0.1` e checksums Sigstore. |
 
+## Correção de janela após auto-update — validação local para v3.0.2 — 21/10/2026
+
+O processo do helper de update e o reinício pelo menu da bandeja agora usam
+`HideConsole` ao abrir a interface Wails. `Hide` configurava `SW_HIDE`, podendo
+manter o processo ativo sem a janela gráfica. O teste Windows verifica que a
+flag de console oculto continua configurada e que `HideWindow` permanece falso.
+
+| Comando/inspeção | Resultado |
+|---|---|
+| `gofmt -w internal/platform/process_windows_test.go internal/update/update.go main.go` | Passou. |
+| `go test ./...` | Passou em todos os pacotes no Windows amd64, incluindo `TestHideConsoleKeepsGUIWindowVisible`. |
+| `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado. |
+| `cd frontend; npm exec -- tsc --noEmit` | Passou sem diagnósticos. |
+| `cd frontend; npm test -- --run` | Passou: 34 testes. |
+| Consulta a `AnimeCaos.exe` ativos e aos logs `startup-error.log`/`updater-error.log` locais | Não havia processo ativo nem logs no momento da investigação; a execução mostrada nas capturas não pôde ser inspecionada diretamente. |
+
+O teste confirma os atributos de inicialização, mas não substitui a inspeção da
+janela numa instalação empacotada. O workflow da próxima release repetirá os
+testes Windows/Ubuntu e os smokes dos pacotes.
+
 ## Validação local antes da tag v3.0.1 — 21/10/2026
 
 | Comando | Resultado |

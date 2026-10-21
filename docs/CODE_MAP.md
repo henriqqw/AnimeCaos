@@ -6,7 +6,7 @@ Mapa conferido em 21/10/2026. Atualize junto com mudanças de responsabilidade, 
 
 | Caminho | Responsabilidade |
 |---|---|
-| `main.go` | Entry point Wails, embed do frontend/ícone, janela com fundo preto para evitar flash antes da splash, prioridade em primeiro plano sincronizada com a splash, reexibição da splash na segunda instância, geometria visível, diálogos, ciclo da bandeja Windows, reinício por reload no modo dev e relançamento no pacote, início do auto-update em builds instaladas, single-instance e helper de atualização |
+| `main.go` | Entry point Wails, embed do frontend/ícone, janela com fundo preto para evitar flash antes da splash, prioridade em primeiro plano sincronizada com a splash, reexibição da splash na segunda instância, geometria visível, diálogos, ciclo da bandeja Windows, reinício por reload no modo dev e relançamento visível no pacote, início do auto-update em builds instaladas, single-instance e helper de atualização |
 | `build_identity_dev.go`, `build_identity_production.go` | IDs de mutex e seleção do comportamento de reinício conforme os build tags dev/produção |
 | `build_identity_dev_test.go`, `build_identity_production_test.go` | Testes dos IDs de instância e da estratégia de reinício selecionados pelos build tags |
 | `go.mod`, `go.sum` | Versão do Go e dependências |
@@ -147,7 +147,8 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/player/player_test.go` | EOF natural, sessão, regra de 80% para episódio assistido e integração audiovisual opt-in |
 | `internal/player/offline_test.go` | Reprodução offline |
 | `internal/platform/system.go` | Diretórios, busca de binário, abertura no sistema e segurança de caminhos; encaminha revelação de arquivo para o adaptador nativo |
-| `internal/platform/process_windows.go`, `process_unix.go` | Inicialização de processos sem console; o player preserva a visibilidade das janelas gráficas no Windows |
+| `internal/platform/process_windows.go`, `process_unix.go` | Inicialização de processos sem console; player, atualizador e helper de reinício preservam a visibilidade das janelas gráficas no Windows |
+| `internal/platform/process_windows_test.go` | Confirma que `HideConsole` não passa estado `SW_HIDE` ao processo gráfico |
 | `internal/platform/reveal_windows.go`, `reveal_other.go` | Abre ou reutiliza a pasta no gerenciador nativo; no Windows localiza e ativa a janela do Explorer |
 | `internal/platform/window_position*.go` | Valida posição salva contra as áreas de trabalho dos monitores no Windows; teste da interseção da barra de título |
 | `internal/platform/webview.go`, `webview_windows.go`, `webview_other.go`, `webview_runtime_windows_test.go` | Descoberta do WebView2 junto ao executável, configuração do Wails para usar o runtime empacotado, ACL AppContainer e validação pelo loader Wails no Windows |
@@ -155,7 +156,7 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/platform/process_windows.go`, `process_unix.go` | Opções de subprocesso e espera pelo processo anterior durante reinicialização |
 | `internal/platform/publish.go` | Publicação de arquivo temporário |
 | `internal/platform/publish_test.go` | Não sobrescrever arquivo já existente |
-| `internal/update/update.go` | Releases, checksum, staging e substituição |
+| `internal/update/update.go` | Releases, checksum, staging, substituição e relançamento visível do app |
 | `internal/update/parent_windows.go`, `parent_unix.go` | Espera do processo pai por plataforma |
 | `internal/update/update_test.go` | Regras de versão, staging e atualização |
 

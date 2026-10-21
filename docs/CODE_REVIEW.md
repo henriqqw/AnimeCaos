@@ -32,6 +32,12 @@ Revisão base de 20/10/2026; atualização em 21/10/2026 após a publicação da
 - **Correção:** o player agora usa `HideConsole`, que mantém `CREATE_NO_WINDOW` para não abrir console e não altera o estado inicial das janelas gráficas. O MPV/DLLs já são incluídos pelos pacotes de distribuição.
 - **Limite:** a release `v3.0.1` publicou a correção e os testes automatizados passaram. O teste MPV automatizado usa saída nula, então a janela ainda precisa de validação manual numa execução Windows empacotada. A atualização de uma instalação real `v3.0.0` para `v3.0.1` também não foi observada ponta a ponta.
 
+### [P1] O atualizador podia deixar a interface do AnimeCaos oculta no Windows — corrigido na v3.0.2
+
+- **Evidência:** o helper de update e o relançamento após “Reiniciar” iniciavam o executável Wails com `platform.Hide`, que ativa `STARTF_USESHOWWINDOW/SW_HIDE`. A instância podia permanecer ativa sem apresentar sua janela.
+- **Correção:** ambos usam `platform.HideConsole`, que evita uma janela de console sem passar estado oculto ao processo gráfico. Um teste Windows confirma esses atributos de inicialização.
+- **Limite:** o teste de atributos não substitui a inspeção visual de uma instalação empacotada. Usuários que ficaram com uma instância oculta precisam encerrá-la e instalar manualmente a v3.0.2 uma vez, pois o helper da v3.0.1 é o código que executa o primeiro relançamento.
+
 ### [P2] Encerramento curto podia marcar episódio como assistido na sincronização — corrigido
 
 - **Evidência:** `internal/player/player.go` definia `Watched` depois de 30 s de processo ativo, sem considerar duração ou posição do vídeo. `syncWatched` então gravava o número inteiro do episódio no AniList/MAL.

@@ -355,11 +355,20 @@ jobs:
           ### Correções e catálogo
 
           - No Windows, o MPV deixa de iniciar com a primeira janela gráfica escondida. Isso corrige o caso em que o áudio e o progresso avançavam sem mostrar o vídeo.
+          - O helper de auto-update roda fora da pasta instalada; isso permite renomear o diretório no Windows e corrigir instalações que baixavam o pacote, mas continuavam abrindo a versão anterior.
           - A Home usa o catálogo público do MyAnimeList como fallback quando a AniList está indisponível e informa a fonte exibida.
 
           ### MyAnimeList
 
           O login de primeira conexão com MyAnimeList ainda não foi validado em uma conta real; a troca de token sem Client Secret retornou `invalid_client`. Segredos legados já salvos podem ser usados pelo aplicativo. A sincronização AniList não é afetada.
           EOF
+          if [ "$tag" = "v3.0.3" ]; then
+            cat >> release/release-notes.md <<'EOF'
+
+          ### Aplicação da v3.0.3 em instalações antigas
+
+          Instalações até a v3.0.2 carregam o helper antigo e precisam executar o setup da v3.0.3 uma vez. Depois disso, as atualizações automáticas usam o helper corrigido.
+          EOF
+          fi
           gh release edit "$tag" --notes-file release/release-notes.md
           gh release edit "$tag" --draft=false

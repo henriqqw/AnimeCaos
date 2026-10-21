@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-var Version = "3.0.2"
+var Version = "3.0.3"
 
 type Info struct {
 	Version     string `json:"version"`
@@ -223,9 +223,18 @@ func Stage(zipPath, dir string) error {
 // A copied helper waits for the parent to close; it only replaces files in the
 // application directory, preserving user data. Existing binaries are backed up.
 func Apply(helper, packagePath, target string, pid int) error {
-	cmd := exec.Command(helper, "--apply-update", packagePath, "--target", target, "--parent", strconv.Itoa(pid))
-	platform.Hide(cmd)
+	cmd := newApplyCommand(helper, packagePath, target, pid)
 	return cmd.Start()
+}
+
+func newApplyCommand(helper, packagePath, target string, pid int) *exec.Cmd {
+	cmd := exec.Command(helper, "--apply-update", packagePath, "--target", target, "--parent", strconv.Itoa(pid))
+	// The helper must not inherit the application's working directory. On
+	// Windows that directory is the install directory, and keeping it as the
+	// helper's current directory prevents renaming the directory during update.
+	cmd.Dir = filepath.Dir(filepath.Clean(target))
+	platform.Hide(cmd)
+	return cmd
 }
 func RunHelper(packagePath, target string, pid int) error {
 	return runHelper(packagePath, target, pid, launchUpdatedApp)
@@ -306,6 +315,7 @@ func runHelper(packagePath, target string, pid int, launch func(string) error) e
 	if e != nil {
 		return e
 	}
+	defer os.RemoveAll(stage)
 	if e = Stage(packagePath, stage); e != nil {
 		return e
 	}

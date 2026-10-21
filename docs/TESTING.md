@@ -90,6 +90,42 @@ janela numa instalação empacotada. A pipeline v3.0.2 repetiu testes Windows e
 Ubuntu e os smokes dos pacotes; a atualização real de v3.0.1 para v3.0.2 não
 foi simulada pelos runners.
 
+## Falha de auto-update observada na instalação v3.0.0 — 21/10/2026
+
+Na máquina usada para reproduzir a falha, `D:\AnimeCaosApp\release-manifest.json`
+continuava em `3.0.0`, embora o ZIP `AnimeCaos-3.0.2-windows-amd64.zip` estivesse
+em `%APPDATA%\AnimeCaos\updates`. `updater-error.log`, gravado às 19:16:21,
+registrou que o Windows não conseguiu renomear `D:\AnimeCaosApp` porque ela
+estava em uso. O helper era criado em `%APPDATA%`, mas `exec.Command` herdava o
+diretório de trabalho da instalação; assim, o próprio helper podia manter a
+pasta alvo aberta. A tentativa das 19:37 deixou o manifesto da instalação em
+`3.0.0`; não há log atualizado que permita atribuir um erro específico a essa
+tentativa.
+
+O MPV ativo usava `--force-window=yes`, mas não tinha janela (`MainWindowHandle`
+igual a zero). Como o processo Wails e o manifesto eram da `3.0.0`, ele não
+continha a correção de visibilidade do MPV da `3.0.1`.
+
+O código em preparação para a `3.0.3` inicia o helper com o diretório de
+trabalho na pasta pai do alvo e limpa o stage em falhas de extração/troca.
+`TestApplyHelperRunsFromOutsideInstallDirectory` cobre o diretório do helper;
+`TestUpdateHelperCleansIncompleteStage` cobre a remoção do stage. Como as
+versões anteriores copiam o helper antigo, instalações até a `3.0.2` precisam
+rodar o setup da `3.0.3` uma vez para receber a correção; depois disso, o
+auto-update usa o helper corrigido.
+
+| Comando | Resultado |
+|---|---|
+| `gofmt -w internal/update/update.go internal/update/update_test.go` | Passou. |
+| `git diff --check` | Passou. |
+| `go test ./internal/update` | Passou em Windows amd64. |
+| `go test ./...` | Passou em todos os pacotes no Windows amd64. |
+| `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado localmente. |
+
+O smoke Windows/AppImage da release ainda será executado pelos runners. Ele
+atualiza uma instalação descartável da própria release e não substitui uma
+observação manual de `3.0.0` → `3.0.3` nesta máquina.
+
 ## Release pública v3.0.2 — 21/10/2026
 
 A [release `v3.0.2`](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.2)

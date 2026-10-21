@@ -2,7 +2,7 @@
   #error Defina PackageDir para o stage produzido por go run ./cmd/package
 #endif
 #ifndef AppVersion
-  #define AppVersion "3.0.2"
+  #define AppVersion "3.0.3"
 #endif
 [Setup]
 AppId=com.animecaos.App

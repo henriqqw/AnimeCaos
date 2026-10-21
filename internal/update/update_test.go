@@ -123,6 +123,39 @@ func TestDownloadRejectsChecksumMismatch(t *testing.T) {
 	}
 }
 
+func TestApplyHelperRunsFromOutsideInstallDirectory(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "installed")
+	cmd := newApplyCommand("updater", filepath.Join(root, "updates", "package.zip"), target, 42)
+	if got, want := filepath.Clean(cmd.Dir), filepath.Clean(root); got != want {
+		t.Fatalf("helper working directory = %q, want installation parent %q", got, want)
+	}
+}
+
+func TestUpdateHelperCleansIncompleteStage(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "installed")
+	if err := os.MkdirAll(target, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(target, "AnimeCaos.exe"), []byte("old-app"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	packagePath := writeUpdateZip(t, root, map[string][]byte{"README.txt": []byte("incomplete package")})
+	if err := runHelper(packagePath, target, 2147483647, func(string) error { return nil }); err == nil {
+		t.Fatal("incomplete package was accepted")
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".animecaos-update-") {
+			t.Fatalf("failed update left staging directory %q", entry.Name())
+		}
+	}
+}
+
 func TestUpdateHelperReplacesApplicationAndPreservesUserData(t *testing.T) {
 	root := t.TempDir()
 	target := filepath.Join(root, "installed")

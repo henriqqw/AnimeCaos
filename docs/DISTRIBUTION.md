@@ -101,7 +101,7 @@ de mídia estão em [`licenses/SOURCE-OFFERS.md`](../licenses/SOURCE-OFFERS.md).
   ela não substitui o certificado Authenticode nem elimina o aviso de editor
   desconhecido do Windows.
 - A versão da tag deve coincidir com `wails.json` e com o `-version` do pacote.
-  A versão padrão atual é `3.0.2`. O atualizador verifica a release no começo
+  A versão padrão atual é `3.0.3`. O atualizador verifica a release no começo
   da splash, usa um limite de 8 s para a consulta, baixa o pacote com limite de
   30 min, confere `SHA256SUMS` e aplica ZIP Windows/AppImage antes de liberar a
   interface. O fluxo não vale para `wails dev` ou Flatpak.

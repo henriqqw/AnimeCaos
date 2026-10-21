@@ -156,7 +156,7 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/platform/process_windows.go`, `process_unix.go` | Opções de subprocesso e espera pelo processo anterior durante reinicialização |
 | `internal/platform/publish.go` | Publicação de arquivo temporário |
 | `internal/platform/publish_test.go` | Não sobrescrever arquivo já existente |
-| `internal/update/update.go` | Releases, checksum, staging, substituição e relançamento visível do app |
+| `internal/update/update.go` | Releases, checksum, staging, helper com diretório de trabalho fora da instalação, substituição, limpeza do stage e relançamento visível do app |
 | `internal/update/parent_windows.go`, `parent_unix.go` | Espera do processo pai por plataforma |
 | `internal/update/update_test.go` | Regras de versão, staging e atualização |
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## Release Go/Wails v3.0.3
+
+- Corrigido o auto-update no Windows: o helper agora usa a pasta pai da instalação como diretório de trabalho, permitindo renomear a pasta do app depois que o processo antigo fecha.
+- O atualizador remove o estágio temporário quando a extração ou a troca falha.
+- A release inclui as correções do MPV e do catálogo MAL fallback já publicadas na v3.0.1.
+- Instalações até a v3.0.2 precisam executar o setup da v3.0.3 uma vez para substituir o helper antigo; as atualizações seguintes voltam a ser automáticas.
+
 ## Release Go/Wails v3.0.2
 
 - Publicada em 21/10/2026 pelo workflow `39685413215`; testes Windows/Ubuntu, smokes dos pacotes, checksums Sigstore e publicação passaram.

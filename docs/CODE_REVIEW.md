@@ -38,6 +38,13 @@ Revisão base de 20/10/2026; atualização em 21/10/2026 após as releases `v3.0
 - **Correção:** ambos usam `platform.HideConsole`, que evita uma janela de console sem passar estado oculto ao processo gráfico. Um teste Windows confirma esses atributos de inicialização.
 - **Limite:** o teste de atributos não substitui a inspeção visual de uma instalação empacotada. Usuários que ficaram com uma instância oculta precisam encerrá-la e instalar manualmente a v3.0.2 uma vez, pois o helper da v3.0.1 é o código que executa o primeiro relançamento.
 
+### [P1] Auto-update não substituía a pasta instalada no Windows — correção preparada para v3.0.3
+
+- **Evidência:** `updater-error.log` da instalação local registrou falha ao renomear `D:\AnimeCaosApp` por estar em uso; o manifesto permaneceu em `3.0.0` apesar do ZIP `3.0.2` baixado. `Apply` iniciava o helper sem definir `Cmd.Dir`, herdando o diretório atual da própria instalação. A splash só confirmava que o helper iniciou, não que a substituição terminou.
+- **Impacto:** a instalação antiga continuava sendo aberta; por isso o usuário não recebia a janela do MPV, cuja correção já estava na `3.0.1`.
+- **Correção:** o helper passa a usar a pasta pai do alvo como diretório atual. O stage também é removido quando a extração ou substituição falha.
+- **Cobertura/limite:** testes Go cobrem o diretório de trabalho e a limpeza de stage. Como as versões até `3.0.2` carregam o helper antigo, precisam executar o setup da `3.0.3` manualmente uma vez; o salto real `3.0.0` → `3.0.3` ainda não foi observado ponta a ponta. A pipeline executa o smoke de update em instalação descartável.
+
 ### [P2] Encerramento curto podia marcar episódio como assistido na sincronização — corrigido
 
 - **Evidência:** `internal/player/player.go` definia `Watched` depois de 30 s de processo ativo, sem considerar duração ou posição do vídeo. `syncWatched` então gravava o número inteiro do episódio no AniList/MAL.

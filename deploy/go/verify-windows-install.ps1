@@ -101,14 +101,14 @@ if (-not $helper.WaitForExit(120000)) { $helper.Kill(); throw "Updater não conc
 if ($helper.ExitCode -ne 0) { throw "Helper do updater retornou código $($helper.ExitCode)" }
 $markerPath = Join-Path $installDir "THIRD-PARTY-NOTICES.md"
 if (-not (Test-Path -LiteralPath $markerPath)) { throw "O updater não instalou os arquivos do pacote novo" }
-$databasePath = Join-Path $installData "state.db"
-$afterUpdate = (Get-FileHash -LiteralPath $databasePath -Algorithm SHA256).Hash
-if ($afterUpdate -ne $beforeUpdate) { throw "O updater alterou ou perdeu o banco de dados do usuário" }
 Start-Sleep -Seconds 3
 $running = Get-CimInstance Win32_Process -Filter "Name='AnimeCaos.exe'" |
   Where-Object { $_.ExecutablePath -and $_.ExecutablePath.Equals([IO.Path]::GetFullPath($installedApp), [StringComparison]::OrdinalIgnoreCase) }
 if (-not $running) { throw "O aplicativo atualizado não permaneceu aberto" }
 Stop-AppProcesses $installedApp
+$databasePath = Join-Path $installData "state.db"
+$afterUpdate = (Get-FileHash -LiteralPath $databasePath -Algorithm SHA256).Hash
+if ($afterUpdate -ne $beforeUpdate) { throw "O updater alterou ou perdeu o banco de dados do usuário" }
 Write-Output "Instalação, atualização do diretório, reinício e preservação de state.db passaram."
 
 $uninstaller = Get-ChildItem -LiteralPath $installDir -Filter 'unins*.exe' -File | Select-Object -First 1

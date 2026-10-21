@@ -67,12 +67,21 @@ jobs:
       - name: Install pinned media tools
         shell: pwsh
         run: |
-          choco install mpvio.install --version=0.41.0 --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw 'Não foi possível instalar mpv 0.41.0' }
-          choco install ffmpeg --version=9.0.2 --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw 'Não foi possível instalar FFmpeg 9.0.2' }
-          choco install innosetup --version=6.7.1 --yes --no-progress
-          if ($LASTEXITCODE -ne 0) { throw 'Não foi possível instalar Inno Setup 6.7.1' }
+          function Install-ChocoPackage([string]$id, [string]$version) {
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+              choco install $id "--version=$version" --yes --no-progress --execution-timeout=300
+              if ($LASTEXITCODE -eq 0) { return }
+              if ($attempt -lt 3) {
+                $delay = $attempt * 15
+                Write-Warning "Chocolatey falhou ao instalar $id $version (tentativa $attempt/3); nova tentativa em $delay s."
+                Start-Sleep -Seconds $delay
+              }
+            }
+            throw "Não foi possível instalar $id $version após 3 tentativas."
+          }
+          Install-ChocoPackage 'mpvio.install' '0.41.0'
+          Install-ChocoPackage 'ffmpeg' '9.0.2'
+          Install-ChocoPackage 'innosetup' '6.7.1'
           $mpv = Get-ChildItem "$env:ChocolateyInstall\lib\mpvio.install" -Filter mpv.exe -Recurse -File | Select-Object -First 1
           $ffmpeg = Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Filter ffmpeg.exe -Recurse -File | Select-Object -First 1
           $ffprobe = Get-ChildItem "$env:ChocolateyInstall\lib\ffmpeg" -Filter ffprobe.exe -Recurse -File | Select-Object -First 1

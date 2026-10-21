@@ -140,11 +140,36 @@ instalador Windows não têm Authenticode; o Windows pode exibir aviso de editor
 desconhecido. A assinatura Sigstore comprova a origem/integridade do manifesto,
 mas não substitui Authenticode.
 
-O smoke da release foi executado em runners GitHub, não em VMs limpas. A
-checagem e a aplicação do update foram exercitadas com os pacotes da própria
-versão `3.0.0`; uma atualização real de uma instalação `3.0.0` para uma futura
-`3.0.1` ainda precisa ser observada quando houver essa release. O fluxo de
-primeira conexão MAL também permanece sem validação com conta real.
+O smoke da release foi executado em runners GitHub, não em VMs limpas. Naquela
+execução, a checagem e a aplicação do update foram exercitadas com os pacotes
+da própria versão `3.0.0`. A atualização real de `3.0.0` para `3.0.1` ainda
+não foi observada ponta a ponta. O fluxo de primeira conexão MAL também
+permanece sem validação com conta real.
+
+## Release v3.0.1 publicada — 21/10/2026
+
+A [release v3.0.1](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.1)
+foi publicada pelo
+[workflow `39681768142`](https://github.com/henriqqw/AnimeCaos/actions/runs/39681768142)
+às 22:05 UTC. Os testes Windows/Ubuntu, o smoke do AppImage e a jornada
+Windows de instalação, atualização, reinício, desinstalação e preservação do
+banco passaram. `/releases/latest` agora aponta para `v3.0.1`.
+
+| Arquivo | Tamanho | SHA-256 |
+|---|---:|---|
+| `AnimeCaos-3.0.1-windows-amd64.zip` | 669.959.943 bytes | `8538edfef6a990e02c7de4851689924e49a639f0005a1a29cccd1823c37fe844` |
+| `AnimeCaos-3.0.1-windows-setup.exe` | 489.733.176 bytes | `8641e6ec7cb00d5ab5f0b73094a7e6337051273b7750959097941209d067d677` |
+| `AnimeCaos-3.0.1-x86_64.AppImage` | 342.968.824 bytes | `1ee00afb2347c27f101e5f3fce9342673b6b99e48c03706710a40ef989752f70` |
+
+`SHA256SUMS` e `SHA256SUMS.sigstore.json` foram publicados. Os binários
+Windows não têm Authenticode; essa condição está nas notas da release e em
+`WINDOWS-AUTHENTICODE-STATUS.txt`. Os hashes foram conferidos com o manifesto
+baixado e os digests dos assets da API do GitHub.
+
+O smoke de atualização aplica o pacote da própria release numa instalação
+descartável. A atualização de uma instalação real `v3.0.0` para `v3.0.1` e a
+visibilidade gráfica da janela MPV numa sessão interativa empacotada ainda
+precisam de validação manual.
 
 ## Validação manual ainda exigida
 

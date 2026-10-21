@@ -67,6 +67,7 @@ Go/Wails valida o pacote e passa a operar após a migração.
 | Workflow de release `39535484688` | Os testes Go/race/TypeScript/Vitest e o smoke do AppImage passaram; o ZIP Windows também foi construído. O smoke Windows falhou ao conferir o processo depois do update. O script agora espera o encerramento do app/WebView2 antes da troca, aguarda o relançamento e imprime `updater-error.log`/`startup-error.log` em caso de falha. Reexecução após essa correção ainda pendente. |
 | Workflow de release `39537337764` | Testes de release passaram nos dois sistemas e o AppImage passou pelo smoke test. O runner Windows recebeu HTTP 504 do feed do Chocolatey ao instalar `mpvio.install`, antes de empacotar. A etapa agora repete a instalação dos pacotes fixados até três vezes com espera progressiva; nova execução pendente. |
 | Workflow de release `39538571500` | Passou em `windows-latest` e `ubuntu-24.04`: Go/race/TypeScript/Vitest; empacotamento Windows e AppImage; smoke de instalação, atualização, reinício, desinstalação e preservação do banco no Windows; smoke do AppImage; checksums Sigstore; publicação da release `v3.0.0`. |
+| Workflow de release `39681768142` | Passou em `windows-latest` e `ubuntu-24.04`: Go/race/TypeScript/Vitest; ZIP e instalador Windows; AppImage com smoke; atualização, reinício, desinstalação e preservação do banco; publicação da release `v3.0.1` e checksums Sigstore. |
 
 ## Validação local antes da tag v3.0.1 — 21/10/2026
 
@@ -104,11 +105,49 @@ não estavam configurados. Essa condição está nas notas da release e em
 desconhecido. A assinatura Sigstore de `SHA256SUMS` foi criada no workflow,
 mas não substitui Authenticode.
 
-Os smoke tests foram feitos nos runners GitHub, não em VMs limpas. A aplicação
-do update foi exercitada com os artefatos da própria versão `3.0.0`; uma
-atualização real de uma instalação `3.0.0` para uma futura `3.0.1` ainda não
-foi testada porque essa versão ainda não existe. Também falta validação em VM
-limpa e o login MAL continua sem teste com conta real.
+Os smoke tests foram feitos nos runners GitHub, não em VMs limpas. Naquela
+rodada, a aplicação do update foi exercitada com os artefatos da própria
+versão `3.0.0`. A validação posterior da `v3.0.1` está na seção abaixo. Também
+falta validação em VM limpa e o login MAL continua sem teste com conta real.
+
+## Release pública v3.0.1 — 21/10/2026
+
+A [release `v3.0.1`](https://github.com/henriqqw/AnimeCaos/releases/tag/v3.0.1)
+foi publicada às 22:05 UTC pelo
+[workflow `39681768142`](https://github.com/henriqqw/AnimeCaos/actions/runs/39681768142).
+Os testes Windows/Ubuntu, o smoke do AppImage e a jornada Windows de
+instalação, atualização, reinício, desinstalação e preservação do banco
+passaram. O endpoint GitHub `/releases/latest` retorna `v3.0.1`.
+
+| Asset | Tamanho | SHA-256 |
+|---|---:|---|
+| `AnimeCaos-3.0.1-windows-amd64.zip` | 669.959.943 bytes | `8538edfef6a990e02c7de4851689924e49a639f0005a1a29cccd1823c37fe844` |
+| `AnimeCaos-3.0.1-windows-setup.exe` | 489.733.176 bytes | `8641e6ec7cb00d5ab5f0b73094a7e6337051273b7750959097941209d067d677` |
+| `AnimeCaos-3.0.1-x86_64.AppImage` | 342.968.824 bytes | `1ee00afb2347c27f101e5f3fce9342673b6b99e48c03706710a40ef989752f70` |
+
+O manifesto `SHA256SUMS` foi baixado e conferido contra os digests SHA-256 dos
+assets informados pela API GitHub. `SHA256SUMS.sigstore.json` acompanha a
+release. Os arquivos Windows não têm Authenticode; `WINDOWS-AUTHENTICODE-STATUS.txt`
+registra essa condição.
+
+O smoke Windows aplica o ZIP da própria versão numa instalação descartável;
+uma atualização de uma instalação real `v3.0.0` para `v3.0.1` ainda não foi
+observada ponta a ponta. O teste MPV automatizado usa saída de vídeo nula, por
+isso a visibilidade da janela numa sessão interativa empacotada continua
+pendente de validação manual.
+
+Comandos usados para conferir a publicação:
+
+```powershell
+gh run view 39681768142 --repo henriqqw/AnimeCaos --json conclusion,url,headSha,createdAt
+gh release view v3.0.1 --repo henriqqw/AnimeCaos --json url,isDraft,tagName,publishedAt,assets,body
+gh api repos/henriqqw/AnimeCaos/releases/latest --jq '{tag_name,html_url,published_at}'
+$releaseVerifyDir = Join-Path $env:TEMP ("animecaos-release-verify-v301-" + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $releaseVerifyDir | Out-Null
+gh release download v3.0.1 --repo henriqqw/AnimeCaos --pattern SHA256SUMS --pattern WINDOWS-AUTHENTICODE-STATUS.txt --dir $releaseVerifyDir
+Get-Content (Join-Path $releaseVerifyDir 'SHA256SUMS')
+Get-Content (Join-Path $releaseVerifyDir 'WINDOWS-AUTHENTICODE-STATUS.txt')
+```
 
 Comandos usados para conferir o estado remoto:
 

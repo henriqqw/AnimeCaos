@@ -63,9 +63,9 @@ A versão estável disponível é **v3.0.1**. Os pacotes ficam na [página da re
 
 | Sistema | Pacote | Tamanho aproximado | Instalação |
 |---|---|---:|---|
-| Windows x64 | [Instalador](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.1/AnimeCaos-3.0.1-windows-setup.exe) | Em breve | Baixe e execute o instalador. |
-| Windows x64 | [ZIP portátil](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.1/AnimeCaos-3.0.1-windows-amd64.zip) | Em breve | Extraia o ZIP e abra `AnimeCaos.exe`. |
-| Linux x86_64 | [AppImage](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.1/AnimeCaos-3.0.1-x86_64.AppImage) | Em breve | Torne executável e abra o arquivo. |
+| Windows x64 | [Instalador](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.1/AnimeCaos-3.0.1-windows-setup.exe) | 490 MB | Baixe e execute o instalador. |
+| Windows x64 | [ZIP portátil](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.1/AnimeCaos-3.0.1-windows-amd64.zip) | 670 MB | Extraia o ZIP e abra `AnimeCaos.exe`. |
+| Linux x86_64 | [AppImage](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.1/AnimeCaos-3.0.1-x86_64.AppImage) | 343 MB | Torne executável e abra o arquivo. |
 
 No Linux, pelo terminal:
 

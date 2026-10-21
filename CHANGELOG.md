@@ -2,6 +2,7 @@
 
 ## Release Go/Wails v3.0.1
 
+- Publicada em 21/10/2026 pelo workflow `39681768142`; os testes Windows/Ubuntu, smokes dos pacotes, checksum Sigstore e publicação passaram.
 - No Windows, iniciar o MPV sem ocultar sua primeira janela gráfica; a configuração anterior permitia áudio e IPC com a janela de vídeo invisível.
 - A Home usa o catálogo público do MyAnimeList como fallback quando a AniList falha; um aviso informa a fonte, e o cache local ainda válido fica disponível se as duas APIs falharem.
 

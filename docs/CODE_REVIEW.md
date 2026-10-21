@@ -1,6 +1,6 @@
 # Revisão técnica — AnimeCaos
 
-Data: 20/10/2026. O escopo desta revisão também inclui os pacotes locais Windows/Linux com Firefox/GeckoDriver, MPV/FFmpeg/FFprobe e WebView2, CI, instaladores, update e material de licenças. O ZIP e instalador Windows e o AppImage foram recompilados; o smoke portátil Windows, o smoke completo do AppImage e os runtimes de mídia/navegador passaram localmente. O instalador não foi executado no perfil de desenvolvimento porque o mesmo AppId já tem uma entrada registrada. Esta revisão não publicou artefatos. A árvore Python antiga está preservada em `../Legacy/`.
+Revisão base de 20/10/2026; atualização em 21/10/2026 após a publicação da `v3.0.1`. O escopo inclui os pacotes Windows/Linux com Firefox/GeckoDriver, MPV/FFmpeg/FFprobe e WebView2, CI, instaladores, update e licenças. A revisão original recompilou ZIP, instalador e AppImage; o smoke local passou, mas o instalador não foi executado no perfil de desenvolvimento por já haver uma entrada com o mesmo AppId. A release `v3.0.1` e seus resultados estão registrados em [Distribuição](DISTRIBUTION.md) e [Testes](TESTING.md). A árvore Python antiga está preservada em `../Legacy/`.
 
 ### [P2] Windows sem Authenticode quando não há certificado configurado — risco conhecido
 
@@ -25,12 +25,12 @@ Data: 20/10/2026. O escopo desta revisão também inclui os pacotes locais Windo
 
 ## Achados corrigidos nesta etapa
 
-### [P1] Janela de vídeo do MPV podia iniciar oculta no Windows — correção preparada, release pendente
+### [P1] Janela de vídeo do MPV podia iniciar oculta no Windows — correção publicada na v3.0.1; validação visual pendente
 
 - **Evidência:** `internal/player/player.go` iniciava o MPV com `platform.Hide`. No Windows, esse helper define `HideWindow`, que configura a primeira janela gráfica do processo para `SW_HIDE`; o player ainda pode decodificar áudio e responder pelo IPC sem exibir o vídeo.
 - **Impacto:** a interface do AnimeCaos continua mostrando o episódio e o progresso, mas o usuário só ouve o áudio e não vê a janela separada do MPV.
 - **Correção:** o player agora usa `HideConsole`, que mantém `CREATE_NO_WINDOW` para não abrir console e não altera o estado inicial das janelas gráficas. O MPV/DLLs já são incluídos pelos pacotes de distribuição.
-- **Limite:** a alteração ainda precisa de validação manual numa execução Windows empacotada e publicação de nova release. A `v3.0.0` instalada continua com o comportamento anterior até receber uma versão posterior.
+- **Limite:** a release `v3.0.1` publicou a correção e os testes automatizados passaram. O teste MPV automatizado usa saída nula, então a janela ainda precisa de validação manual numa execução Windows empacotada. A atualização de uma instalação real `v3.0.0` para `v3.0.1` também não foi observada ponta a ponta.
 
 ### [P2] Encerramento curto podia marcar episódio como assistido na sincronização — corrigido
 

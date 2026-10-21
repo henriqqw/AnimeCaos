@@ -31,14 +31,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build frontend assets for Go embed
+        working-directory: frontend
+        run: npm run build
       - name: Go tests
         run: go test ./...
       - name: Go race tests
         if: runner.os == 'Linux'
         run: go test -race ./...
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
       - name: TypeScript check
         working-directory: frontend
         run: npm exec -- tsc --noEmit
@@ -61,15 +64,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Require release signing certificate
-        env:
-          WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        shell: pwsh
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PFX_BASE64) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
-            throw 'Configure os secrets WINDOWS_CERTIFICATE_PFX_BASE64 e WINDOWS_CERTIFICATE_PASSWORD antes de criar uma tag de release.'
-          }
       - name: Install pinned media tools
         shell: pwsh
         run: |
@@ -162,15 +156,24 @@ jobs:
           & (Join-Path $stage.FullName 'bin/ffmpeg.exe') -version | Out-File -Encoding utf8 "$mediaDir/ffmpeg-version.txt"
           & (Join-Path $stage.FullName 'bin/ffmpeg.exe') -L | Out-File -Encoding utf8 "$mediaDir/ffmpeg-license.txt"
           Get-FileHash "$($stage.FullName)\bin\mpv.exe", "$($stage.FullName)\bin\ffmpeg.exe", "$($stage.FullName)\bin\ffprobe.exe" -Algorithm SHA256 | Format-Table -AutoSize | Out-File -Encoding utf8 "$mediaDir/binary-sha256.txt"
-          $pfxPath = Join-Path $env:RUNNER_TEMP 'animecaos-release-signing.pfx'
-          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_PFX_BASE64))
-          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
-          if (-not $signtool) { throw 'SignTool não está instalado no runner' }
-          foreach ($file in @("$($stage.FullName)\AnimeCaos.exe", "$($stage.FullName)\animecaos-cli.exe")) {
-            & $signtool.FullName sign /fd SHA256 /f $pfxPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $file
-            if ($LASTEXITCODE -ne 0) { throw "Não foi possível assinar $file" }
-            & $signtool.FullName verify /pa /all $file
-            if ($LASTEXITCODE -ne 0) { throw "A assinatura de $file não passou na verificação" }
+          $hasCertificate = -not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PFX_BASE64)
+          $hasPassword = -not [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)
+          if ($hasCertificate -ne $hasPassword) { throw 'Configure os dois secrets Authenticode ou remova ambos para publicar sem assinatura.' }
+          $signingConfigured = $hasCertificate -and $hasPassword
+          New-Item -ItemType Directory -Force release | Out-Null
+          $signatureStatus = 'Windows artifacts are not Authenticode-signed. SHA256SUMS is signed with Sigstore.'
+          if ($signingConfigured) {
+            $pfxPath = Join-Path $env:RUNNER_TEMP 'animecaos-release-signing.pfx'
+            [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_PFX_BASE64))
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName | Select-Object -Last 1
+            if (-not $signtool) { throw 'SignTool não está instalado no runner' }
+            foreach ($file in @("$($stage.FullName)\AnimeCaos.exe", "$($stage.FullName)\animecaos-cli.exe")) {
+              & $signtool.FullName sign /fd SHA256 /f $pfxPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $file
+              if ($LASTEXITCODE -ne 0) { throw "Não foi possível assinar $file" }
+              & $signtool.FullName verify /pa /all $file
+              if ($LASTEXITCODE -ne 0) { throw "A assinatura de $file não passou na verificação" }
+            }
+            $signatureStatus = 'Windows application and installer are Authenticode-signed; SHA256SUMS is signed with Sigstore.'
           }
           & "$env:GITHUB_WORKSPACE/scripts/write-release-manifest.ps1" -Stage $stage.FullName -Version $version -Platform windows -Architecture amd64
           $portable = "release/AnimeCaos-$version-windows-amd64.zip"
@@ -181,10 +184,17 @@ jobs:
           if (-not $iscc) { throw 'Inno Setup compiler não está no runner' }
           & $iscc.Source "/DPackageDir=$($stage.FullName)" "/DAppVersion=$version" deploy/go/windows.iss
           if ($LASTEXITCODE -ne 0) { throw 'Falha ao gerar instalador Inno Setup' }
-          & $signtool.FullName sign /fd SHA256 /f $pfxPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td SHA256 "release/AnimeCaos-$version-windows-setup.exe"
-          if ($LASTEXITCODE -ne 0) { throw 'Não foi possível assinar o instalador Inno Setup' }
-          & $signtool.FullName verify /pa /all "release/AnimeCaos-$version-windows-setup.exe"
-          if ($LASTEXITCODE -ne 0) { throw 'Assinatura do instalador não passou na verificação' }
+          if ($signingConfigured) {
+            & $signtool.FullName sign /fd SHA256 /f $pfxPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td SHA256 "release/AnimeCaos-$version-windows-setup.exe"
+            if ($LASTEXITCODE -ne 0) { throw 'Não foi possível assinar o instalador Inno Setup' }
+            & $signtool.FullName verify /pa /all "release/AnimeCaos-$version-windows-setup.exe"
+            if ($LASTEXITCODE -ne 0) { throw 'Assinatura do instalador não passou na verificação' }
+          }
+          Set-Content -Path release/WINDOWS-AUTHENTICODE-STATUS.txt -Value $signatureStatus -Encoding utf8
+          if (-not $signingConfigured) {
+            Write-Warning 'Publicando os binários Windows sem Authenticode; a situação também será registrada nas notas e nos arquivos da release.'
+            Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value "Windows: sem assinatura Authenticode. SHA256SUMS terá assinatura Sigstore."
+          }
           Write-Output "Version=$version" >> $env:GITHUB_OUTPUT
         env:
           WINDOWS_CERTIFICATE_PFX_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
@@ -201,6 +211,7 @@ jobs:
           path: |
             release/AnimeCaos-*-windows-amd64.zip
             release/AnimeCaos-*-windows-setup.exe
+            release/WINDOWS-AUTHENTICODE-STATUS.txt
           if-no-files-found: error
           retention-days: 14
 
@@ -278,7 +289,7 @@ jobs:
           retention-days: 14
 
   publish:
-    name: Sign manifests and create GitHub Release
+    name: Sign checksums and create GitHub Release
     needs: [windows, linux]
     runs-on: ubuntu-24.04
     permissions:
@@ -301,4 +312,34 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${GITHUB_REF_NAME}"
-          gh release create "$tag" release/AnimeCaos-*-windows-amd64.zip release/AnimeCaos-*-windows-setup.exe release/AnimeCaos-*-x86_64.AppImage release/SHA256SUMS release/SHA256SUMS.sigstore.json --verify-tag --generate-notes
+          gh release create "$tag" release/AnimeCaos-*-windows-amd64.zip release/AnimeCaos-*-windows-setup.exe release/AnimeCaos-*-x86_64.AppImage release/SHA256SUMS release/SHA256SUMS.sigstore.json release/WINDOWS-AUTHENTICODE-STATUS.txt --verify-tag --generate-notes --draft
+          gh release view "$tag" --json body --jq .body > release/release-notes.md
+          cat >> release/release-notes.md <<'EOF'
+
+          ### Atualização de instalações anteriores
+
+          No Windows, a versão 2.0.0 pode oferecer a atualização para 3.x ao abrir; confirme a atualização para migrar. Depois disso, a linha 3.x se atualiza automaticamente ao iniciar. O atualizador antigo não verifica SHA-256. A versão Flatpak 2.0.0 não instala AppImage; instale o AppImage manualmente para migrar.
+          EOF
+          if grep -qi 'not Authenticode-signed' release/WINDOWS-AUTHENTICODE-STATUS.txt; then
+            cat >> release/release-notes.md <<'EOF'
+
+          ### Windows signature
+
+          Windows binaries are not Authenticode-signed. The SHA-256 manifest is signed with Sigstore; Windows may still show a publisher warning.
+          EOF
+          else
+            cat >> release/release-notes.md <<'EOF'
+
+          ### Windows signature
+
+          The Windows application and installer are Authenticode-signed. The SHA-256 manifest is also signed with Sigstore.
+          EOF
+          fi
+          cat >> release/release-notes.md <<'EOF'
+
+          ### MyAnimeList
+
+          O login de primeira conexão com MyAnimeList ainda não foi validado em uma conta real; a troca de token sem Client Secret retornou `invalid_client`. Segredos legados já salvos podem ser usados pelo aplicativo. A sincronização AniList não é afetada.
+          EOF
+          gh release edit "$tag" --notes-file release/release-notes.md
+          gh release edit "$tag" --draft=false

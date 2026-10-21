@@ -137,6 +137,20 @@ func showMainWindowWithSplash(ctx context.Context) {
 	wr.WindowReloadApp(ctx)
 }
 
+func restartFromTray(ctx context.Context) {
+	if developmentBuild {
+		// Keep the Wails dev process and its Vite server alive. Restarting the
+		// compiled child executable directly would leave it pointing at a Vite
+		// server that the wails dev command shuts down with the parent process.
+		showMainWindowWithSplash(ctx)
+		return
+	}
+	quitRequested.Store(true)
+	restartRequested.Store(true)
+	platform.QuitTray()
+	wr.Quit(ctx)
+}
+
 func stopStartupTopmostTimer() {
 	startupTopmostMu.Lock()
 	if startupTopmostTimer != nil {
@@ -236,7 +250,7 @@ func main() {
 		}
 	}()
 	settings := service.Settings()
-	e = wails.Run(&options.App{Title: "AnimeCaos", Width: max(900, settings.Width), Height: max(600, settings.Height), MinWidth: 800, MinHeight: 560, BackgroundColour: options.NewRGB(21, 21, 21), AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{service, &desktop}, Windows: webviewOptions,
+	e = wails.Run(&options.App{Title: "AnimeCaos", Width: max(900, settings.Width), Height: max(600, settings.Height), MinWidth: 800, MinHeight: 560, BackgroundColour: options.NewRGB(0, 0, 0), AssetServer: &assetserver.Options{Assets: assets}, Bind: []interface{}{service, &desktop}, Windows: webviewOptions,
 		OnStartup: func(ctx context.Context) {
 			desktop.ctx = ctx
 			width, height := max(900, settings.Width), max(600, settings.Height)
@@ -247,15 +261,15 @@ func main() {
 			}
 			prioritizeStartupWindow(ctx)
 			platform.RunTray(trayIcon, func() { showMainWindow(ctx) }, func() { wr.WindowMinimise(ctx) }, func() { wr.WindowHide(ctx) }, func() {
-				quitRequested.Store(true)
-				restartRequested.Store(true)
-				platform.QuitTray()
-				wr.Quit(ctx)
+				restartFromTray(ctx)
 			}, func() {
 				quitRequested.Store(true)
 				platform.QuitTray()
 				wr.Quit(ctx)
 			})
+			if !developmentBuild {
+				service.StartStartupAutoUpdate()
+			}
 		},
 		OnBeforeClose: func(ctx context.Context) bool {
 			saveWindowGeometry(ctx, service)

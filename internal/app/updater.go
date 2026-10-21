@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -9,7 +10,89 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 )
+
+const startupAutoUpdateOperationID = "startup-auto-update"
+
+func startupUpdateTarget(goos, executable, appImage, flatpakID string) (string, bool) {
+	switch goos {
+	case "windows":
+		target := filepath.Dir(executable)
+		if _, err := os.Stat(filepath.Join(target, "release-manifest.json")); err != nil {
+			return "", false
+		}
+		return target, true
+	case "linux":
+		if appImage == "" || flatpakID != "" {
+			return "", false
+		}
+		return appImage, true
+	default:
+		return "", false
+	}
+}
+
+func (s *Service) supportsStartupAutoUpdate() bool {
+	executable, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	_, supported := startupUpdateTarget(runtime.GOOS, executable, os.Getenv("APPIMAGE"), os.Getenv("FLATPAK_ID"))
+	return supported
+}
+
+// StartStartupAutoUpdate checks for a published release in the background.
+// Packaged Windows and AppImage builds download and verify an update while the
+// startup splash is visible. Development builds and externally managed Linux
+// packages continue starting without checking or replacing files.
+func (s *Service) StartStartupAutoUpdate() {
+	s.startupUpdateOnce.Do(func() {
+		if !s.supportsStartupAutoUpdate() {
+			return
+		}
+		s.setStartupUpdateStatus(StartupUpdateStatus{State: "checking", Done: false})
+		go s.runStartupAutoUpdate()
+	})
+}
+
+func (s *Service) runStartupAutoUpdate() {
+	checkCtx, cancelCheck := context.WithTimeout(s.ctx, 8*time.Second)
+	info, err := s.updater.Check(checkCtx)
+	cancelCheck()
+	if err != nil {
+		s.setStartupUpdateStatus(StartupUpdateStatus{State: "failed", Done: true})
+		return
+	}
+	if !info.Available || info.Managed {
+		s.setStartupUpdateStatus(StartupUpdateStatus{State: "ready", Percent: 100, Done: true})
+		return
+	}
+
+	s.setStartupUpdateStatus(StartupUpdateStatus{State: "downloading", Version: info.Version, Done: false})
+	path, err := s.DownloadUpdate(startupAutoUpdateOperationID, info)
+	if err != nil {
+		s.setStartupUpdateStatus(StartupUpdateStatus{State: "failed", Version: info.Version, Done: true})
+		return
+	}
+	s.setStartupUpdateStatus(StartupUpdateStatus{State: "installing", Percent: 100, Version: info.Version, Done: false})
+	if err := s.InstallUpdate(path); err != nil {
+		s.setStartupUpdateStatus(StartupUpdateStatus{State: "failed", Percent: 100, Version: info.Version, Done: true})
+	}
+}
+
+func (s *Service) StartupUpdateStatus() StartupUpdateStatus {
+	s.startupUpdateMu.RLock()
+	defer s.startupUpdateMu.RUnlock()
+	return s.startupUpdate
+}
+
+func (s *Service) setStartupUpdateStatus(status StartupUpdateStatus) {
+	s.startupUpdateMu.Lock()
+	s.startupUpdate = status
+	s.startupUpdateMu.Unlock()
+	s.emit("startup-update", status)
+}
 
 func digestFile(path string) (string, error) {
 	f, e := os.Open(path)

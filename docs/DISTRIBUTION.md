@@ -84,16 +84,28 @@ de mídia estão em [`licenses/SOURCE-OFFERS.md`](../licenses/SOURCE-OFFERS.md).
 - `.github/workflows/ci.yml` roda `go test ./...`, `go test -race ./...` no
   Linux, TypeScript e Vitest em runners Windows e Ubuntu 24.04.
 - `.github/workflows/release.yml` só inicia em uma tag `v*`, repete as
-  validações, gera portátil/instalador Windows e AppImage, testa atualização e
-  preservação de dados e bloqueia publicação quando faltar assinatura Windows.
-- Para publicar Windows, configure os secrets
-  `WINDOWS_CERTIFICATE_PFX_BASE64` e `WINDOWS_CERTIFICATE_PASSWORD` com um
-  certificado de assinatura de código. O workflow assina EXE e instalador,
-  valida Authenticode e gera hashes. `SHA256SUMS` recebe assinatura keyless
-  Sigstore via OIDC do GitHub Actions.
+  validações, gera portátil/instalador Windows e AppImage, executa os smoke
+  tests de instalação/update e publica checksums assinados com Sigstore.
+- Com os secrets `WINDOWS_CERTIFICATE_PFX_BASE64` e
+  `WINDOWS_CERTIFICATE_PASSWORD`, o workflow assina EXE e instalador com
+  Authenticode e verifica as assinaturas. Sem os dois secrets, publica os
+  pacotes Windows sem Authenticode e registra essa condição nas notas e num
+  arquivo da release. A assinatura Sigstore de `SHA256SUMS` continua ativa;
+  ela não substitui o certificado Authenticode nem elimina o aviso de editor
+  desconhecido do Windows.
 - A versão da tag deve coincidir com `wails.json` e com o `-version` do pacote.
-  A versão padrão atual é `3.0.0`; a release não deve ser criada até a matriz
-  manual limpa e a rotação do segredo MAL exposto estarem concluídas.
+  A versão padrão atual é `3.0.0`. O atualizador verifica a release no começo
+  da splash, usa um limite de 8 s para a consulta, baixa o pacote com limite de
+  30 min, confere `SHA256SUMS` e aplica ZIP Windows/AppImage antes de liberar a
+  interface. O fluxo não vale para `wails dev` ou Flatpak.
+- A release histórica `v2.0.0` para Windows tem um atualizador Python que
+  consulta a mesma API e escolhe o ZIP Windows. Na primeira versão 3.x, ela
+  detecta a versão nova e pede confirmação para copiar o ZIP. Depois da
+  migração, as próximas versões 3.x são aplicadas automaticamente. O atualizador
+  legado não valida SHA-256; releases precisam ser servidas pela API oficial do
+  GitHub via HTTPS. A linha Go/Wails valida SHA-256 antes de substituir os
+  arquivos. A antiga edição Flatpak não sabe instalar o AppImage e exige
+  migração manual para esse formato.
 
 ## Validação manual ainda exigida
 

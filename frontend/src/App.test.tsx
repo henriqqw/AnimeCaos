@@ -127,6 +127,7 @@ async function renderReadyApp() {
   try {
     const rendered = render(<App />);
     rendered.container.querySelectorAll<HTMLImageElement>(".startup-splash img").forEach((image) => fireEvent.load(image));
+    rendered.container.querySelectorAll<HTMLVideoElement>(".startup-splash video").forEach((video) => fireEvent.loadedData(video));
     await act(async () => {
       await new Promise<void>((resolve) => originalSetTimeout(resolve, 20));
     });
@@ -135,6 +136,43 @@ async function renderReadyApp() {
     window.setTimeout = originalSetTimeout;
   }
 }
+describe("splash de inicialização", () => {
+  it("sincroniza o fade da wordmark com o primeiro quadro pronto do vídeo", () => {
+    const { container } = render(<App />);
+    const wordmark = container.querySelector<HTMLImageElement>(".startup-splash-wordmark");
+    const video = container.querySelector<HTMLVideoElement>(".startup-splash-mascot-video");
+    expect(wordmark).toBeTruthy();
+    expect(video).toBeTruthy();
+    expect(container.querySelector(".startup-splash-mascot-poster")).toBeNull();
+
+    fireEvent.load(wordmark!);
+    expect(wordmark!.classList.contains("startup-splash-art-loaded")).toBe(false);
+    expect(video!.classList.contains("startup-splash-art-loaded")).toBe(false);
+
+    fireEvent.loadedData(video!);
+    expect(wordmark!.classList.contains("startup-splash-art-loaded")).toBe(true);
+    expect(video!.classList.contains("startup-splash-art-loaded")).toBe(true);
+  });
+
+  it("tenta recarregar o vídeo e não revela a logo se a animação falhar", () => {
+    const { container } = render(<App />);
+    const firstVideo = container.querySelector<HTMLVideoElement>(".startup-splash-mascot-video")!;
+    const wordmark = container.querySelector<HTMLImageElement>(".startup-splash-wordmark")!;
+
+    fireEvent.load(wordmark);
+    fireEvent.error(firstVideo);
+
+    const retriedVideo = container.querySelector<HTMLVideoElement>(".startup-splash-mascot-video")!;
+    expect(retriedVideo.getAttribute("src")).toBe("/avatar_loop.webm?retry=1");
+    expect(wordmark.classList.contains("startup-splash-art-loaded")).toBe(false);
+
+    fireEvent.error(retriedVideo);
+    expect(screen.getByRole("alert").textContent).toContain("Não foi possível carregar a animação.");
+    fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
+    expect(container.querySelector(".startup-splash-video-error")).toBeNull();
+    expect(container.querySelector<HTMLVideoElement>(".startup-splash-mascot-video")!.getAttribute("src")).toBe("/avatar_loop.webm?retry=2");
+  });
+});
 async function searchScreen() {
   await renderReadyApp();
   const navigation = await screen.findByRole("navigation", { name: "Navegação principal" });

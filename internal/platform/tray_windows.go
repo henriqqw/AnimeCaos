@@ -44,8 +44,9 @@ func RunTray(icon []byte, show, minimize, hide, restart, quit func()) {
 						case <-hideItem.ClickedCh:
 							hide()
 						case <-restartItem.ClickedCh:
+							// Keep listening: in development restart reloads the UI without
+							// exiting this process or rebuilding the tray menu.
 							restart()
-							return
 						case <-quitItem.ClickedCh:
 							quit()
 							return

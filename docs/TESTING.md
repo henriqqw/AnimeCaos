@@ -1,5 +1,58 @@
 # Testes e validação
 
+## Splash animada e reinício em desenvolvimento — 20/10/2026
+
+O PNG de poster foi removido da splash. O HTML antecipa o carregamento do WebM;
+vídeo e wordmark só iniciam juntos o fade de 560 ms após o primeiro quadro ser
+decodificado e a logo carregar. Se houver falha, a página tenta o vídeo outra
+vez e oferece retry manual, mantendo a logo oculta. O progresso soma vídeo e
+wordmark (10% cada), `Initial()` (60%), o tempo mínimo (18%) e o fade-out (2%).
+O relógio normaliza os primeiros 3,4 s; o fade-out dura mais 600 ms. A splash
+fica visível por pelo menos 4 s e pode demorar mais se o vídeo, o backend ou o
+fade-in ainda estiverem em andamento. O layout adapta a composição a janelas
+estreitas e baixas. O listener da bandeja não termina após um reinício, então
+`wails dev` pode recarregar a interface várias vezes sem encerrar o Vite.
+
+| Comando/inspeção | Resultado |
+|---|---|
+| `cd frontend; npm exec -- tsc --noEmit` | Passou após a remoção do poster e a implementação do retry de vídeo. |
+| `cd frontend; npm test -- --run` | Passou: 34/34, incluindo a entrada sincronizada, ausência de poster e retry após falha do vídeo. |
+| `go test ./... -count=1` no Windows | Passou em todos os pacotes, incluindo `internal/platform`. |
+| `go test -tags dev . -run '^TestAppInstanceIDUsesDevelopmentNamespace$' -count=1` | Passou; o build `dev` seleciona recarregamento no mesmo processo. |
+| `wsl -d Ubuntu-24.04 -- bash -lc 'export PATH=/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin; cd /mnt/d/AnimeCaos; go test -race ./... -count=1'` | Passou em todos os pacotes. |
+| `git diff --check` | Passou; Git mostrou apenas avisos de conversão LF/CRLF no checkout Windows. |
+| Build/empacotamento depois desta revisão | Não executado conforme a pausa solicitada. A reprodução visual e os reinícios repetidos ainda precisam de inspeção manual na janela Wails. |
+
+## Auto-update na inicialização e correção do CI — 21/10/2026
+
+Builds instaladas no Windows e AppImage Linux agora consultam a release durante
+a splash. A checagem tem limite de 8 s; pacote mais novo é baixado, validado
+com SHA-256 e aplicado antes de a interface ser liberada. Download, instalação,
+erro de rede e pacote Flatpak não bloqueiam a versão atual. Os testes cobrem
+Windows/AppImage/Flatpak e a falha de consulta. A edição Windows v2.0.0 tem um
+atualizador Python que pede confirmação e migra pelo ZIP, sem validar SHA-256.
+A antiga edição Flatpak exige migrar manualmente para AppImage. O auto-update
+Go/Wails valida o pacote e passa a operar após a migração.
+
+| Comando/inspeção | Resultado |
+|---|---|
+| `npm ci` em `frontend` | Passou depois de encerrar a sessão `wails dev` que mantinha o binário Rollup aberto. Instalou 99 pacotes; `npm audit` informou 0 vulnerabilidades. |
+| `cd frontend; npm run build` | Passou; TypeScript e Vite geraram `frontend/dist`. |
+| `go test ./... -count=1` | Passou em todos os pacotes, incluindo os testes do auto-update na inicialização. |
+| `cd frontend; npm exec -- tsc --noEmit` | Passou. |
+| `cd frontend; npm test -- --run` | Passou: 34/34. |
+| Parser YAML do Python (`yaml.safe_load`) nos dois workflows | Passou depois de corrigir a indentação das notas da release. |
+| CI remoto após corrigir a ordem de build do frontend | Ainda não executado nesta revisão; requer commit/push. |
+| Workflow de release e smoke de instalação em Windows/Linux | Ainda não executados nesta revisão; requer a tag `v3.0.0`. |
+
+Antes da pausa do build, o empacotador Windows já havia escrito um ZIP
+`AnimeCaos-3.0.0-windows-amd64.zip` de 673.047.323 bytes. O compilador Inno
+escreveu um arquivo `AnimeCaos-3.0.0-windows-setup.exe` de 235.083.780 bytes,
+mas a execução foi interrompida e o código de saída não foi registrado. Esses
+dois arquivos foram gerados antes da correção atual do fade sincronizado e do
+reinício dev; não são builds finais nem foram verificados para distribuição.
+O AppImage em `release/` é da rodada anterior. Nenhuma release foi publicada.
+
 ## Pacotes locais de release — 20/10/2026
 
 Os pacotes `3.0.0` para Windows x64 e Ubuntu 24.04 x86_64 foram recompilados

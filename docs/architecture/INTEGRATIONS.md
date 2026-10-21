@@ -46,11 +46,11 @@ A tela de Configurações mostra o símbolo Discord, o estado do controle de pre
 
 ## Atualizador
 
-- Consulta `https://api.github.com/repos/henriqqw/animecaos/releases/latest`.
-- Seleciona ZIP Windows `windows-amd64.zip` ou AppImage Linux x86_64, além de `SHA256SUMS`.
-- Confere checksum antes de publicar pacote local. O helper valida caminhos do ZIP, rejeita symlinks/duplicatas e limita conteúdo descompactado. Atualizações Flatpak são identificadas como gerenciadas e não aplicadas pelo helper.
-- O helper copia/substitui os arquivos de aplicativo e conserva dados do usuário; rollback é tentado quando inicialização ou troca falha.
-- A verificação e os testes unitários não significam que uma atualização instalada tenha sido executada ponta a ponta nesta máquina.
+- Builds de distribuição Windows e AppImage Linux iniciam uma consulta a `https://api.github.com/repos/henriqqw/animecaos/releases/latest` ao abrir o app. A consulta tem limite de 8 s; sem rede, pacote de desenvolvimento e builds não suportadas seguem para o app sem instalar nada.
+- Para uma versão numericamente superior, escolhe o ZIP Windows `windows-amd64.zip` ou AppImage Linux x86_64 e baixa `SHA256SUMS`. Verifica o SHA-256 do pacote antes de registrar sua validação local e instalá-lo; o progresso é enviado à barra da splash.
+- A splash espera o resultado da checagem/download. Ao terminar a validação, o helper substitui os arquivos e abre a versão nova antes de mostrar a interface. Erro ou timeout encerra a tentativa e libera a versão atual. O helper valida caminhos do ZIP, rejeita symlinks/duplicatas e limita o conteúdo descompactado; dados do usuário ficam fora do pacote.
+- Flatpak é identificado como gerenciado pelo sistema; `wails dev` não participa do fluxo. Configurações ainda oferece checagem, download e instalação manuais.
+- A edição Windows da release histórica `v2.0.0` ainda tem um atualizador Python que detecta a release 3.x e solicita confirmação antes de copiar o ZIP para a instalação existente. Após a migração, o atualizador Go/Wails aplica as próximas versões automaticamente. O atualizador legado não confere o SHA-256; o novo confere. A edição Flatpak antiga não instala o AppImage e requer migração manual. Atualizações ponta a ponta devem continuar sendo exercitadas pelos smoke tests Windows e AppImage.
 
 ## Configuração e credenciais
 

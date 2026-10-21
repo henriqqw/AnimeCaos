@@ -1,7 +1,7 @@
 import Image from "./Image";
 import { createPortal } from "react-dom";
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { api, desktop, on, op } from "./api";
+import { api, desktop, on, op, type StartupUpdateStatus } from "./api";
 import {
   key,
   type Anime,
@@ -44,7 +44,7 @@ const names: Record<string, string> = {
 const time = (n: number) =>
   `${Math.floor(n / 60)}:${String(Math.floor(n % 60)).padStart(2, "0")}`;
 const HISTORY_PAGE_SIZE = 24;
-const STARTUP_SPLASH_TOTAL_MS = 3000;
+const STARTUP_SPLASH_TOTAL_MS = 4000;
 const STARTUP_SPLASH_FADE_IN_MS = 560;
 const STARTUP_SPLASH_EXIT_MS = 600;
 const STARTUP_SPLASH_EXIT_START_MS = STARTUP_SPLASH_TOTAL_MS - STARTUP_SPLASH_EXIT_MS;
@@ -55,6 +55,10 @@ const userMessage = (value: string) =>
   value
     .replace(/https?:\/\/[^\s)]+/gi, "serviço externo")
     .replace(/animefire|animesonlinecc|betteranime/gi, "fonte de conteúdo");
+const hasStartupUpdateAPI = () => {
+  const service = window.go?.app?.Service as unknown as Record<string, unknown> | undefined;
+  return typeof service?.StartupUpdateStatus === "function";
+};
 
 const navPaths: Record<string, string> = {
   home: "M3 10.5 12 3l9 7.5M5.5 9v11h13V9M9 20v-6h6v6",
@@ -80,7 +84,6 @@ const mascotAssets = {
   bugReport: "/mascots/reactions/animecaos-reaction-bug-report-v1.png",
   mangaReading: "/mascots/reactions/animecaos-reaction-reading-focused-v3.png",
   homeWink: "/mascots/reactions/animecaos-reaction-home-wink-v2.png",
-  startup: "/mascots/poses/animecaos-pose-startup-v2.png",
 } as const;
 type MascotAsset = keyof typeof mascotAssets;
 const externalLinks = {
@@ -112,15 +115,19 @@ function MascotArt({ asset, className, loading = "lazy" }: { asset: MascotAsset;
 function StartupSplash({
   leaving,
   backendReady,
+  startupUpdate,
   assets,
   onAssetLoaded,
 }: {
   leaving: boolean;
   backendReady: boolean;
+  startupUpdate: StartupUpdateStatus;
   assets: StartupAssets;
   onAssetLoaded: (asset: StartupAsset) => void;
 }) {
-  const [mascotLoaded, setMascotLoaded] = useState(false);
+  const [mascotVideoReady, setMascotVideoReady] = useState(false);
+  const [mascotVideoAttempt, setMascotVideoAttempt] = useState(0);
+  const [mascotVideoError, setMascotVideoError] = useState(false);
   const [wordmarkLoaded, setWordmarkLoaded] = useState(false);
   const [holdProgress, setHoldProgress] = useState(0);
   useEffect(() => {
@@ -135,8 +142,16 @@ function StartupSplash({
     return () => window.cancelAnimationFrame(frame);
   }, []);
   const assetsLoaded = Number(assets.mascot) + Number(assets.wordmark);
-  const progress = Math.min(100, assetsLoaded * 10 + (backendReady ? 60 : 0) + holdProgress * 18 + (leaving ? 2 : 0));
+  const updateProgress = startupUpdate.done ? 28 : Math.max(0, Math.min(100, startupUpdate.percent)) * 0.28;
+  const progress = Math.min(100, assetsLoaded * 10 + (backendReady ? 50 : 0) + holdProgress * 10 + updateProgress + (leaving ? 2 : 0));
   const percentage = Math.round(progress);
+  const startupLabel = startupUpdate.state === "downloading"
+    ? `BAIXANDO ATUALIZAÇÃO${startupUpdate.version ? ` ${startupUpdate.version}` : ""}`
+    : startupUpdate.state === "installing"
+      ? "INSTALANDO ATUALIZAÇÃO"
+      : "INICIANDO";
+  const artEntranceReady = mascotVideoReady && wordmarkLoaded;
+  const videoClass = `startup-splash-mascot startup-splash-mascot-video startup-splash-art${artEntranceReady ? " startup-splash-art-loaded" : ""}`;
   return (
     <div
       className={`startup-splash${leaving ? " startup-splash-leaving" : ""}`}
@@ -146,15 +161,25 @@ function StartupSplash({
     >
       <div className="startup-splash-stage">
         <div className="startup-splash-mascot-wrap">
-          <img
-            src={mascotAssets.startup}
-            alt=""
+          <video
+            key={mascotVideoAttempt}
+            src={mascotVideoAttempt === 0 ? "/avatar_loop.webm" : `/avatar_loop.webm?retry=${mascotVideoAttempt}`}
             aria-hidden="true"
-            className={`startup-splash-mascot startup-splash-art${mascotLoaded ? " startup-splash-art-loaded" : ""}`}
-            loading="eager"
-            decoding="sync"
-            onLoad={() => { setMascotLoaded(true); onAssetLoaded("mascot"); }}
-            onError={() => onAssetLoaded("mascot")}
+            className={videoClass}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            onLoadedData={() => {
+              setMascotVideoReady(true);
+              setMascotVideoError(false);
+              onAssetLoaded("mascot");
+            }}
+            onError={() => {
+              if (mascotVideoAttempt === 0) setMascotVideoAttempt(1);
+              else setMascotVideoError(true);
+            }}
           />
         </div>
         <div className="startup-splash-brand">
@@ -162,14 +187,22 @@ function StartupSplash({
             src="/animecaos-wordmark.png"
             alt=""
             aria-hidden="true"
-            className={`startup-splash-wordmark startup-splash-art${wordmarkLoaded ? " startup-splash-art-loaded" : ""}`}
+            className={`startup-splash-wordmark startup-splash-art${artEntranceReady ? " startup-splash-art-loaded" : ""}`}
             loading="eager"
             decoding="sync"
             onLoad={() => { setWordmarkLoaded(true); onAssetLoaded("wordmark"); }}
-            onError={() => onAssetLoaded("wordmark")}
+            onError={() => { setWordmarkLoaded(true); onAssetLoaded("wordmark"); }}
           />
+          {mascotVideoError && (
+            <div className="startup-splash-video-error" role="alert">
+              <span>Não foi possível carregar a animação.</span>
+              <button type="button" onClick={() => { setMascotVideoError(false); setMascotVideoAttempt((attempt) => attempt + 1); }}>
+                Tentar novamente
+              </button>
+            </div>
+          )}
           <span className="startup-splash-divider" aria-hidden="true" />
-          <span className="startup-splash-label" aria-hidden="true">INICIANDO</span>
+          <span className="startup-splash-label" aria-hidden="true">{startupLabel}</span>
           <div
             className="startup-splash-progress"
             role="progressbar"
@@ -226,11 +259,14 @@ export default function App() {
   const [startupSplashDismissed, setStartupSplashDismissed] = useState(false);
   const [startupSplashToken, setStartupSplashToken] = useState<number | null>(null);
   const [startupInitialReady, setStartupInitialReady] = useState(false);
+  const [startupUpdate, setStartupUpdate] = useState<StartupUpdateStatus>(() => hasStartupUpdateAPI()
+    ? { state: "checking", percent: 0, version: "", done: false }
+    : { state: "ready", percent: 100, version: "", done: true });
   const [startupAssets, setStartupAssets] = useState<StartupAssets>({ mascot: false, wordmark: false });
   const [startupSplashArtEntranceComplete, setStartupSplashArtEntranceComplete] = useState(false);
   const startupSplashCanDismiss =
-    startupSplashHoldElapsed && startupInitialReady && startupAssets.mascot &&
-    startupAssets.wordmark && startupSplashArtEntranceComplete;
+    startupSplashHoldElapsed && startupInitialReady && startupAssets.mascot && startupAssets.wordmark &&
+    startupSplashArtEntranceComplete && startupUpdate.done;
   const startupSplashVisible = !startupSplashDismissed;
   const [settingsSaveState, setSettingsSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const settingsRef = useRef<Settings | null>(null);
@@ -266,6 +302,27 @@ export default function App() {
       if (active) setStartupSplashToken(token);
     }).catch(() => {});
     return () => { active = false; };
+  }, []);
+  useEffect(() => {
+    if (!hasStartupUpdateAPI()) return;
+    let active = true;
+    let timer = 0;
+    const refresh = () => {
+      void api.StartupUpdateStatus().then((status) => {
+        if (!active) return;
+        setStartupUpdate(status);
+        if (status.done && timer) window.clearInterval(timer);
+      }).catch(() => {
+        if (active) setStartupUpdate({ state: "ready", percent: 100, version: "", done: true });
+        if (timer) window.clearInterval(timer);
+      });
+    };
+    refresh();
+    timer = window.setInterval(refresh, 250);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, []);
   const report = (e: unknown) => {
     const m = message(e);
@@ -443,7 +500,7 @@ export default function App() {
           <small>v{version}</small>
           <p>{error || "Abrindo sua biblioteca…"}</p>
         </main>
-        {startupSplashVisible && <StartupSplash leaving={startupSplashCanDismiss} backendReady={startupInitialReady} assets={startupAssets} onAssetLoaded={markStartupAssetLoaded} />}
+        {startupSplashVisible && <StartupSplash leaving={startupSplashCanDismiss} backendReady={startupInitialReady} startupUpdate={startupUpdate} assets={startupAssets} onAssetLoaded={markStartupAssetLoaded} />}
       </>
     );
   return (
@@ -723,7 +780,7 @@ export default function App() {
         </footer>
       )}
       </div>
-      {startupSplashVisible && <StartupSplash leaving={startupSplashCanDismiss} backendReady={startupInitialReady} assets={startupAssets} onAssetLoaded={markStartupAssetLoaded} />}
+      {startupSplashVisible && <StartupSplash leaving={startupSplashCanDismiss} backendReady={startupInitialReady} startupUpdate={startupUpdate} assets={startupAssets} onAssetLoaded={markStartupAssetLoaded} />}
     </>
   );
 }

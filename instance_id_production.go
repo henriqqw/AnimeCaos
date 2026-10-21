@@ -3,3 +3,4 @@
 package main
 
 const appInstanceID = "com.animecaos.App.production"
+const developmentBuild = false

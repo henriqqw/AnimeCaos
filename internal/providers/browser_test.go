@@ -4,10 +4,21 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
 )
+
+func requireBrowserTest(t *testing.T) {
+	t.Helper()
+	if os.Getenv("ANIMECAOS_BROWSER_TEST") != "1" {
+		t.Skip("set ANIMECAOS_BROWSER_TEST=1 to exercise Selenium/browser fixtures")
+	}
+	if _, err := findBrowser(); err != nil {
+		t.Skip(err)
+	}
+}
 
 func TestSecurityChallengeMarkersAreRejected(t *testing.T) {
 	if !securityChallenge(`<title>Performing security verification</title><div class="cf-chl-widget"></div>`) {
@@ -19,9 +30,7 @@ func TestSecurityChallengeMarkersAreRejected(t *testing.T) {
 }
 
 func TestRenderedPlayerURLsFindsIframeCreatedByJavaScript(t *testing.T) {
-	if _, err := findBrowser(); err != nil {
-		t.Skip(err)
-	}
+	requireBrowserTest(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(`<!doctype html><html><body><script>
@@ -47,9 +56,7 @@ setTimeout(() => {
 }
 
 func TestRenderedPlayerURLsRejectsProtectorInsteadOfOpeningItsLink(t *testing.T) {
-	if _, err := findBrowser(); err != nil {
-		t.Skip(err)
-	}
+	requireBrowserTest(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(`<!doctype html><html><body>
@@ -70,9 +77,7 @@ func TestRenderedPlayerURLsRejectsProtectorInsteadOfOpeningItsLink(t *testing.T)
 }
 
 func TestRenderedPlayerURLsReadsJWPlayerAndStartsMuted(t *testing.T) {
-	if _, err := findBrowser(); err != nil {
-		t.Skip(err)
-	}
+	requireBrowserTest(t)
 	t.Run("configured source", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -112,9 +117,7 @@ window.jwplayer = () => ({getPlaylistItem: () => ({}), setMute: () => {}, play: 
 }
 
 func TestRenderedPlayerURLsStartsScopedHTML5VideoMuted(t *testing.T) {
-	if _, err := findBrowser(); err != nil {
-		t.Skip(err)
-	}
+	requireBrowserTest(t)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write([]byte(`<!doctype html><html><body><div class="player-container"><video id="episode"></video></div><script>

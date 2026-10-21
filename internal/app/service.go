@@ -67,6 +67,9 @@ type Service struct {
 	player            playerController
 	queue             *downloads.Queue
 	updater           *update.Service
+	startupUpdateMu   sync.RWMutex
+	startupUpdateOnce sync.Once
+	startupUpdate     StartupUpdateStatus
 	bookRelease       func()
 	imageSlots        chan struct{}
 	availabilityMu    sync.Mutex
@@ -91,6 +94,12 @@ type Initial struct {
 	Settings domain.Settings        `json:"settings"`
 	Version  string                 `json:"version"`
 	Accounts []integrations.Account `json:"accounts"`
+}
+type StartupUpdateStatus struct {
+	State   string `json:"state"`
+	Percent int    `json:"percent"`
+	Version string `json:"version"`
+	Done    bool   `json:"done"`
 }
 type PlayerEvent struct {
 	State   player.State   `json:"state"`
@@ -119,7 +128,7 @@ func New(parent context.Context, dir string, emit func(string, any)) (*Service, 
 		emit = func(string, any) {}
 	}
 	c := netx.New()
-	s := &Service{ctx: ctx, cancel: cancel, ops: map[string]operation{}, db: db, gateway: g, emit: emit, settings: db.Defaults(), discord: &integrations.Discord{}, imageSlots: make(chan struct{}, 3), availabilityCache: map[string]availabilityCacheEntry{}}
+	s := &Service{ctx: ctx, cancel: cancel, ops: map[string]operation{}, db: db, gateway: g, emit: emit, settings: db.Defaults(), discord: &integrations.Discord{}, imageSlots: make(chan struct{}, 3), availabilityCache: map[string]availabilityCacheEntry{}, startupUpdate: StartupUpdateStatus{State: "ready", Done: true}}
 	s.catalog = &providers.Catalog{Providers: []domain.AnimeProvider{providers.NewAnimeFire(c), providers.NewSushiAnimes(c), providers.NewOnlineCC(c), providers.NewOtakulogia(c)}, Store: db}
 	s.metadata = integrations.NewMetadata(c, db)
 	s.accounts = integrations.NewAccounts(db, s.metadata)
@@ -1225,7 +1234,12 @@ func (s *Service) CheckUpdate(id string) (update.Info, error) {
 func (s *Service) DownloadUpdate(id string, info update.Info) (string, error) {
 	ctx, end := s.operation(id, 30*time.Minute)
 	defer end()
-	path, e := s.updater.Download(ctx, info, filepath.Join(s.db.Dir, "updates"), func(n int) { s.emit("update", map[string]any{"id": id, "percent": n}) })
+	path, e := s.updater.Download(ctx, info, filepath.Join(s.db.Dir, "updates"), func(n int) {
+		s.emit("update", map[string]any{"id": id, "percent": n})
+		if id == startupAutoUpdateOperationID {
+			s.setStartupUpdateStatus(StartupUpdateStatus{State: "downloading", Percent: n, Version: info.Version, Done: false})
+		}
+	})
 	if e != nil {
 		return "", e
 	}

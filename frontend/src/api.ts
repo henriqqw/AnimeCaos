@@ -71,6 +71,13 @@ export interface API {
   ClearCache(): Promise<void>;
   CheckUpdate(id: string): Promise<Update>;
   DownloadUpdate(id: string, info: Update): Promise<string>;
+  StartupUpdateStatus(): Promise<StartupUpdateStatus>;
+}
+export interface StartupUpdateStatus {
+  state: "ready" | "checking" | "downloading" | "installing" | "failed";
+  percent: number;
+  version: string;
+  done: boolean;
 }
 declare global {
   interface Window {

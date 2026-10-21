@@ -6,9 +6,9 @@ Mapa conferido em 20/10/2026. Atualize junto com mudanças de responsabilidade, 
 
 | Caminho | Responsabilidade |
 |---|---|
-| `main.go` | Entry point Wails, embed do frontend/ícone, janela com fundo inicial grafite, prioridade em primeiro plano sincronizada com a splash, reexibição da splash na segunda instância, geometria visível, diálogos, ciclo da bandeja Windows, single-instance e helpers de reinicialização/atualização |
-| `instance_id_dev.go`, `instance_id_production.go` | Mutexes separados para instância Wails de desenvolvimento e aplicativo empacotado |
-| `instance_id_dev_test.go`, `instance_id_production_test.go` | Testes dos IDs de instância selecionados pelos build tags |
+| `main.go` | Entry point Wails, embed do frontend/ícone, janela com fundo preto para evitar flash antes da splash, prioridade em primeiro plano sincronizada com a splash, reexibição da splash na segunda instância, geometria visível, diálogos, ciclo da bandeja Windows, reinício por reload no modo dev e relançamento no pacote, início do auto-update em builds instaladas, single-instance e helper de atualização |
+| `instance_id_dev.go`, `instance_id_production.go` | IDs de mutex e seleção do comportamento de reinício conforme os build tags dev/produção |
+| `instance_id_dev_test.go`, `instance_id_production_test.go` | Testes dos IDs de instância e da estratégia de reinício selecionados pelos build tags |
 | `go.mod`, `go.sum` | Versão do Go e dependências |
 | `wails.json` | Configuração do projeto Wails e comandos do frontend |
 | `cmd/animecaos/main.go` | CLI e navegação interativa com os mesmos serviços do app |
@@ -22,7 +22,7 @@ Mapa conferido em 20/10/2026. Atualize junto com mudanças de responsabilidade, 
 | `deploy/go/verify-appimage.sh` | Testa os MPV/FFmpeg/FFprobe/Firefox/GeckoDriver extraídos do AppImage, iframe JS, abertura, aplicação do update e preservação de `state.db` |
 | `deploy/go/bootstrap-appimage-tools.sh` | Obtém ferramentas AppImage com versões e SHA-256 fixados |
 | `scripts/write-release-manifest.ps1` | Gera inventário SHA-256 e tamanho dos arquivos do stage após assinatura |
-| `.github/workflows/ci.yml`, `.github/workflows/release.yml` | CI multiplataforma e pipeline de release assinado e com smoke tests |
+| `.github/workflows/ci.yml`, `.github/workflows/release.yml` | CI multiplataforma, builds de release com smoke tests, checksums assinados com Sigstore e Authenticode Windows quando os secrets de certificado existem; a release registra explicitamente quando Windows não tem assinatura Authenticode |
 | `THIRD-PARTY-NOTICES.md`, `licenses/` | Avisos, textos de licença e fontes/metadados de dependências distribuídas |
 | `build/appicon.png`, `build/windows/icon.ico` | Recursos-fonte de ícone do Wails |
 | `build/windows/info.json` | Metadados de identidade usados pela integração Windows do Wails |
@@ -43,19 +43,20 @@ Mapa conferido em 20/10/2026. Atualize junto com mudanças de responsabilidade, 
 |---|---|
 | `frontend/package.json`, `frontend/package-lock.json` | Dependências e scripts npm |
 | `frontend/tsconfig.json` | Configuração TypeScript |
-| `frontend/index.html` | Documento HTML de entrada do Vite/Wails |
+| `frontend/index.html` | Documento HTML de entrada do Vite/Wails; inicia o preload do vídeo da splash |
 | `frontend/public/animecaos-icon.png` | Ícone quadrado usado na sidebar recolhida e na identidade web |
 | `frontend/public/animecaos-wordmark.png` | Lettering transparente da sidebar expandida e da tela de carregamento |
+| `frontend/public/avatar_loop.webm` | Único asset da mascote na splash: loop VP9 local de 8 s/60 fps, pré-carregado no HTML; sem poster PNG ou fallback estático |
 | `frontend/public/anilist.ico`, `frontend/public/myanimelist.ico`, `frontend/public/discord.svg` | Ícones locais oficiais para identificar as integrações de conta e Rich Presence |
-| `frontend/public/mascots/` | Artes PNG transparentes da mascote: versão normal, mini superdeformed, miniatura 256 px, poses de abertura em `poses/` (a splash de produção usa a versão v2 de cabelo simplificado) e reações em `reactions/` para busca/lista vazias, erros recuperáveis, feedback, piscadela na Home e leitura no catálogo de mangás. Home e Mangás exibem suas reações no fim do conteúdo rolável |
+| `frontend/public/mascots/` | Artes PNG transparentes da mascote: versão normal, mini superdeformed, miniatura 256 px, poses e reações para busca/lista vazias, erros recuperáveis, feedback, piscadela na Home e leitura no catálogo de mangás. A splash de produção usa o WebM; Home e Mangás exibem suas reações no fim do conteúdo rolável |
 | `frontend/src/main.tsx` | Inicialização do React |
-| `frontend/src/App.tsx` | Splash de inicialização com imagem estática da mascote, fades da mascote e wordmark, barra de progresso com percentual e duração mínima de 3 s; navegação local, sidebar com links sociais, cabeçalho com busca contextual de anime/mangá, telas, estados vazios com reações e atalhos externos por ícones, cards com ano/episódios e preview de sinopse local-first, CTA “Ver anime” na Home e mascotes no fim do conteúdo rolável, descoberta de mangás com banner/categorias/prateleiras, busca compartilhada, reações contextuais em erros, retomada, capítulos/leitor, contas e Configurações com autosave e feedback via GitHub |
+| `frontend/src/App.tsx` | Splash de inicialização com vídeo local e wordmark em fade sincronizado, retry de vídeo, barra de progresso responsiva e estado de download do auto-update enquanto a interface fica bloqueada; navegação local, sidebar com links sociais, cabeçalho com busca contextual de anime/mangá, telas, estados vazios com reações e atalhos externos por ícones, cards com ano/episódios e preview de sinopse local-first, CTA “Ver anime” na Home e mascotes no fim do conteúdo rolável, descoberta de mangás com banner/categorias/prateleiras, busca compartilhada, reações contextuais em erros, retomada, capítulos/leitor, contas e Configurações com autosave e feedback via GitHub |
 | `frontend/splash-preview.html`, `frontend/src/splash-preview.tsx`, `frontend/src/splash-preview.css` | Página Vite separada para revisar a animação da splash continuamente, com progresso simulado, ajustes de amplitude/velocidade e reinício do ciclo; não é usada pelo app |
 | `frontend/src/StartupMascot.tsx` | Componente local de preview com Three.js; cria uma camada base e recortes alinhados das mechas laterais a partir dos pixels da arte original, deformando as pontas sem mover rosto ou corpo |
-| `frontend/src/api.ts` | Proxy tipado para Wails, métodos Desktop e eventos, incluindo sinal de fim da splash, descoberta MangaDex, filtro de categoria, AniList ID na prévia e operações de contas sem setters de credenciais MAL |
+| `frontend/src/api.ts` | Proxy tipado para Wails, métodos Desktop e eventos, incluindo sinal de fim da splash, status do auto-update, descoberta MangaDex, filtro de categoria, AniList ID na prévia e operações de contas sem setters de credenciais MAL |
 | `frontend/src/types.ts` | Tipos dos DTOs compartilhados com Go, incluindo manga/categoria/prateleiras, metadados de ano/formato e ID externo das contas; configurações não contêm Client ID MAL editável |
 | `frontend/src/Image.tsx` | Imagens com carregamento via backend e fallback |
-| `frontend/src/style.css` | Temas, splash responsiva com fade-in/fade-out na mascote e wordmark, barra de progresso espessa com percentual, componentes, layout responsivo, sidebar com atalhos sociais, carrosséis, previews, tiles monocromáticos responsivos de categorias, selo de qualidade, reações da mascote e atalhos iconográficos de links externos, descoberta de mangás e Configurações com switches, autosave e feedback |
+| `frontend/src/style.css` | Temas, splash responsiva com fade-in/fade-out sincronizado entre vídeo e wordmark, barra de progresso espessa com percentual e estado de retry, componentes, layout responsivo, sidebar com atalhos sociais, carrosséis, previews, tiles monocromáticos responsivos de categorias, selo de qualidade, reações da mascote e atalhos iconográficos de links externos, descoberta de mangás e Configurações com switches, autosave e feedback |
 | `frontend/src/App.test.tsx` | Testes DOM da interface; busca, CTA das capas na Home, prévia de sinopse MangaDex, leitor, integrações e configurações (autosave, debounce, serialização, retry, índice e navegação Contas) |
 
 As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atualmente, várias telas ainda vivem no mesmo `App.tsx`.
@@ -65,7 +66,8 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | Arquivo | Conteúdo |
 |---|---|
 | `service.go` | Composição, casos de uso, cancelamento, busca com limites por fase, prévia de metadados ancorada opcionalmente no AniList ID, descoberta MangaDex com cache, filtro por categoria, reprodução, consolidação do histórico de downloads offline, abertura segura da pasta de arquivos locais, ciclo de sessão do player, sincronização com Client ID MAL interno e eventos |
-| `updater.go` | Instalação de pacote já baixado/validado e saída para reinício |
+| `updater.go` | Checagem automática na inicialização para Windows/AppImage, progresso/status da splash, validação e instalação do pacote, além do fluxo manual e saída para reinício |
+| `updater_test.go` | Cobertura das plataformas elegíveis e do comportamento de seguir com a inicialização se a checagem de release falhar |
 | `images.go` | Busca/cache de imagem e recuperação de capas |
 | `service_test.go` | Busca canônica, cancelamento, autoplay concorrente, limpeza da sessão do player, mídia offline e live opt-in; o teste de stream registra o título/episódio de entrada e a resolução real |
 | `availability_test.go` | Preflight de disponibilidade: concorrência, cancelamento, cache, prazos e publicação parcial sem cards não validados |

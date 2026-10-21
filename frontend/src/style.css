@@ -501,7 +501,7 @@ main > header h2 { font-size: 1.15rem; }
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #151515;
+  background: #000;
   color: #f2f2f0;
 }
 .startup-splash-stage {
@@ -514,11 +514,13 @@ main > header h2 { font-size: 1.15rem; }
   gap: clamp(18px, 2vw, 28px);
 }
 .startup-splash-mascot-wrap {
+  position: relative;
   display: grid;
   place-items: center;
 }
 .startup-splash-mascot {
   display: block;
+  grid-area: 1 / 1;
   width: min(100%, 530px);
   height: min(82dvh, 700px);
   justify-self: center;
@@ -578,6 +580,23 @@ main > header h2 { font-size: 1.15rem; }
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
+.startup-splash-video-error {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  color: #f0aaa8;
+  font-size: .82rem;
+}
+.startup-splash-video-error button {
+  justify-self: start;
+  padding: 7px 10px;
+  border: 1px solid #5a3838;
+  border-radius: 6px;
+  background: #211818;
+  color: #f2f2f0;
+  cursor: pointer;
+}
+.startup-splash-video-error button:hover { background: #352020; }
 .startup-splash-art {
   opacity: 0;
   transition: opacity 560ms ease-out;
@@ -592,20 +611,28 @@ main > header h2 { font-size: 1.15rem; }
 }
 @media (max-width: 760px) {
   .startup-splash-stage {
-    width: min(540px, calc(100vw - 40px));
+    width: min(540px, calc(100vw - 32px));
     grid-template-columns: minmax(0, 1fr);
     justify-items: center;
-    gap: 18px;
+    gap: clamp(12px, 2dvh, 18px);
   }
-  .startup-splash-mascot { width: min(70vw, 320px); height: min(51dvh, 370px); }
+  .startup-splash-mascot { width: min(70vw, 320px); height: min(44dvh, 370px); }
   .startup-splash-brand { width: min(290px, 74vw); }
   .startup-splash-divider { margin-top: 8px; }
-  .startup-splash-label { margin-top: 18px; }
-  .startup-splash-progress { gap: 9px; margin-top: 16px; }
+  .startup-splash-label { margin-top: 14px; }
+  .startup-splash-progress { gap: 9px; margin-top: 12px; }
   .startup-splash-progress-track { height: 9px; }
 }
 @media (max-height: 620px) and (min-width: 761px) {
-  .startup-splash-mascot { height: 72dvh; }
+  .startup-splash-mascot { height: min(66dvh, 520px); }
+}
+@media (max-height: 480px) {
+  .startup-splash-stage { gap: 10px; }
+  .startup-splash-mascot { height: min(40dvh, 210px); }
+  .startup-splash-brand { width: min(260px, 55vw); }
+  .startup-splash-divider { margin-top: 6px; }
+  .startup-splash-label { margin-top: 10px; }
+  .startup-splash-progress { margin-top: 9px; }
 }
 @media (prefers-color-scheme: light) {
   .app[data-theme="system"] .brand-wordmark, .boot[data-theme="system"] .boot-logo { filter: invert(1); }

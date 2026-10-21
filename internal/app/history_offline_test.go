@@ -87,7 +87,9 @@ func TestHistoryMergesDownloadedPlaybackAndResumesOffline(t *testing.T) {
 	if err := service.Resume("resume", anime.Key()); err != nil {
 		t.Fatal(err)
 	}
-	if capture.path != videoPath || capture.position != 8 {
+	openedInfo, openedErr := os.Stat(capture.path)
+	wantedInfo, wantedErr := os.Stat(videoPath)
+	if openedErr != nil || wantedErr != nil || !os.SameFile(openedInfo, wantedInfo) || capture.position != 8 {
 		t.Fatalf("offline resume opened %q at %v; want %q at 8", capture.path, capture.position, videoPath)
 	}
 	service.onPlayer(player.State{Session: service.current.ID, Playing: true, Position: 14})

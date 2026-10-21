@@ -2,6 +2,12 @@
 
 Data: 20/10/2026. O escopo desta revisão também inclui os pacotes locais Windows/Linux com Firefox/GeckoDriver, MPV/FFmpeg/FFprobe e WebView2, CI, instaladores, update e material de licenças. O ZIP e instalador Windows e o AppImage foram recompilados; o smoke portátil Windows, o smoke completo do AppImage e os runtimes de mídia/navegador passaram localmente. O instalador não foi executado no perfil de desenvolvimento porque o mesmo AppId já tem uma entrada registrada. Esta revisão não publicou artefatos. A árvore Python antiga está preservada em `../Legacy/`.
 
+### [P2] Windows sem Authenticode quando não há certificado configurado — risco conhecido
+
+- **Evidência:** o repositório não tem os secrets `WINDOWS_CERTIFICATE_PFX_BASE64` e `WINDOWS_CERTIFICATE_PASSWORD`. O workflow publica ZIP e instalador sem assinatura Authenticode nesse caso e inclui um aviso nas notas e nos arquivos da release.
+- **Impacto:** o Windows pode mostrar aviso de editor desconhecido e a primeira execução pode exigir confirmação adicional. A assinatura Sigstore de `SHA256SUMS` autentica o manifesto, não fornece reputação Authenticode aos executáveis.
+- **Mitigação:** o atualizador valida o SHA-256 do pacote e a release identifica explicitamente a falta de assinatura. Para retirar esse aviso, será necessário configurar um certificado Authenticode válido nos secrets do GitHub.
+
 ### [P1] Pacotes não incluíam todos os runtimes que o app usa — corrigido no stage
 
 - **Evidência:** a configuração anterior podia depender de MPV/FFmpeg no `PATH`, Firefox/GeckoDriver do computador e do WebView2 Evergreen instalado. Isso fazia um app abrir em desenvolvimento e falhar em máquinas sem ferramentas externas.

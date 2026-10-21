@@ -25,6 +25,22 @@ function Stop-AppProcesses([string]$path) {
   Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" |
     Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($runtime, [StringComparison]::OrdinalIgnoreCase) } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
+  $deadline = [DateTime]::UtcNow.AddSeconds(15)
+  do {
+    $appStillRunning = Get-CimInstance Win32_Process -Filter "Name='AnimeCaos.exe'" |
+      Where-Object { $_.ExecutablePath -and $_.ExecutablePath.Equals($fullPath, [StringComparison]::OrdinalIgnoreCase) } |
+      Select-Object -First 1
+    $webViewStillRunning = Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe'" |
+      Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($runtime, [StringComparison]::OrdinalIgnoreCase) } |
+      Select-Object -First 1
+    if (-not $appStillRunning -and -not $webViewStillRunning) { return }
+    if ($appStillRunning) { Stop-Process -Id $appStillRunning.ProcessId -Force -ErrorAction SilentlyContinue }
+    if ($webViewStillRunning) { Stop-Process -Id $webViewStillRunning.ProcessId -Force -ErrorAction SilentlyContinue }
+    Start-Sleep -Milliseconds 250
+  } while ([DateTime]::UtcNow -lt $deadline)
+
+  if ($appStillRunning -or $webViewStillRunning) { throw "Os processos do app/WebView2 não encerraram: $fullPath" }
 }
 
 function Start-AppAndWaitForDatabase([string]$appPath, [string]$dataDir) {
@@ -91,6 +107,9 @@ $installedApp = Join-Path $installDir "AnimeCaos.exe"
 if (-not (Test-Path -LiteralPath $installedApp)) { throw "O instalador não criou $installedApp" }
 $beforeUpdate = Start-AppAndWaitForDatabase $installedApp $installData
 
+$updaterErrorPath = Join-Path $installDir 'updater-error.log'
+$startupErrorPath = Join-Path $installData 'startup-error.log'
+Remove-Item -LiteralPath $updaterErrorPath, $startupErrorPath -Force -ErrorAction SilentlyContinue
 $psi = [Diagnostics.ProcessStartInfo]::new($installedApp)
 $psi.UseShellExecute = $false
 foreach ($argument in @('--apply-update', $UpdateZip, '--target', $installDir, '--parent', '2147483647')) {
@@ -99,12 +118,36 @@ foreach ($argument in @('--apply-update', $UpdateZip, '--target', $installDir, '
 $helper = [Diagnostics.Process]::Start($psi)
 if (-not $helper.WaitForExit(120000)) { $helper.Kill(); throw "Updater não concluiu em 120 segundos" }
 if ($helper.ExitCode -ne 0) { throw "Helper do updater retornou código $($helper.ExitCode)" }
+if (Test-Path -LiteralPath $updaterErrorPath) {
+  $detail = Get-Content -LiteralPath $updaterErrorPath -Raw
+  throw "O helper do updater falhou: $detail"
+}
 $markerPath = Join-Path $installDir "THIRD-PARTY-NOTICES.md"
 if (-not (Test-Path -LiteralPath $markerPath)) { throw "O updater não instalou os arquivos do pacote novo" }
-Start-Sleep -Seconds 3
-$running = Get-CimInstance Win32_Process -Filter "Name='AnimeCaos.exe'" |
-  Where-Object { $_.ExecutablePath -and $_.ExecutablePath.Equals([IO.Path]::GetFullPath($installedApp), [StringComparison]::OrdinalIgnoreCase) }
-if (-not $running) { throw "O aplicativo atualizado não permaneceu aberto" }
+$deadline = [DateTime]::UtcNow.AddSeconds(60)
+$running = $null
+while ([DateTime]::UtcNow -lt $deadline) {
+  $running = Get-CimInstance Win32_Process -Filter "Name='AnimeCaos.exe'" |
+    Where-Object { $_.ExecutablePath -and $_.ExecutablePath.Equals([IO.Path]::GetFullPath($installedApp), [StringComparison]::OrdinalIgnoreCase) } |
+    Select-Object -First 1
+  if ($running) { break }
+  if (Test-Path -LiteralPath $updaterErrorPath) {
+    $detail = Get-Content -LiteralPath $updaterErrorPath -Raw
+    throw "O helper do updater falhou ao reiniciar o aplicativo: $detail"
+  }
+  if (Test-Path -LiteralPath $startupErrorPath) {
+    $detail = Get-Content -LiteralPath $startupErrorPath -Raw
+    throw "O aplicativo atualizado falhou ao iniciar: $detail"
+  }
+  Start-Sleep -Milliseconds 500
+}
+if (-not $running) {
+  $details = @()
+  if (Test-Path -LiteralPath $updaterErrorPath) { $details += "updater-error.log: $(Get-Content -LiteralPath $updaterErrorPath -Raw)" }
+  if (Test-Path -LiteralPath $startupErrorPath) { $details += "startup-error.log: $(Get-Content -LiteralPath $startupErrorPath -Raw)" }
+  $suffix = if ($details.Count) { " $($details -join '; ')" } else { '' }
+  throw "O aplicativo atualizado não permaneceu aberto em até 60 segundos.$suffix"
+}
 Stop-AppProcesses $installedApp
 $databasePath = Join-Path $installData "state.db"
 $afterUpdate = (Get-FileHash -LiteralPath $databasePath -Algorithm SHA256).Hash

@@ -43,7 +43,8 @@ Go/Wails valida o pacote e passa a operar após a migração.
 | `cd frontend; npm test -- --run` | Passou: 34/34. |
 | Parser YAML do Python (`yaml.safe_load`) nos dois workflows | Passou depois de corrigir a indentação das notas da release. |
 | CI `39529315094` no GitHub | Ubuntu passou em Go, `-race`, TypeScript e Vitest. Windows passou instalação/build frontend e falhou em `TestHistoryMergesDownloadedPlaybackAndResumesOffline`: alias 8.3 `RUNNER~1` e caminho longo identificavam o mesmo arquivo, mas a associação do download comparava apenas texto. Corrigido com `os.SameFile`; CI será repetido no próximo commit. |
-| Workflow de release e smoke de instalação em Windows/Linux | Ainda não executados nesta revisão; requer a tag `v3.0.0`. |
+| CI `39529998556` no GitHub | Passou em `windows-latest` e `ubuntu-24.04`; Ubuntu também passou `go test -race ./...`. |
+| Workflow de release `39530287789` | Os testes de release passaram em Windows e Ubuntu. O primeiro job Linux de pacote falhou antes de construir o AppImage porque o teste Firefox recebeu o caminho relativo do stage, mas `go test` executa a partir de `internal/providers`. Corrigido para usar o caminho absoluto e validar Firefox/GeckoDriver no stage; aguardando nova execução da tag `v3.0.0`. |
 
 Antes da pausa do build, o empacotador Windows já havia escrito um ZIP
 `AnimeCaos-3.0.0-windows-amd64.zip` de 673.047.323 bytes. O compilador Inno

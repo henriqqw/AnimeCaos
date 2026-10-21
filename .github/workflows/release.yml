@@ -263,6 +263,9 @@ jobs:
           go run ./cmd/package -version "$version"
           stage="$(find release -maxdepth 1 -type d -name 'stage-linux-*' | sort | tail -n 1)"
           [[ -n "$stage" ]] || { echo 'Stage Linux não encontrado' >&2; exit 1; }
+          stage="$(realpath "$stage")"
+          [[ -f "$stage/bin/firefox/firefox" ]] || { echo "Firefox empacotado não encontrado em $stage/bin/firefox/firefox" >&2; exit 1; }
+          [[ -f "$stage/bin/geckodriver" ]] || { echo "GeckoDriver empacotado não encontrado em $stage/bin/geckodriver" >&2; exit 1; }
           ANIMECAOS_BROWSER_TEST=1 ANIMECAOS_FIREFOX_PATH="$stage/bin/firefox/firefox" ANIMECAOS_GECKODRIVER_PATH="$stage/bin/geckodriver" go test ./internal/providers -run '^TestBundledFirefoxDynamicPlayerFixture$' -count=1 -v
           cp -a release/licenses "$stage/licenses/dependency-reports"
           mkdir -p "$stage/licenses/media"

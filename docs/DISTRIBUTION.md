@@ -56,7 +56,10 @@ No AppImage, o Firefox e o GeckoDriver são copiados com os bytes originais. O
 restaura os dois runtimes depois dessa etapa e gera a imagem final diretamente
 com o `appimagetool` incluído na ferramenta. `verify-appimage.sh` abre o
 AppImage, extrai e testa os próprios executáveis distribuídos e valida uma
-atualização com preservação do banco.
+atualização com preservação do banco. O workflow resolve o stage para caminho
+absoluto antes de executar testes Go: `go test` muda o diretório de trabalho
+para o diretório do pacote, portanto caminhos relativos ao repositório não
+identificam corretamente os runtimes no stage.
 
 ## Dependências de terceiros
 

@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-var Version = "3.0.4"
+var Version = "3.0.5"
 
 type Info struct {
 	Version     string `json:"version"`
@@ -266,6 +266,9 @@ func runHelper(packagePath, target string, pid int, launch func(string) error) e
 		return fmt.Errorf("destino de atualização inválido")
 	}
 	if e := waitParent(pid, 60*time.Second); e != nil {
+		return e
+	}
+	if e := prepareInstallDirectory(target); e != nil {
 		return e
 	}
 	var e error

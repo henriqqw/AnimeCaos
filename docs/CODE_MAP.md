@@ -157,9 +157,9 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/platform/process_windows.go`, `process_unix.go` | Opções de subprocesso e espera pelo processo anterior durante reinicialização |
 | `internal/platform/publish.go` | Publicação de arquivo temporário |
 | `internal/platform/publish_test.go` | Não sobrescrever arquivo já existente |
-| `internal/update/update.go` | Releases, checksum, staging, helper com diretório de trabalho fora da instalação, substituição, limpeza do stage e relançamento visível do app |
-| `internal/update/parent_windows.go`, `parent_unix.go` | Espera do processo pai por plataforma |
-| `internal/update/update_test.go` | Regras de versão, staging e atualização |
+| `internal/update/update.go` | Releases, checksum, staging, helper com diretório de trabalho fora da instalação, espera por processos do pacote, substituição, limpeza do stage e relançamento visível do app |
+| `internal/update/parent_windows.go`, `parent_unix.go` | Espera do processo pai; no Windows, localização dos processos dentro da instalação e encerramento do WebView2 empacotado |
+| `internal/update/update_test.go`, `parent_windows_test.go` | Regras de versão, staging, atualização e espera/encerramento de processos do pacote no Windows |
 
 ## Legado
 

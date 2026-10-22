@@ -45,12 +45,19 @@ Revisão base de 20/10/2026; atualização em 21/10/2026 após as releases `v3.0
 - **Correção:** ambos usam `platform.HideConsole`, que evita uma janela de console sem passar estado oculto ao processo gráfico. Um teste Windows confirma esses atributos de inicialização.
 - **Limite:** o teste de atributos não substitui a inspeção visual de uma instalação empacotada. Usuários que ficaram com uma instância oculta precisam encerrá-la e instalar manualmente a v3.0.2 uma vez, pois o helper da v3.0.1 é o código que executa o primeiro relançamento.
 
-### [P1] Auto-update não substituía a pasta instalada no Windows — correção publicada na v3.0.3; migração pendente nesta instalação
+### [P1] Auto-update não substituía a pasta instalada no Windows — correção do diretório de trabalho publicada na v3.0.3
 
 - **Evidência:** `updater-error.log` da instalação local registrou falha ao renomear `D:\AnimeCaosApp` por estar em uso; o manifesto permaneceu em `3.0.0` apesar do ZIP `3.0.2` baixado. `Apply` iniciava o helper sem definir `Cmd.Dir`, herdando o diretório atual da própria instalação. A splash só confirmava que o helper iniciou, não que a substituição terminou.
 - **Impacto:** a instalação antiga continuava sendo aberta; por isso o usuário não recebia a janela do MPV, cuja correção já estava na `3.0.1`.
 - **Correção:** o helper passa a usar a pasta pai do alvo como diretório atual. O stage também é removido quando a extração ou substituição falha.
-- **Cobertura/limite:** testes Go e o smoke Windows da release cobrem o diretório do helper, a atualização e a limpeza. Como as versões até `3.0.2` carregam o helper antigo, precisam executar o [setup da `3.0.3`](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.3/AnimeCaos-3.0.3-windows-setup.exe) manualmente uma vez. Nesta máquina, a splash chegou a 100% e mostrou “iniciando”, mas o app reabriu em `3.0.0`; o manifesto e o registro de desinstalação confirmam que a migração pelo setup ainda está pendente. A splash não confirma que a troca terminou.
+- **Cobertura/limite:** testes Go e o smoke da release cobriam o helper fora da pasta instalada, mas não o encerramento do WebView2 no fluxo real. A investigação atual confirmou um segundo bloqueio, detalhado abaixo. O caso `3.0.0` permanece como registro histórico da primeira falha.
+
+### [P1] Processos WebView2 podiam bloquear a troca da instalação Windows — corrigido na v3.0.5
+
+- **Evidência:** em 21/10/2026 às 21:09:28, `updater-error.log` registrou `rename D:\AnimeCaosDesktop ...: The process cannot access the file because it is being used by another process`. O ZIP local `AnimeCaos-3.0.4-windows-amd64.zip` tem SHA-256 `059b436d5652639cfea325cdb41443e350a40acd485bde109eb6e301f69e9812`, igual ao asset publicado e ao hash registrado em `verified_updates`. O manifesto da instalação continuou em `3.0.3`. O log não registra qual PID mantinha a pasta aberta.
+- **Causa provável:** o helper esperava apenas o processo principal do AnimeCaos. O smoke Windows encerrava também `msedgewebview2.exe` antes de tentar a troca, então não exercitava processos residuais do runtime no fluxo automático. A [documentação da Microsoft sobre processos WebView2](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/process-related-events) confirma o grupo de processos e a liberação de recursos após a saída do browser principal; ainda assim, não foi possível identificar retrospectivamente o PID desta tentativa.
+- **Correção:** o helper espera processos que executam arquivos da instalação e, após uma tolerância de três segundos, encerra somente `msedgewebview2.exe` da pasta `bin/webview2` empacotada. Se outro processo continuar usando a pasta, o log identifica nome e PID.
+- **Cobertura/limite:** testes Windows simulam um processo executável dentro da instalação e verificam que o helper espera ou encerra o WebView2 empacotado. A migração desta instalação de `3.0.3` para `3.0.5` ainda exige executar o setup manualmente uma vez, pois o helper `3.0.3` não contém essa correção.
 
 ### [P2] Encerramento curto podia marcar episódio como assistido na sincronização — corrigido
 

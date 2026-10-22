@@ -1,5 +1,35 @@
 # Testes e validação
 
+## Correção da troca da instalação no Windows — v3.0.5
+
+Evidência da tentativa real em 21/10/2026 às 21:09:28: o log do helper registrou
+que o Windows não conseguiu renomear `D:\AnimeCaosDesktop` por estar em uso.
+O ZIP v3.0.4 local tinha SHA-256
+`059b436d5652639cfea325cdb41443e350a40acd485bde109eb6e301f69e9812`, igual ao
+asset da release e ao hash salvo em `verified_updates`; o manifesto da pasta
+instalada permaneceu em v3.0.3. Assim, a falha ocorreu depois do download e da
+verificação, durante a troca do diretório.
+
+O erro prova que algum processo mantinha o diretório ocupado, mas o log não
+capturou seu PID. O WebView2 empacotado é o candidato mais provável: o smoke
+Windows encerra esse runtime antes da troca e a [documentação da Microsoft](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/process-related-events)
+descreve seu grupo de processos. O helper passa a esperar os processos que
+executam arquivos da instalação e, após três segundos, encerra somente o
+WebView2 empacotado. O teste Windows exercita espera e encerramento. A
+instalação de v3.0.3 ou anterior precisa
+rodar o setup da nova versão manualmente uma vez, pois o helper antigo não
+consegue atualizar a si próprio com essa correção.
+
+| Comando | Resultado |
+|---|---|
+| `gofmt -w internal/update/update.go internal/update/parent_windows.go internal/update/parent_unix.go internal/update/parent_windows_test.go` | Passou. |
+| `go test ./...` com `GOCACHE=D:\AnimeCaos\.task-cache\gocache` e `GOTMPDIR=D:\AnimeCaos\.task-cache\gotmp` | Passou em todos os pacotes no Windows amd64; `internal/update` executou os novos testes Windows. |
+| `go env CGO_ENABLED` | Retornou `0`; `go test -race ./...` não foi executado. |
+| `cd frontend; npm exec -- tsc --noEmit` | Passou sem diagnósticos. |
+| `cd frontend; npm test -- --run` | Passou: 1 arquivo e 35 testes. |
+| `git diff --check` | Passou; Git avisou apenas sobre conversão LF/CRLF no checkout Windows. |
+| Release workflow v3.0.5 | A publicação e os resultados de CI serão registrados após a pipeline. |
+
 ## Validação local da v3.0.4 — 21/10/2026
 
 | Comando | Resultado |

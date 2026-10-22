@@ -1,5 +1,12 @@
 # Changelog
 
+## Release Go/Wails v3.0.5
+
+- O helper de auto-update aguarda processos que ainda estejam executando arquivos dentro da instalação. Se o WebView2 fixo permanecer depois do fechamento do app, encerra apenas os processos desse runtime empacotado antes de trocar a pasta.
+- O log de falha agora identifica os processos que continuam usando a pasta se a troca ainda não puder ocorrer.
+- O teste Windows cobre um processo filho dentro da pasta instalada e o encerramento do WebView2 empacotado.
+- Quem estiver na v3.0.4 ou anterior deve instalar o setup v3.0.5 manualmente uma vez; os helpers antigos não incluem a espera pelo WebView2.
+
 ## Release Go/Wails v3.0.4
 
 - Publicada em 21/10/2026 pelo workflow `39693016202`; testes Windows/Ubuntu, smokes Windows/AppImage, checksums Sigstore e publicação passaram.

@@ -385,5 +385,17 @@ jobs:
           Instalações Windows até a v3.0.2 precisam executar o setup da v3.0.4 uma vez. O helper dessas versões não consegue substituir a própria pasta instalada. Depois da instalação manual, as atualizações automáticas voltam a funcionar.
           EOF
           fi
+          if [ "$tag" = "v3.0.5" ]; then
+            cat >> release/release-notes.md <<'EOF'
+
+          ### Correção do auto-update no Windows
+
+          O helper aguarda processos que ainda executam arquivos da instalação. Se o WebView2 fixo continuar aberto após o fechamento do AnimeCaos, encerra apenas os processos desse runtime empacotado antes de substituir a pasta. Falhas persistentes registram os processos que ainda mantêm a pasta em uso.
+
+          ### Aplicação da v3.0.5 em instalações existentes
+
+          Instalações Windows até a v3.0.4 precisam executar o setup da v3.0.5 uma vez. O helper dessas versões não inclui a espera pelo WebView2 e pode deixar a instalação antiga em uso.
+          EOF
+          fi
           gh release edit "$tag" --notes-file release/release-notes.md
           gh release edit "$tag" --draft=false

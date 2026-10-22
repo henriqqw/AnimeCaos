@@ -101,7 +101,7 @@ de mídia estão em [`licenses/SOURCE-OFFERS.md`](../licenses/SOURCE-OFFERS.md).
   ela não substitui o certificado Authenticode nem elimina o aviso de editor
   desconhecido do Windows.
 - A versão da tag deve coincidir com `wails.json` e com o `-version` do pacote.
-  A versão padrão atual é `3.0.4`. O atualizador verifica a release no começo
+  A versão padrão atual é `3.0.5`. O atualizador verifica a release no começo
   da splash, usa um limite de 8 s para a consulta, baixa o pacote com limite de
   30 min, confere `SHA256SUMS` e aplica ZIP Windows/AppImage antes de liberar a
   interface. O fluxo não vale para `wails dev` ou Flatpak.
@@ -236,16 +236,32 @@ publicação passaram. `/releases/latest` aponta para `v3.0.4`.
 | `AnimeCaos-3.0.4-windows-setup.exe` | 489.708.620 bytes | `014cad5b0ed7c3ad6add11835e02137571dfe35e0ecdc7982576772aa5eec43e` |
 | `AnimeCaos-3.0.4-x86_64.AppImage` | 342.972.920 bytes | `bf51130911e813695ac0fda1750655c76d3fa70105539d94d5120f8c49936e80` |
 
-As instalações Windows até a `v3.0.2` precisam executar o [setup Windows
-v3.0.4](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.4/AnimeCaos-3.0.4-windows-setup.exe)
-uma vez: o helper antigo não consegue substituir a pasta que está em uso.
-Depois, o auto-update volta a funcionar. A partir da v3.0.3, a atualização
-automática já usa o helper corrigido. Os executáveis Windows continuam sem
+As instalações Windows até a `v3.0.4` precisam executar o setup da v3.0.5
+manualmente uma vez. A investigação da instalação local mostrou que a v3.0.4
+baixava e validava o ZIP, mas o helper falhava ao renomear a pasta ainda em uso.
+O log não identificou o processo responsável; o WebView2 empacotado é o
+candidato mais provável, pois o smoke Windows encerra esse runtime antes da
+troca. O helper da v3.0.5 aguarda processos dentro da instalação e encerra
+apenas o WebView2 fixo empacotado. Os executáveis Windows continuam sem
 Authenticode; `WINDOWS-AUTHENTICODE-STATUS.txt` registra isso, e `SHA256SUMS`
 tem assinatura Sigstore.
 
 Os hashes acima foram lidos do `SHA256SUMS` baixado da release e conferidos
 contra os digests SHA-256 dos assets informados pela API do GitHub.
+
+## Correção do auto-update Windows — v3.0.5
+
+O helper agora espera processos que ainda executam arquivos da instalação. Se
+o runtime WebView2 empacotado continuar aberto três segundos após a saída do
+AnimeCaos, o helper encerra apenas os processos `msedgewebview2.exe` dentro de
+`bin/webview2` e aguarda o restante da instalação liberar a pasta. Se ainda
+houver bloqueio, `updater-error.log` registra nome e PID dos processos
+detectados. Testes Windows cobrem a espera de um processo filho e o encerramento
+do WebView2 empacotado.
+
+Como o helper antigo não contém essa correção, a migração para a v3.0.5 exige
+uma execução manual do setup. A publicação, o workflow e os hashes dos pacotes
+serão registrados após a conclusão da pipeline.
 
 ## Validação manual ainda exigida
 

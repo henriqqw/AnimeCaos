@@ -21,3 +21,5 @@ func waitParent(pid int, timeout time.Duration) error {
 	}
 	return fmt.Errorf("aplicativo ainda em execução")
 }
+
+func prepareInstallDirectory(string) error { return nil }

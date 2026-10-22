@@ -28,7 +28,8 @@ consegue atualizar a si próprio com essa correção.
 | `cd frontend; npm exec -- tsc --noEmit` | Passou sem diagnósticos. |
 | `cd frontend; npm test -- --run` | Passou: 1 arquivo e 35 testes. |
 | `git diff --check` | Passou; Git avisou apenas sobre conversão LF/CRLF no checkout Windows. |
-| Release workflow v3.0.5 | A publicação e os resultados de CI serão registrados após a pipeline. |
+| `gh run watch 39699014182 --exit-status --interval 15` | Passou: testes Windows/Ubuntu, smokes Windows de portátil/instalação/update/reinício/desinstalação, smoke AppImage, checksums Sigstore e publicação da v3.0.5. O smoke Windows encerra o WebView2 antes da troca; não reproduz processos residuais de uma atualização real N→N+1. |
+| `gh release download v3.0.5 --pattern SHA256SUMS --pattern SHA256SUMS.sigstore.json --dir .task-cache\release-meta-v305` | Passou; hashes do manifesto conferem com os digests SHA-256 dos três assets na API do GitHub. |
 
 ## Validação local da v3.0.4 — 21/10/2026
 

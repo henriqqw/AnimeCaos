@@ -256,12 +256,29 @@ o runtime WebView2 empacotado continuar aberto três segundos após a saída do
 AnimeCaos, o helper encerra apenas os processos `msedgewebview2.exe` dentro de
 `bin/webview2` e aguarda o restante da instalação liberar a pasta. Se ainda
 houver bloqueio, `updater-error.log` registra nome e PID dos processos
-detectados. Testes Windows cobrem a espera de um processo filho e o encerramento
-do WebView2 empacotado.
+detectados executando a partir da instalação. Testes Windows cobrem a espera de
+um processo filho e o encerramento do WebView2 empacotado.
 
 Como o helper antigo não contém essa correção, a migração para a v3.0.5 exige
-uma execução manual do setup. A publicação, o workflow e os hashes dos pacotes
-serão registrados após a conclusão da pipeline.
+uma execução manual do [setup Windows](https://github.com/henriqqw/AnimeCaos/releases/download/v3.0.5/AnimeCaos-3.0.5-windows-setup.exe).
+A release foi publicada em 21/10/2026 às 21:37 (horário de Brasília) pelo
+[workflow `39699014182`](https://github.com/henriqqw/AnimeCaos/actions/runs/39699014182).
+Os testes dos dois sistemas, os smokes Windows/AppImage, a assinatura Sigstore
+e a publicação passaram. O endpoint `/releases/latest` aponta para `v3.0.5`.
+
+| Arquivo | Tamanho | SHA-256 |
+|---|---:|---|
+| `AnimeCaos-3.0.5-windows-amd64.zip` | 669.971.759 bytes | `68133988e204719e3c3a2459ae0aa5f2ebbf86bac8a5ead9e7aa831fd3bfaaeb` |
+| `AnimeCaos-3.0.5-windows-setup.exe` | 489.709.126 bytes | `26f58fbe2c356d0a3eab870a4f1de984769c9479f26c7455243db36277475cb7` |
+| `AnimeCaos-3.0.5-x86_64.AppImage` | 342.972.920 bytes | `028bbb0336868eb02e13dc28ba9e4cf9dc559f931aee2a3b19d1e2384fa5c995` |
+
+Os hashes de `SHA256SUMS` conferem com os digests SHA-256 dos três assets
+informados pela API do GitHub. O manifesto de checksums também tem assinatura
+Sigstore. O smoke Windows instala e atualiza uma cópia descartável e encerra o
+WebView2 antes da troca; ele não simula uma migração real de `v3.0.3` para
+`v3.0.5` com processos residuais. Os testes unitários Windows cobrem a espera
+por um processo filho no diretório instalado e o encerramento do WebView2
+empacotado.
 
 ## Validação manual ainda exigida
 

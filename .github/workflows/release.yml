@@ -390,7 +390,7 @@ jobs:
 
           ### Correção do auto-update no Windows
 
-          O helper aguarda processos que ainda executam arquivos da instalação. Se o WebView2 fixo continuar aberto após o fechamento do AnimeCaos, encerra apenas os processos desse runtime empacotado antes de substituir a pasta. Falhas persistentes registram os processos que ainda mantêm a pasta em uso.
+          O helper aguarda processos que ainda executam arquivos da instalação. Se o WebView2 fixo continuar aberto após o fechamento do AnimeCaos, encerra apenas os processos desse runtime empacotado antes de substituir a pasta. Se a espera atingir o limite, o log lista os processos detectados dentro da instalação.
 
           ### Aplicação da v3.0.5 em instalações existentes
 

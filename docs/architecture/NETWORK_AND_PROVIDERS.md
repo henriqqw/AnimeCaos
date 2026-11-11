@@ -20,6 +20,19 @@ As fontes remotas mudam sem aviso. Os parsers têm fixtures locais para formatos
 
 A API envia títulos indexados por idioma, poster, backdrop, sinopse, áudio/estado/score; detalhes incluem IDs de episódios e metadados de temporada. A aplicação usa os IDs da API como identidade, paginação da resposta e títulos disponíveis para comparação. A resolução filtra streams sinalizados offline e preserva qualidade/áudio. O URL de mídia pode terminar em `.jpg` sem ser imagem: o backend detecta HLS pelo conteúdo e utiliza cabeçalhos `Origin`/`Referer` de AnimeFire.
 
+## AnimesFHD
+
+Adaptador JSON público em `https://animesfhd.net` (`animesfhd` no catálogo), sem chave nem cookie.
+
+| Operação | Requisição |
+|---|---|
+| Pesquisa | `GET /api/series?pagination=1&page={n}&per_page=24&q={termo}` |
+| Lista sem termo | Mesmo endpoint com `sort=popular` |
+| Obra e episódios | `GET /api/series/{id}?page={n}&per_page=200` |
+| Fontes | `GET /api/episodes/{id}` |
+
+`Search` faz uma chamada por página e usa `has_more`. `Details` percorre as páginas de episódios e só as versões declaradas na ficha (`versions[]`), com temporada e áudio explícitos; áudios do mesmo episódio viram uma linha. `Resolve` aceita apenas fontes nativas (MP4/HLS, sem `embed`) e detecta HLS pelo conteúdo quando a URL não diz. Todas as chamadas enviam `Referer: https://animesfhd.net/`. Legendas externas (`subtitle_url`) ainda não são encaminhadas porque `domain.Stream` não tem esse campo.
+
 ## AnimesOnlineCC
 
 Provedor secundário em `https://animesonlinecc.to`. Busca e detalhes são obtidos via HTML com goquery. Os seletores toleram alguns formatos de card e atributos alternativos de capa; URLs relativas são resolvidas em relação à página atual. A paginação é inferida pelos links `next` da página.

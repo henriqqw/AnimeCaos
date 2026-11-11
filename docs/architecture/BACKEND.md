@@ -2,7 +2,7 @@
 
 ## Composição
 
-`internal/app.Service` é o ponto de entrada da aplicação. `New` abre a base SQLite, cria o gateway de mídia e um cliente HTTP compartilhado; instancia o catálogo com AnimeFire, AnimesOnlineCC, SushiAnimes e Otakulogia, além de AniList, contas, Discord, MangaDex, player, fila e atualizador. Wails e CLI recebem a mesma instância de serviço e, portanto, compartilham as regras de negócio.
+`internal/app.Service` é o ponto de entrada da aplicação. `New` abre a base SQLite, cria o gateway de mídia e um cliente HTTP compartilhado; instancia o catálogo com AnimeFire, AnimesOnlineCC, SushiAnimes, Otakulogia e AnimesFHD, além de AniList, contas, Discord, MangaDex, player, fila e atualizador. Wails e CLI recebem a mesma instância de serviço e, portanto, compartilham as regras de negócio.
 
 | Pacote | Responsabilidade atual |
 |---|---|

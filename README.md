@@ -137,7 +137,7 @@ flowchart TD
   H --> S[Sincronização externa, quando conectada e elegível]
 ```
 
-A busca consulta AnimeFire, AnimesOnlineCC, SushiAnimes e Otakulogia, normaliza os resultados e só exibe candidatos cujo episódio de amostra passou pelo preflight. O backend seleciona e valida a fonte de mídia; URLs temporárias de stream não são tratadas como dados duráveis.
+A busca consulta AnimeFire, AnimesOnlineCC, SushiAnimes, Otakulogia e AnimesFHD, normaliza os resultados e só exibe candidatos cujo episódio de amostra passou pelo preflight. O backend seleciona e valida a fonte de mídia; URLs temporárias de stream não são tratadas como dados duráveis.
 
 ## Stack
 
@@ -160,7 +160,7 @@ O app **não expõe uma API HTTP/REST pública**. A UI usa métodos Go locais ge
 
 | Serviço | Uso |
 |---|---|
-| AnimeFire, AnimesOnlineCC, SushiAnimes, Otakulogia | Catálogo, temporadas, episódios e fontes de mídia |
+| AnimeFire, AnimesOnlineCC, SushiAnimes, Otakulogia, AnimesFHD | Catálogo, temporadas, episódios e fontes de mídia |
 | AniList | Descoberta, metadados e sincronização de progresso |
 | MyAnimeList | Perfil e sincronização; primeira conexão real pendente de validação |
 | MangaDex | Descoberta, busca, capas, capítulos e páginas de mangá |

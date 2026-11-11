@@ -85,6 +85,7 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 |---|---|
 | `internal/domain/models.go` | Modelos de anime, metadados canônicos de ano/formato/episódios, agrupamento provisório interno por consulta sazonal, títulos principais internos do AniList, episódio, stream, histórico, configurações sem credencial OAuth MAL editável, mangá/categoria/descoberta, capítulo com crédito do grupo de tradução, downloads e `AnimeProvider` |
 | `internal/providers/animefire.go` | Busca, detalhes e streams AnimeFire |
+| `internal/providers/animesfhd.go` | API pública AnimesFHD: busca paginada, versões explícitas em detalhes, identidade de episódios e resolução nativa MP4/HLS com cabeçalhos de origem |
 | `internal/providers/onlinecc.go` | Busca HTML, episódios, temporadas, opções de áudio, resolução de páginas estáticas/dinâmicas e fallback do RPC Blogger para mídia renderizada |
 | `internal/providers/sushi.go` | Busca HTML, episódios, temporadas e players AJAX; aceita `data-embed`/`data-id` e usa o extrator filtrado de player embutido como fallback |
 | `internal/providers/otakulogia.go` | Busca GraphQL, detalhes, grupos de temporada, variantes de áudio e verificação de acesso antes de retornar streams |
@@ -101,11 +102,13 @@ As telas e suas chamadas estão em [FRONTEND.md](architecture/FRONTEND.md). Atua
 | `internal/providers/search_intent.go` | Reconhece sufixos explícitos de temporada e ano de lançamento, produzindo consulta base sem remover esses qualificadores da correspondência final |
 | `internal/app/availability.go` | Preflight do E1 da temporada consultada, FFprobe opcional para faixas de áudio, pool 6/2, cache separado por temporada e comparação de qualidade para a resposta em lote |
 | `internal/providers/animefire_test.go` | Contrato, streams offline, cancelamento/recuperação e live opt-in |
+| `internal/providers/animesfhd_test.go` | Fixtures reais, busca sem N+1, versões/paginação, IDs, filtro de embeds, redirects MP4/HLS, erros, cancelamento e live opt-in |
+| `internal/providers/testdata/animesfhd/` | Seis amostras JSON públicas sem BOM: busca, populares, série, filme e respectivos episódios |
 | `internal/providers/onlinecc_test.go` | Números/temporadas explícitos, markup alternativo, áudio e política `no-referrer` |
 | `internal/providers/player_candidates_test.go` | Isolamento do player, filtragem de wrappers/trackers e seleção conservadora sem raiz de vídeo |
 | `internal/providers/browser_ad_proxy_test.go` | Bloqueio de hosts de anúncio em HTTP/CONNECT e passagem de requisições normais |
 | `internal/netx/advertising_test.go`, `internal/media/hls_test.go`, `gateway_test.go` | Redirecionamento normal preservado; redirects conhecidos de anúncio param antes da validação e do MPV |
-| `internal/providers/live_ad_audit_test.go` | Auditoria live opt-in da busca, player e validação de mídia nas quatro fontes registradas |
+| `internal/providers/live_ad_audit_test.go` | Auditoria live opt-in da busca, player e validação de mídia em AnimeFire, AnimesOnlineCC, SushiAnimes e Otakulogia |
 | `internal/providers/live_player_test.go` | Teste live opt-in específico por fonte: busca, detalhes, resolução, gateway local, codecs/dimensões, avanço e seek real no MPV |
 | `internal/providers/browser_test.go` | Fixtures locais que injetam iframe por JavaScript, isolam tracker externo, rejeitam protector e simulam mídia HTML5 disponível após reprodução silenciada |
 | `internal/providers/blogger_test.go` | Parser Blogger e testes live opt-in |

@@ -129,7 +129,7 @@ func New(parent context.Context, dir string, emit func(string, any)) (*Service, 
 	}
 	c := netx.New()
 	s := &Service{ctx: ctx, cancel: cancel, ops: map[string]operation{}, db: db, gateway: g, emit: emit, settings: db.Defaults(), discord: &integrations.Discord{}, imageSlots: make(chan struct{}, 3), availabilityCache: map[string]availabilityCacheEntry{}, startupUpdate: StartupUpdateStatus{State: "ready", Done: true}}
-	s.catalog = &providers.Catalog{Providers: []domain.AnimeProvider{providers.NewAnimeFire(c), providers.NewSushiAnimes(c), providers.NewOnlineCC(c), providers.NewOtakulogia(c)}, Store: db}
+	s.catalog = &providers.Catalog{Providers: []domain.AnimeProvider{providers.NewAnimeFire(c), providers.NewSushiAnimes(c), providers.NewOnlineCC(c), providers.NewOtakulogia(c), providers.NewAnimesFHD(c)}, Store: db}
 	s.metadata = integrations.NewMetadata(c, db)
 	s.accounts = integrations.NewAccounts(db, s.metadata)
 	s.manga = manga.New(c)

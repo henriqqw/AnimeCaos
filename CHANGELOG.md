@@ -1,5 +1,11 @@
 # Changelog
 
+## Não lançado
+
+- Adicionado AnimesFHD ao catálogo Go com busca paginada pela API pública, temporadas/áudios explícitos em detalhes e fontes nativas MP4/HLS. A busca do adaptador não consulta a ficha de cada resultado; o preflight existente da aplicação permanece ativo.
+- Adicionadas seis fixtures sem BOM, testes de contrato, paginação, redirecionamentos, falhas e cancelamento; consulta ao site e diagnóstico MPV disponíveis apenas por opt-in. Legendas externas ainda não são representadas no contrato de streams do app.
+- Cópias já consolidadas pela API não geram consultas adicionais; versões de áudio do mesmo episódio ficam numa linha com opções na resolução. Partes com numeração sobreposta retornam erro por falta de representação no domínio.
+
 ## Release Go/Wails v3.0.5
 
 - Publicada em 21/10/2026 (horário de Brasília) pelo workflow `39699014182`; testes, smokes Windows/AppImage, assinatura Sigstore e publicação passaram.

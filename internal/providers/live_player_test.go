@@ -38,6 +38,8 @@ func TestLiveProviderPlayerMPVE2E(t *testing.T) {
 			query = "Hunter x Hunter"
 		case "animefire":
 			query = "One Piece"
+		case "animesfhd":
+			query = "Frieren"
 		default:
 			t.Fatalf("unknown provider %q", providerName)
 		}
@@ -65,6 +67,8 @@ func TestLiveProviderPlayerMPVE2E(t *testing.T) {
 		provider = NewOnlineCC(client)
 	case "otakulogia":
 		provider = NewOtakulogia(client)
+	case "animesfhd":
+		provider = NewAnimesFHD(client)
 	default:
 		t.Fatalf("unknown provider %q", providerName)
 	}

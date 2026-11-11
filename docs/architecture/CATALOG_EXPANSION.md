@@ -22,7 +22,7 @@ IDs locais são identificados por `provider:id`. Um título semelhante é candid
 5. Limite a extração ao contêiner do player. Não transforme anúncios, iframes externos ou páginas de verificação em candidatos. Desafios de segurança que persistem são falha fechada; a integração não automatiza sua evasão.
 6. Passe os candidatos por `media.Validate`/`media.Best`, gateway e MPV. O preflight da busca só aprova um card depois de confirmar o episódio amostrado.
 
-O app usa AnimeFire, AnimesOnlineCC, SushiAnimes e Otakulogia na composição atual. O construtor e a interface do catálogo ficam em `internal/app/service.go` e `internal/domain/models.go`.
+O app usa AnimeFire, AnimesOnlineCC, SushiAnimes, Otakulogia e AnimesFHD na composição atual. O construtor e a interface do catálogo ficam em `internal/app/service.go` e `internal/domain/models.go`.
 
 ## Critérios de teste
 
